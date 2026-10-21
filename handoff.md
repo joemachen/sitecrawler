@@ -33,17 +33,21 @@ Stacking worked: after each squash merge,
 changes no content (`git diff --stat <old-tip> <branch>` empty) does not
 need a fresh CI run; the earlier green run tested the same tree.
 
-**Phase 4 (live crawl UI, v0.5.0) is built and waiting to be merged** as
-five stacked PRs, each based on the previous branch: #21
-`feat/crawl-control` (CrawlControl + CrawlSession + ADR-0007 + roadmap
-renumber), #22 `feat/web-shell` (tabs.py, rows.py, the one-page shell),
-#23 `feat/web-live` (start/pause/stop, polling, `serve` with no file),
-#24 `feat/web-detail` (detail pane, e2e, docs) and #25 `chore/release-v0.5.0`.
-Merge in order with squash; after each merge rebase the next with
-`git rebase --onto origin/main <old-base-tip> <branch>`,
-`git push --force-with-lease`, `gh pr edit N --base main`. Tag v0.5.0
-after the release PR lands. The roadmap now calls the live UI Phase 4 and
-JS rendering Phase 5 (later phases shifted by one).
+**Phase 4 (live crawl UI, v0.5.0) is built; one of its five stacked PRs
+is merged.** #21 `feat/crawl-control` (CrawlControl + CrawlSession +
+ADR-0007 + roadmap renumber) is on `main` (squash 37d7e41, 2026-10-21).
+Still open, each based on the previous branch and already rebased onto
+that merge: #26 `feat/web-shell` (tabs.py, rows.py, the one-page shell;
+it replaces #22, see the gotcha below), #23 `feat/web-live`
+(start/pause/stop, polling, `serve` with no file), #24 `feat/web-detail`
+(detail pane, e2e, docs) and #25 `chore/release-v0.5.0`. Merge in that
+order with squash **without deleting the head branch**; after each merge
+rebase the next with `git rebase --onto origin/main <old-base-tip>
+<branch>`, `git push --force-with-lease`, `gh pr edit N --base main`, and
+rebase the ones after it onto their new bases the same way. Tag v0.5.0
+after the release PR lands, then delete the branches. The roadmap now
+calls the live UI Phase 4 and JS rendering Phase 5 (later phases shifted
+by one).
 
 What exists now:
 
@@ -217,6 +221,11 @@ test, then regenerate `rules.md`.
   whitespace removed when asserting on a path.
 - `pydantic.Field(5000, ge=1)` reads as "no default" to mypy without the
   plugin; write `Field(default=5000, ge=1)`.
+- **Never `gh pr merge --delete-branch` on a PR that other PRs are based
+  on.** Deleting the base branch closed #22 and GitHub refused to reopen
+  it or change its base; #26 is the same branch re-filed against `main`.
+  Merge stacked PRs with `gh pr merge N --squash`, rebase and retarget the
+  next PR, and delete branches only at the end.
 
 ## Where to look next
 
