@@ -14,6 +14,7 @@ from sitecrawler.cli._run import err, run_crawl
 from sitecrawler.cli.audit_cmd import audit, issues
 from sitecrawler.cli.export_cmd import export
 from sitecrawler.cli.list_urls import list_urls
+from sitecrawler.cli.serve_cmd import serve
 from sitecrawler.models import CrawlConfig
 
 app = typer.Typer(
@@ -96,3 +97,4 @@ app.command("list")(list_urls)
 app.command("export")(export)
 app.command("audit")(audit)
 app.command("issues")(issues)
+app.command("serve")(serve)

@@ -10,5 +10,6 @@ newcomer. Copy `0000-template.md`, number it, fill it in, link it from the PR.
 | [0003](0003-httpx-asyncio-manual-redirects.md) | httpx + asyncio, redirects followed by hand | Accepted |
 | [0004](0004-one-crawl-per-file-and-resume.md) | One crawl per SQLite file, resumed from pending rows | Accepted |
 | [0005](0005-rules-as-code-and-docs.md) | Audit rules as discovered classes; docs generated from them | Accepted |
+| [0006](0006-web-ui-snapshot-and-client-grids.md) | Web UI serves an in-memory snapshot; grids filter client-side; assets vendored | Accepted |
 
 Statuses: Proposed, Accepted, Superseded by ####, Deprecated.

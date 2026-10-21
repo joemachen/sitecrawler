@@ -50,7 +50,7 @@ class TableDump:
     rows: list[tuple[Cell, ...]]
 
 
-_PAGE_COLUMNS = (
+PAGE_COLUMNS: tuple[str, ...] = (
     "url",
     "status",
     "outcome",
@@ -76,6 +76,7 @@ _PAGE_COLUMNS = (
     "indexable",
     "indexability_reason",
 )
+"""Column names of the ``pages`` dump, in order."""
 
 
 def _iso(value: datetime | None) -> str | None:
@@ -145,7 +146,7 @@ def dump_tables(store: Store) -> list[TableDump]:
             .order_by(PageRow.url, HreflangRow.id)
         ).all()
         return [
-            TableDump("pages", _PAGE_COLUMNS, [_page_row(p) for p in pages]),
+            TableDump("pages", PAGE_COLUMNS, [_page_row(p) for p in pages]),
             TableDump(
                 "issues",
                 ("url", "rule_id", "severity", "message"),

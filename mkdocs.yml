@@ -25,6 +25,7 @@ nav:
       - Exporting: user-guide/export.md
       - Auditing: user-guide/audit.md
       - Audit rules: user-guide/rules.md
+      - Browsing a crawl: user-guide/serve.md
   - Project:
       - Development process: DEVELOPMENT.md
       - Architecture: ARCHITECTURE.md
@@ -36,6 +37,7 @@ nav:
           - 0003 httpx and redirects: adr/0003-httpx-asyncio-manual-redirects.md
           - 0004 One crawl per file: adr/0004-one-crawl-per-file-and-resume.md
           - 0005 Rules as code and docs: adr/0005-rules-as-code-and-docs.md
+          - 0006 Web UI snapshot and grids: adr/0006-web-ui-snapshot-and-client-grids.md
   - API reference: reference.md
 
 markdown_extensions:

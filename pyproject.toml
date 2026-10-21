@@ -22,6 +22,9 @@ dependencies = [
   "httpx[http2]>=0.28",
   "sqlalchemy>=2.0",
   "openpyxl>=3.1",
+  "fastapi>=0.115",
+  "uvicorn>=0.34",
+  "jinja2>=3.1",
 ]
 
 [project.scripts]
@@ -110,6 +113,10 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 markers = [
   "live: hits the real network; never run in CI",
+]
+filterwarnings = [
+  # Starlette 1.9 prefers httpx2 for its test client; httpx 0.28 still works.
+  "ignore:Using `httpx` with `starlette.testclient` is deprecated:DeprecationWarning",
 ]
 
 [tool.coverage.run]
