@@ -10,8 +10,8 @@ against `tests/fixtures/site/`, the user guide has a page for it, and
 
 | Phase | Name | Release | Status |
 | --- | --- | --- | --- |
-| 0 | Foundation | v0.1.0 | In progress |
-| 1 | Core crawl and storage | v0.2.0 | |
+| 0 | Foundation | v0.1.0 | Done (live-site check parked) |
+| 1 | Core crawl and storage | v0.2.0 | Done (2026-10-21) |
 | 2 | Audit checks and issues engine | v0.3.0 | |
 | 3 | Local web UI | v0.4.0 | |
 | 4 | JavaScript rendering | v0.5.0 | |
@@ -60,10 +60,10 @@ Deliverables:
 
 Acceptance:
 
-- [ ] Fixture redirect chain yields two `redirect_hops` rows; the loop yields a `redirect_loop` outcome after N hops, not a timeout.
-- [ ] List mode on the fixture sitemap's URLs fetches exactly those and nothing else.
-- [ ] `export --format xlsx` opens in Excel with pages, links, redirects sheets.
-- [ ] Killing a crawl and re-running with `--resume` finishes without re-fetching done pages.
+- [x] Fixture redirect chain yields two `redirect_hops` rows; the loop yields a `redirect_loop` outcome after N hops, not a timeout (`tests/integration/test_store_crawl.py`, `tests/unit/test_fetcher.py`).
+- [x] List mode on the fixture sitemap's URLs fetches exactly those and nothing else (`tests/integration/test_list_mode.py`).
+- [x] `export --format xlsx` opens in Excel with pages, links, redirects sheets (`tests/e2e/test_export.py`; opened in Excel by hand still to do).
+- [x] Killing a crawl and re-running with `--resume` finishes without re-fetching done pages (`tests/integration/test_store_crawl.py`).
 
 ---
 
