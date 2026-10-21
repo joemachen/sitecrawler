@@ -57,3 +57,32 @@ def test_links_are_absolutised_and_filtered() -> None:
 def test_canonical_with_multiple_rel_values() -> None:
     html = '<link rel="alternate canonical" href="https://example.com/c">'
     assert parse_html(html, BASE).canonical == "https://example.com/c"
+
+
+def test_headings_metas_and_lang() -> None:
+    html = """
+    <html lang="en-GB"><head>
+      <meta name="ROBOTS" content="noindex, follow">
+    </head><body>
+      <h1>One</h1><h2>Two a</h2><h1>One again</h1><h2>Two b</h2>
+    </body></html>
+    """
+    page = parse_html(html, BASE)
+    assert page.lang == "en-GB"
+    assert page.meta_robots == "noindex, follow"
+    assert page.h1s == ["One", "One again"]
+    assert page.h2s == ["Two a", "Two b"]
+    assert page.h1 == "One"
+
+
+def test_anchors_carry_text_and_rel() -> None:
+    html = """
+    <a href="/a" rel="nofollow noopener">  Click <b>here</b> </a>
+    <a href="/b">plain</a>
+    """
+    page = parse_html(html, BASE)
+    assert [a.href for a in page.anchors] == page.links
+    assert page.anchors[0].text == "Click here"
+    assert page.anchors[0].rel == "nofollow noopener"
+    assert page.anchors[0].nofollow
+    assert not page.anchors[1].nofollow

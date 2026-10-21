@@ -55,6 +55,8 @@ def site(httpserver: HTTPServer) -> str:
     """
     base = httpserver.url_for("/").rstrip("/")
     httpserver.no_handler_status_code = 404
+    routes = json.loads((FIXTURE_SITE / "routes.json").read_text())
+    extra_headers: dict[str, dict[str, str]] = routes.get("headers", {})
 
     for file in sorted(FIXTURE_SITE.rglob("*")):
         if not file.is_file() or file.name == "routes.json":
@@ -65,11 +67,12 @@ def site(httpserver: HTTPServer) -> str:
             body = body.replace(b"<loc>/", f"<loc>{base}/".encode())
             body = body.replace(b"Sitemap: /", f"Sitemap: {base}/".encode())
         path = _url_path(file)
-        httpserver.expect_request(path).respond_with_data(body, content_type=content_type)
+        httpserver.expect_request(path).respond_with_data(
+            body, content_type=content_type, headers=extra_headers.get(path, {})
+        )
         if len(path) > 1 and path.endswith("/"):
             _redirect(httpserver, path[:-1], f"{base}{path}", status=301)
 
-    routes = json.loads((FIXTURE_SITE / "routes.json").read_text())
     for path, target in routes["redirects"].items():
         _redirect(httpserver, path, f"{base}{target}", status=302)
     return base

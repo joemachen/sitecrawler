@@ -8,6 +8,12 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `crawl --db crawl.db` stores the crawl in SQLite as it runs (tables
+  `crawls`, `pages`, `redirect_hops`, `page_html`, `links`, `sitemap_urls`),
+  and `--resume` continues an interrupted crawl without re-fetching finished
+  pages. With `--db`, `-o` writes the CSV from the store.
+- The parser now keeps every H1 and H2, `<meta name="robots">`, `<html lang>`
+  and each anchor's text and `rel`.
 - Every redirect hop (from, to, status) is recorded on each page record, and
   response headers plus body size are kept.
 - `redirect_loop` status: a chain that revisits a URL or exceeds

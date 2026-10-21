@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections import deque
+from collections.abc import Iterable
 from urllib.parse import urlparse
 
 from sitecrawler.crawl.urls import looks_like_page, normalize, same_site
@@ -25,20 +26,30 @@ class Frontier:
         self._seen: set[str] = set()
         self._queue: deque[QueueItem] = deque()
 
-    def add(self, url: str, depth: int, found_on: str) -> bool:
-        """Queue ``url`` if it is in scope and new. Returns True if it was queued."""
+    def add(self, url: str, depth: int, found_on: str) -> QueueItem | None:
+        """Queue ``url`` if it is in scope and new. Returns the queued item, else ``None``."""
         normalised = normalize(url, keep_query=self._keep_query, scheme=self._scheme)
         if normalised is None:
-            return False
+            return None
         if not same_site(urlparse(normalised).netloc, self._host):
-            return False
+            return None
         if not looks_like_page(normalised):
-            return False
+            return None
         if normalised in self._seen:
-            return False
+            return None
         self._seen.add(normalised)
-        self._queue.append(QueueItem(normalised, depth, found_on))
-        return True
+        item = QueueItem(normalised, depth, found_on)
+        self._queue.append(item)
+        return item
+
+    def mark_seen(self, urls: Iterable[str]) -> None:
+        """Treat ``urls`` as already known so :meth:`add` will not queue them again."""
+        self._seen.update(urls)
+
+    def restore(self, item: QueueItem) -> None:
+        """Re-queue an item from a previous run without re-checking scope."""
+        self._seen.add(item.url)
+        self._queue.append(item)
 
     def pop(self) -> QueueItem | None:
         """Take the next item, or ``None`` when the queue is empty."""
