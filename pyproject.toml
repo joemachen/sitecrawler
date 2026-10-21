@@ -1,6 +1,6 @@
 [project]
 name = "sitecrawler"
-version = "0.3.0"
+version = "0.4.0"
 description = "SEO site-audit crawler: crawl a site, store every page, report the issues."
 readme = "README.md"
 license = "MIT"

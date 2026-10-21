@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-21
+
+Phase 3: local web UI.
+
 ### Added
 
 - `sitecrawler serve crawl.db` opens the local web UI on
