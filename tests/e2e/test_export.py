@@ -1,0 +1,80 @@
+"""Crawl into a store, then export it in every format."""
+
+from __future__ import annotations
+
+import csv
+import json
+from pathlib import Path
+
+import pytest
+from openpyxl import load_workbook
+from typer.testing import CliRunner
+
+from sitecrawler.cli.main import app
+from sitecrawler.export import CSV_FIELDS
+
+runner = CliRunner()
+
+
+@pytest.fixture
+def db(site: str, tmp_path: Path) -> Path:
+    path = tmp_path / "crawl.db"
+    result = runner.invoke(
+        app, ["crawl", site, "--db", str(path), "--delay", "0", "--workers", "1"]
+    )
+    assert result.exit_code == 0, result.output
+    return path
+
+
+def test_export_xlsx_has_a_sheet_per_table(db: Path) -> None:
+    result = runner.invoke(app, ["export", str(db), "--format", "xlsx"])
+    assert result.exit_code == 0, result.output
+    out = db.with_suffix(".xlsx")
+    workbook = load_workbook(out, read_only=True)
+    try:
+        assert workbook.sheetnames == ["pages", "links", "redirects", "sitemap_urls"]
+        pages = list(workbook["pages"].iter_rows(values_only=True))
+        assert pages[0][0] == "url"
+        assert len(pages) == 1 + 13
+        redirects = list(workbook["redirects"].iter_rows(values_only=True))
+        # two hops for the chain, two for the loop, one for /blog -> /blog/
+        assert len(redirects) == 1 + 5
+        assert redirects[0] == ("url", "hop_no", "from_url", "to_url", "status_code")
+        assert len(list(workbook["sitemap_urls"].iter_rows(values_only=True))) == 1 + 4
+    finally:
+        workbook.close()
+
+
+def test_export_csv_matches_crawl_output(db: Path, site: str, tmp_path: Path) -> None:
+    out = tmp_path / "pages.csv"
+    result = runner.invoke(app, ["export", str(db), "-f", "csv", "-o", str(out)])
+    assert result.exit_code == 0, result.output
+    with out.open(newline="", encoding="utf-8") as fh:
+        reader = csv.DictReader(fh)
+        rows = {row["url"].removeprefix(site): row for row in reader}
+        assert reader.fieldnames == list(CSV_FIELDS)
+    assert len(rows) == 13
+    assert rows["/about"]["title"] == "About the Fixture Site"
+    assert rows["/loop-a"]["status"] == "redirect_loop"
+
+
+def test_export_json(db: Path, site: str) -> None:
+    result = runner.invoke(app, ["export", str(db), "-f", "json"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(db.with_suffix(".json").read_text(encoding="utf-8"))
+    assert data["crawl"]["status"] == "done"
+    assert data["crawl"]["start_url"] == site + "/"
+    assert len(data["pages"]) == 13
+    assert {row["url"].removeprefix(site) for row in data["redirects"]} == {
+        "/redirect-start",
+        "/loop-a",
+        "/blog",
+    }
+    assert all(row["src_url"] for row in data["links"])
+
+
+def test_export_rejects_missing_or_empty_db(tmp_path: Path) -> None:
+    assert runner.invoke(app, ["export", str(tmp_path / "none.db")]).exit_code == 2
+    empty = tmp_path / "empty.db"
+    empty.write_bytes(b"")
+    assert runner.invoke(app, ["export", str(empty)]).exit_code == 2

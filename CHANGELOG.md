@@ -8,6 +8,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `sitecrawler export crawl.db --format csv|xlsx|json`: csv is the pages table,
+  xlsx has one sheet per table (pages, links, redirects, sitemap_urls), json
+  holds the crawl summary and every table.
 - `sitecrawler list urls.txt` and `sitecrawler list -` fetch exactly the
   given URLs (any hosts, robots.txt and `--delay` per host); `--follow` also
   follows links within the listed hosts.
