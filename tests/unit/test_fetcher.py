@@ -188,3 +188,17 @@ async def test_repeated_headers_are_joined(respx_mock: respx.MockRouter, fetcher
     result = await fetcher.fetch("https://x.test/r")
 
     assert result.headers["x-robots-tag"] == "noindex, nofollow"
+
+
+async def test_hop_outside_scope_is_not_followed(respx_mock: respx.MockRouter) -> None:
+    respx_mock.get("https://x.test/go").mock(return_value=_redirect("https://other.test/landing"))
+    other = respx_mock.get("https://other.test/landing").mock(return_value=httpx.Response(200))
+
+    async with Fetcher("ua", 0, 5.0, hop_allowed=lambda url: "other.test" not in url) as fetcher:
+        result = await fetcher.fetch("https://x.test/go")
+
+    assert result.outcome is Outcome.FETCHED
+    assert result.status_code == 302
+    assert result.final_url == "https://other.test/landing"
+    assert len(result.hops) == 1
+    assert other.call_count == 0

@@ -98,14 +98,18 @@ class CrawlView:
         """True when ``url`` is on one of the crawl's hosts."""
         return strip_www(urlparse(url).netloc) in self.hosts
 
-    @staticmethod
-    def is_html_page(page: PageRecord) -> bool:
-        """True for pages whose HTML was parsed (fetched, HTML, status below 400)."""
+    def is_html_page(self, page: PageRecord) -> bool:
+        """True for pages whose own HTML was parsed.
+
+        Fetched as HTML with a status below 400, and not redirected to a
+        different page (that content belongs to the redirect's target).
+        """
         return (
             page.outcome is Outcome.FETCHED
             and "html" in page.content_type
             and page.status_code is not None
             and page.status_code < 400
+            and (not page.final_url or self.same_page(page.final_url, page.url))
         )
 
     @cached_property

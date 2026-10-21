@@ -15,8 +15,16 @@ All notable changes to this project are documented here. The format follows
 - Rule framework under `audit/`: `Rule`, `PageRule`, `HtmlPageRule`,
   `CrawlView`; rules are discovered from `audit/rules/` and the rules
   reference page is generated from them.
-- First rules: `response.4xx`, `response.5xx`, `response.error`,
-  `response.blocked_by_robots`.
+- Rules: `response.4xx`, `response.5xx`, `response.error`,
+  `response.blocked_by_robots`; `redirect.chain`, `redirect.loop`,
+  `redirect.to_error`, `redirect.off_site`, `redirect.temporary`,
+  `link.to_redirect`; `title.missing`, `title.duplicate`, `title.too_long`,
+  `title.too_short`, `title.multiple`, `title.same_as_h1`;
+  `meta_description.missing`, `.duplicate`, `.too_long`, `.too_short`,
+  `.multiple`; `h1.missing`, `h1.multiple`, `h1.duplicate`, `h1.too_long`,
+  `h2.missing`.
+- The fetcher stops at the first redirect hop that leaves the crawl's hosts
+  and reports the redirect instead of fetching the other site.
 - The parser keeps the title and meta description counts, `og:url`, hreflang
   alternates and `rel=prev/next`; the crawler keeps a `Link` header canonical.
   Stored in `page_html` and the new `hreflang` table; exports gain `issues`

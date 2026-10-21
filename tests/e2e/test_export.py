@@ -45,8 +45,8 @@ def test_export_xlsx_has_a_sheet_per_table(db: Path) -> None:
         assert pages[0][0] == "url"
         assert len(pages) == 1 + len(site_pages())
         redirects = list(workbook["redirects"].iter_rows(values_only=True))
-        # two hops for the chain, two for the loop, one each for /blog and /audit -> trailing slash
-        assert len(redirects) == 1 + 6
+        # chain 2, loop 2, /blog and /audit trailing-slash 301s, redirect-to-missing, off-site
+        assert len(redirects) == 1 + 8
         assert redirects[0] == ("url", "hop_no", "from_url", "to_url", "status_code")
         assert len(list(workbook["sitemap_urls"].iter_rows(values_only=True))) == 1 + 4
     finally:
@@ -78,6 +78,8 @@ def test_export_json(db: Path, site: str) -> None:
         "/loop-a",
         "/blog",
         "/audit",
+        "/audit/redirect-to-missing",
+        "/audit/redirect-off-site",
     }
     assert all(row["src_url"] for row in data["links"])
 
