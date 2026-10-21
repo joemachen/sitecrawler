@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections import Counter
 from collections.abc import Callable, Iterator
 from pathlib import Path
@@ -11,9 +12,8 @@ import pytest
 from sitecrawler.models import CrawlConfig
 from sitecrawler.session import CrawlSession, SessionState, SessionStatus
 from sitecrawler.store import open_store
-from tests.conftest import site_pages
+from tests.conftest import settled, site_pages, wait_until
 from tests.integration.test_audit import TRIGGERS
-from tests.unit.test_session import settled, wait_until
 
 
 @pytest.fixture
@@ -36,7 +36,7 @@ def test_live_crawl_matches_the_cli_audit(
     assert state.status is SessionStatus.DONE
     assert state.done == len(pages)
     assert state.queued == 0
-    _, result, _ = session.audit()
+    result = session.audit().result
     assert result is not None
     counts = Counter(i.rule_id for i in result.issues)
     for rule_id, paths in TRIGGERS.items():
@@ -77,7 +77,9 @@ def test_open_audited_file_is_read_only_and_complete(audited_db: Path, tmp_path:
     assert state.audit_rev == 1
     assert state.started_at is not None
     assert state.finished_at is not None
-    _rev, result, view = session.audit()
+    assert abs(time.time() - state.started_at) < 600, "store datetimes are UTC, not local"
+    assert state.finished_at >= state.started_at
+    result, view = session.audit().result, session.audit().view
     assert result is not None
     assert view is not None
     with open_store(audited_db) as store:
@@ -90,7 +92,7 @@ def test_open_audited_file_is_read_only_and_complete(audited_db: Path, tmp_path:
 def test_open_unaudited_file_audits_in_memory_only(crawled_db: Path, tmp_path: Path) -> None:
     session = CrawlSession.open(crawled_db, tmp_path / "crawls")
 
-    _, result, _ = session.audit()
+    result = session.audit().result
     assert result is not None
     assert len(result.verdicts) == len(site_pages())
     assert Counter(i.rule_id for i in result.issues)["title.missing"] == len(

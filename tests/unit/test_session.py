@@ -14,8 +14,14 @@ from sitecrawler.crawl import CrawlControl
 from sitecrawler.crawl.crawler import ProgressCallback
 from sitecrawler.crawl.sink import CrawlSink
 from sitecrawler.models import CrawlConfig, Outcome, PageRecord, QueueItem
-from sitecrawler.session import CrawlSession, SessionBusyError, SessionState, SessionStatus
+from sitecrawler.session import (
+    AuditSnapshot,
+    CrawlSession,
+    SessionBusyError,
+    SessionStatus,
+)
 from sitecrawler.store import open_store
+from tests.conftest import settled, wait_until
 
 SITE = "https://example.test"
 CONFIG = CrawlConfig(start_url=f"{SITE}/")
@@ -89,23 +95,6 @@ def _session(tmp_path: Path, **kwargs: object) -> CrawlSession:
     )
 
 
-def wait_until(
-    session: CrawlSession, predicate: Callable[[SessionState], bool], timeout: float = 10.0
-) -> SessionState:
-    deadline = time.monotonic() + timeout
-    while True:
-        state = session.state()
-        if predicate(state):
-            return state
-        if time.monotonic() > deadline:
-            pytest.fail(f"timed out waiting; last state {state}")
-        time.sleep(0.005)
-
-
-def settled(state: SessionState) -> bool:
-    return not state.status.active
-
-
 @pytest.fixture
 def session(tmp_path: Path) -> Iterator[CrawlSession]:
     s = _session(tmp_path)
@@ -117,10 +106,10 @@ def test_idle_state(session: CrawlSession) -> None:
     state = session.state()
     assert state.status is SessionStatus.IDLE
     assert state.db is None
-    assert state.done == state.seq == 0
+    assert state.done == 0
     assert state.elapsed == 0.0
     assert session.records_since(0) == []
-    assert session.audit() == (0, None, None)
+    assert session.audit() == AuditSnapshot(0)
 
 
 def test_full_run_reaches_done_and_persists(session: CrawlSession, tmp_path: Path) -> None:
@@ -133,18 +122,18 @@ def test_full_run_reaches_done_and_persists(session: CrawlSession, tmp_path: Pat
     state = wait_until(session, settled)
 
     assert state.status is SessionStatus.DONE
-    assert state.done == state.seq == 5
+    assert state.done == 5
     assert state.queued == 0
     assert state.audit_rev >= 1
     assert state.error == ""
     assert state.finished_at is not None
     assert len(session.records_since(3)) == 2
     assert session.sitemap_urls == {f"{SITE}/p0"}
-    rev, result, view = session.audit()
-    assert rev == state.audit_rev
-    assert result is not None
-    assert view is not None
-    assert len(result.verdicts) == 5
+    audit = session.audit()
+    assert audit.rev == state.audit_rev
+    assert audit.result is not None
+    assert audit.view is not None
+    assert len(audit.result.verdicts) == 5
     with open_store(started.db) as store:
         assert store.crawl().status == "done"
         assert len(store.indexability()) == 5
@@ -261,7 +250,7 @@ def test_clear_returns_to_idle(session: CrawlSession) -> None:
     assert state.db is None
     assert state.done == 0
     assert session.records_since(0) == []
-    assert session.audit() == (0, None, None)
+    assert session.audit() == AuditSnapshot(0)
 
 
 def test_restart_opens_a_new_file(session: CrawlSession) -> None:

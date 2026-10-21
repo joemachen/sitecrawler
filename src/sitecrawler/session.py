@@ -23,7 +23,7 @@ import threading
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, fields
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Protocol
@@ -106,18 +106,15 @@ class SessionState:
     read_only: bool = False
     """True for a stored crawl opened with :meth:`CrawlSession.open`."""
     done: int = 0
-    """Pages fetched so far; also the next ``seq`` for :meth:`CrawlSession.records_since`."""
+    """Pages fetched so far. Records are numbered in arrival order, so this is
+    also the next position for :meth:`CrawlSession.records_since`."""
     queued: int = 0
     audit_rev: int = 0
     """Incremented every time the audit has run; 0 until it has."""
     started_at: float | None = None
+    """Unix time."""
     finished_at: float | None = None
     error: str = ""
-
-    @property
-    def seq(self) -> int:
-        """Alias of :attr:`done`: records are numbered in arrival order."""
-        return self.done
 
     @property
     def elapsed(self) -> float:
@@ -126,6 +123,15 @@ class SessionState:
             return 0.0
         end = self.finished_at if self.finished_at is not None else time.time()
         return max(0.0, end - self.started_at)
+
+
+@dataclass(slots=True, frozen=True)
+class AuditSnapshot:
+    """The latest audit a session has run. ``result`` and ``view`` are None until the first."""
+
+    rev: int
+    result: AuditResult | None = None
+    view: CrawlView | None = None
 
 
 class _SessionSink:
@@ -187,7 +193,11 @@ class CrawlSession:
         self._runner_factory = runner_factory
         self._rules: Sequence[Rule] = load_rules()
         self._lock = threading.Lock()
+        """Guards every field set in :meth:`_reset_state`; held briefly, never while joining."""
         self._cond = threading.Condition()
+        """Wakes the audit thread; guards ``_dirty``, ``_audit_stop`` and ``_next_audit_at``."""
+        self._transition = threading.RLock()
+        """Serialises start, clear and close, which join threads and rebuild the state."""
         self._crawl_thread: threading.Thread | None = None
         self._audit_thread: threading.Thread | None = None
         self._reset_state()
@@ -265,36 +275,41 @@ class CrawlSession:
             SessionBusyError: a crawl is running.
             ValueError: the config is invalid (bad start URL). No file is left behind.
         """
-        with self._lock:
-            self._require("start", *_SETTLED)
-        self._join_threads()
-        self._reset_state()
-        path = self._new_db_path(config)
-        store = open_store(path)
-        control = CrawlControl()
-        try:
-            runner = self._runner_factory(config, _SessionSink(store, self), control)
-        except ValueError:
-            store.close()
-            for side in ("", "-wal", "-shm"):
-                path.with_name(path.name + side).unlink(missing_ok=True)
-            raise
-        with self._lock:
-            self._config = config
-            self._db = path
-            self._control = control
-            self._status = SessionStatus.RUNNING
-            self._started_at = time.time()
-            self._next_audit_at = time.monotonic() + self._audit_interval
-        self._audit_thread = threading.Thread(
-            target=self._audit_loop, name="sitecrawler-audit", daemon=True
-        )
-        self._crawl_thread = threading.Thread(
-            target=self._run_crawl, args=(runner, store), name="sitecrawler-crawl", daemon=True
-        )
-        self._audit_thread.start()
-        self._crawl_thread.start()
-        return self.state()
+        with self._transition:
+            with self._lock:
+                self._require("start", *_SETTLED)
+            self._join_threads()
+            self._reset_state()
+            path = self._new_db_path(config)
+            store = open_store(path)
+            control = CrawlControl()
+            try:
+                runner = self._runner_factory(config, _SessionSink(store, self), control)
+            except ValueError:
+                store.close()
+                for side in ("", "-wal", "-shm"):
+                    path.with_name(path.name + side).unlink(missing_ok=True)
+                raise
+            with self._lock:
+                self._config = config
+                self._db = path
+                self._control = control
+                self._status = SessionStatus.RUNNING
+                self._started_at = time.time()
+            with self._cond:
+                self._next_audit_at = time.monotonic() + self._audit_interval
+            self._audit_thread = threading.Thread(
+                target=self._audit_loop, name="sitecrawler-audit", daemon=True
+            )
+            self._crawl_thread = threading.Thread(
+                target=self._run_crawl,
+                args=(runner, store),
+                name="sitecrawler-crawl",
+                daemon=True,
+            )
+            self._audit_thread.start()
+            self._crawl_thread.start()
+            return self.state()
 
     def pause(self) -> SessionState:
         """Hold the crawl once in-flight fetches finish. ``SessionBusyError`` unless running."""
@@ -326,19 +341,21 @@ class CrawlSession:
 
     def clear(self) -> SessionState:
         """Forget the loaded crawl and go back to idle. Raises ``SessionBusyError`` while active."""
-        with self._lock:
-            self._require("clear", *_SETTLED)
-        self._join_threads()
-        self._reset_state()
-        return self.state()
+        with self._transition:
+            with self._lock:
+                self._require("clear", *_SETTLED)
+            self._join_threads()
+            self._reset_state()
+            return self.state()
 
     def close(self) -> None:
         """Stop whatever is running and wait for the threads to finish."""
-        with self._lock:
-            self._control.stop()
-            if self._status in (SessionStatus.RUNNING, SessionStatus.PAUSED):
-                self._status = SessionStatus.STOPPING
-        self._join_threads()
+        with self._transition:
+            with self._lock:
+                self._control.stop()
+                if self._status in (SessionStatus.RUNNING, SessionStatus.PAUSED):
+                    self._status = SessionStatus.STOPPING
+            self._join_threads()
 
     # ------------------------------------------------------------- reading
     def state(self) -> SessionState:
@@ -362,10 +379,10 @@ class CrawlSession:
         with self._lock:
             return self._records[seq:]
 
-    def audit(self) -> tuple[int, AuditResult | None, CrawlView | None]:
-        """The latest audit as ``(revision, result, view)``; the latter two are None at first."""
+    def audit(self) -> AuditSnapshot:
+        """The latest audit."""
         with self._lock:
-            return self._audit_rev, self._audit_result, self._audit_view
+            return AuditSnapshot(self._audit_rev, self._audit_result, self._audit_view)
 
     @property
     def config(self) -> CrawlConfig:
@@ -421,8 +438,11 @@ class CrawlSession:
             self._status = SessionStatus.FINISHING
         self._stop_auditor()
         try:
-            self._run_audit()
-            _, result, _ = self.audit()
+            with self._cond:
+                stale = self._dirty
+            if stale or self.audit().result is None:
+                self._run_audit()
+            result = self.audit().result
             if result is not None:
                 store.replace_issues(result.issues)
                 store.set_indexability(result.verdicts)
@@ -508,4 +528,5 @@ class CrawlSession:
 
 
 def _timestamp(value: datetime | None) -> float | None:
-    return value.timestamp() if value is not None else None
+    """Unix time of a store datetime, which is UTC with the tzinfo stripped."""
+    return value.replace(tzinfo=UTC).timestamp() if value is not None else None
