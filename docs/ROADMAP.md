@@ -14,13 +14,14 @@ against `tests/fixtures/site/`, the user guide has a page for it, and
 | 1 | Core crawl and storage | v0.2.0 | Done (2026-10-21) |
 | 2 | Audit checks and issues engine | v0.3.0 | Done (2026-10-21) |
 | 3 | Local web UI | v0.4.0 | Done (2026-10-21) |
-| 4 | JavaScript rendering | v0.5.0 | |
-| 5 | Custom extraction and search | v0.6.0 | |
-| 6 | XML sitemap audit and generation | v0.7.0 | |
-| 7 | Internal linking analysis | v0.8.0 | |
-| 8 | Duplicate content detection | v0.9.0 | |
-| 9 | Structured data validation | v1.0.0 | |
-| 10 | API integrations | v1.x | |
+| 4 | Live crawl UI | v0.5.0 | In progress |
+| 5 | JavaScript rendering | v0.6.0 | |
+| 6 | Custom extraction and search | v0.7.0 | |
+| 7 | XML sitemap audit and generation | v0.8.0 | |
+| 8 | Internal linking analysis | v0.9.0 | |
+| 9 | Duplicate content detection | v0.10.0 | |
+| 10 | Structured data validation | v1.0.0 | |
+| 11 | API integrations | v1.x | |
 
 ---
 
@@ -123,7 +124,37 @@ through `PageRecord`, which has no verdict field.
 
 ---
 
-## Phase 4: JavaScript rendering
+## Phase 4: Live crawl UI
+
+**Goal:** the Screaming Frog experience in the browser: start a crawl, watch
+the tabs fill, click through to any URL.
+
+- `sitecrawler serve` with no file opens an empty session. A URL bar with
+  Start, Pause, Resume, Stop and Clear, a progress bar, and new crawls
+  written to `crawls/<host>-<timestamp>.db`. `serve crawl.db` still opens a
+  stored crawl, read-only.
+- Three panes: a tab strip (Internal, External, Response Codes, URL, Page
+  Titles, Meta Description, H1, H2, Canonicals, Pagination, Directives,
+  Hreflang, Links, Sitemaps, Issues) with a filter dropdown per tab over a
+  grid; a right-hand Overview tree with a count per filter; a bottom detail
+  pane for the selected URL (details, inlinks, outlinks, redirect chain,
+  headers, hreflang, issues).
+- Filters are the audit rules wherever one exists (Page Titles > Missing is
+  `title.missing`) plus computed columns such as title length. The audit
+  re-runs while pages arrive and is written to the file when the crawl ends.
+- The crawler gains pause and stop (`CrawlControl`); `CrawlSession` runs it
+  on a worker thread and the browser polls for new rows (ADR-0007).
+
+Acceptance:
+
+- [ ] Starting a crawl of the fixture site from the UI ends with the page count and every rule-backed filter count equal to the audit test's numbers.
+- [ ] Stop mid-crawl leaves `crawls.status = stopped` and the UI shows the partial crawl.
+- [ ] A Playwright test drives URL, Start, a tab and filter, a row, the detail sub-tabs and a sidebar count.
+- [ ] `serve crawl.db` shows a stored, audited crawl with the same numbers as v0.4.0.
+
+---
+
+## Phase 5: JavaScript rendering
 
 **Goal:** see what Google sees on JS-heavy and app-injected pages.
 
@@ -140,7 +171,7 @@ Acceptance:
 
 ---
 
-## Phase 5: Custom extraction and custom search
+## Phase 6: Custom extraction and custom search
 
 **Goal:** pull anything off any page, across a whole site.
 
@@ -157,7 +188,7 @@ Acceptance:
 
 ---
 
-## Phase 6: XML sitemap audit and generation
+## Phase 7: XML sitemap audit and generation
 
 **Goal:** sitemaps that match reality.
 
@@ -172,7 +203,7 @@ Acceptance:
 
 ---
 
-## Phase 7: Internal linking analysis
+## Phase 8: Internal linking analysis
 
 **Goal:** the quick wins.
 
@@ -189,7 +220,7 @@ Acceptance:
 
 ---
 
-## Phase 8: Duplicate and near-duplicate content
+## Phase 9: Duplicate and near-duplicate content
 
 - Exact duplicates via content hash of main text (boilerplate stripped).
 - Near-duplicates via SimHash with a configurable Hamming threshold; clusters reported with a representative URL.
@@ -202,7 +233,7 @@ Acceptance:
 
 ---
 
-## Phase 9: Structured data validation
+## Phase 10: Structured data validation
 
 - Extract JSON-LD, microdata and RDFa (`extruct`).
 - Validate types and properties against the schema.org vocabulary (bundled JSON-LD, updated by a script).
@@ -215,7 +246,7 @@ Acceptance:
 
 ---
 
-## Phase 10: API integrations (future)
+## Phase 11: API integrations (future)
 
 Each integration is an `Enricher`: given URLs, return extra columns stored in
 the crawl DB and shown next to crawl data.

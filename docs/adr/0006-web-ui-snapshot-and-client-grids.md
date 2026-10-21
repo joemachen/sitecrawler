@@ -1,6 +1,6 @@
 # ADR-0006: Serve a crawl from an in-memory snapshot with client-side grids
 
-**Status:** Accepted
+**Status:** Accepted (the "restart to refresh" consequence is superseded by ADR-0007)
 **Date:** 2026-10-21
 
 ## Context

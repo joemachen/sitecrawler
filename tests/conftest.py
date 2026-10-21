@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import re
+import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
@@ -15,9 +17,30 @@ from werkzeug.wrappers import Request, Response
 from sitecrawler.audit import CrawlView, run_audit
 from sitecrawler.crawl import Crawler
 from sitecrawler.models import CrawlConfig
+from sitecrawler.session import CrawlSession, SessionState
 from sitecrawler.store import open_store
 
 FIXTURE_SITE = Path(__file__).parent / "fixtures" / "site"
+
+
+def wait_until(
+    session: CrawlSession, predicate: Callable[[SessionState], bool], timeout: float = 10.0
+) -> SessionState:
+    """Poll ``session.state()`` until ``predicate`` holds; fail the test on timeout."""
+    deadline = time.monotonic() + timeout
+    while True:
+        state = session.state()
+        if predicate(state):
+            return state
+        if time.monotonic() > deadline:
+            pytest.fail(f"timed out waiting; last state {state}")
+        time.sleep(0.005)
+
+
+def settled(state: SessionState) -> bool:
+    """True once no crawl thread is doing anything (idle, done, stopped or error)."""
+    return not state.status.active
+
 
 _CONTENT_TYPES = {
     ".html": "text/html; charset=utf-8",

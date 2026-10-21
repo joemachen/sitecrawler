@@ -7,6 +7,7 @@ import logging
 from collections.abc import Callable
 from urllib.parse import urljoin, urlparse
 
+from sitecrawler.crawl.control import POLL_SECONDS, CrawlControl
 from sitecrawler.crawl.fetcher import Fetcher
 from sitecrawler.crawl.frontier import Frontier
 from sitecrawler.crawl.robots import RobotsCache
@@ -48,10 +49,19 @@ class Crawler:
 
     ``run`` drives an asyncio event loop internally; call :meth:`arun` instead
     from code that already has one.
+
+    A ``control`` lets another thread pause, resume or stop the crawl while it
+    runs (see :class:`~sitecrawler.crawl.control.CrawlControl`). A stopped
+    crawl tells its sink it is incomplete, so the file can be resumed later.
     """
 
     def __init__(
-        self, config: CrawlConfig, *, sink: CrawlSink | None = None, resume: bool = False
+        self,
+        config: CrawlConfig,
+        *,
+        sink: CrawlSink | None = None,
+        resume: bool = False,
+        control: CrawlControl | None = None,
     ) -> None:
         """Validate the start URL or seed list and prepare (but do not start) the crawl."""
         if resume and sink is None:
@@ -60,6 +70,7 @@ class Crawler:
         self.config = config
         self.sink = sink
         self.resume = resume
+        self.control = control if control is not None else CrawlControl()
         self.list_mode = bool(config.seed_urls)
         self.robots = RobotsCache(config.user_agent)
         self.records: list[PageRecord] = []
@@ -270,30 +281,45 @@ class Crawler:
             done = await self._crawl_loop(on_progress, done)
 
         self.records.sort(key=lambda r: r.url)
-        if len(self.frontier):
+        stopped = self.control.stopping
+        if stopped:
+            log.info("stopped on request with %d URLs unvisited", len(self.frontier))
+        elif len(self.frontier):
             log.warning(
                 "stopped at max_pages=%d with %d URLs unvisited",
                 self.config.max_pages,
                 len(self.frontier),
             )
         if self.sink is not None:
-            self.sink.finish(pages_done=done, complete=len(self.frontier) == 0)
+            self.sink.finish(pages_done=done, complete=len(self.frontier) == 0 and not stopped)
         return self.records
 
     async def _crawl_loop(self, on_progress: ProgressCallback | None, done: int) -> int:
         limit = self.config.max_pages
+        control = self.control
         inflight: dict[asyncio.Task[_Processed], QueueItem] = {}
         try:
             while (len(self.frontier) or inflight) and done < limit:
-                while len(inflight) < self.config.workers and done + len(inflight) < limit:
-                    item = self.frontier.pop()
-                    if item is None:
-                        break
-                    inflight[asyncio.create_task(self._process(item))] = item
-                if not inflight:
+                if control.stopping:
                     break
-                # Take one finished task at a time so ``max_pages`` is exact.
-                finished, _ = await asyncio.wait(inflight, return_when=asyncio.FIRST_COMPLETED)
+                if not control.paused:
+                    while len(inflight) < self.config.workers and done + len(inflight) < limit:
+                        item = self.frontier.pop()
+                        if item is None:
+                            break
+                        inflight[asyncio.create_task(self._process(item))] = item
+                if not inflight:
+                    if control.paused:
+                        await asyncio.sleep(POLL_SECONDS)
+                        continue
+                    break
+                # Take one finished task at a time so ``max_pages`` is exact; wake
+                # up every POLL_SECONDS to notice a pause or stop request.
+                finished, _ = await asyncio.wait(
+                    inflight, timeout=POLL_SECONDS, return_when=asyncio.FIRST_COMPLETED
+                )
+                if not finished:
+                    continue
                 task = next(iter(finished))
                 inflight.pop(task)
                 record, links = task.result()
