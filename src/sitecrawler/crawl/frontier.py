@@ -6,39 +6,67 @@ from collections import deque
 from collections.abc import Iterable
 from urllib.parse import urlparse
 
-from sitecrawler.crawl.urls import looks_like_page, normalize, same_site
+from sitecrawler.crawl.urls import looks_like_page, normalize, strip_www
 from sitecrawler.models import QueueItem
 
 
 class Frontier:
     """FIFO of URLs to crawl, de-duplicated by normalised form.
 
-    Only URLs on the same site as ``site_host`` that look like HTML pages are
-    accepted; everything else is silently dropped by :meth:`add`. The crawler
-    drives it from a single event loop, so no locking is needed.
+    Only URLs on one of the ``hosts`` that look like HTML pages are accepted;
+    everything else is silently dropped by :meth:`add`. The crawler drives it
+    from a single event loop, so no locking is needed.
     """
 
-    def __init__(self, site_host: str, *, scheme: str = "https", keep_query: bool = False) -> None:
-        """Create an empty frontier scoped to one site (host and scheme)."""
-        self._host = site_host
+    def __init__(
+        self,
+        hosts: str | Iterable[str],
+        *,
+        scheme: str | None = "https",
+        keep_query: bool = False,
+    ) -> None:
+        """Create an empty frontier scoped to one host (a string) or several.
+
+        Args:
+            hosts: The site host, or every host a list-mode crawl may visit.
+            scheme: Force every URL to this scheme so http and https forms of a
+                page collapse; ``None`` keeps each URL's own scheme.
+            keep_query: Treat different query strings as different pages.
+        """
+        names = [hosts] if isinstance(hosts, str) else list(hosts)
+        self._hosts = frozenset(strip_www(h) for h in names)
         self._scheme = scheme
         self._keep_query = keep_query
         self._seen: set[str] = set()
         self._queue: deque[QueueItem] = deque()
+
+    def in_scope(self, host: str) -> bool:
+        """True when ``host`` is one of the frontier's hosts (``www.`` ignored)."""
+        return strip_www(host) in self._hosts
 
     def add(self, url: str, depth: int, found_on: str) -> QueueItem | None:
         """Queue ``url`` if it is in scope and new. Returns the queued item, else ``None``."""
         normalised = normalize(url, keep_query=self._keep_query, scheme=self._scheme)
         if normalised is None:
             return None
-        if not same_site(urlparse(normalised).netloc, self._host):
+        if not self.in_scope(urlparse(normalised).netloc):
             return None
         if not looks_like_page(normalised):
             return None
-        if normalised in self._seen:
+        return self._enqueue(normalised, depth, found_on)
+
+    def add_seed(self, url: str, found_on: str) -> QueueItem | None:
+        """Queue a URL the user asked for explicitly: normalised and de-duplicated only."""
+        normalised = normalize(url, keep_query=self._keep_query, scheme=self._scheme)
+        if normalised is None:
             return None
-        self._seen.add(normalised)
-        item = QueueItem(normalised, depth, found_on)
+        return self._enqueue(normalised, 0, found_on)
+
+    def _enqueue(self, url: str, depth: int, found_on: str) -> QueueItem | None:
+        if url in self._seen:
+            return None
+        self._seen.add(url)
+        item = QueueItem(url, depth, found_on)
         self._queue.append(item)
         return item
 

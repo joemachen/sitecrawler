@@ -66,3 +66,38 @@ def test_resume_needs_db(site: str, tmp_path: Path) -> None:
     assert result.exit_code == 2
     missing = runner.invoke(app, ["crawl", site, "--db", str(tmp_path / "none.db"), "--resume"])
     assert missing.exit_code == 2
+
+
+def test_list_from_stdin(site: str, tmp_path: Path) -> None:
+    out = tmp_path / "list.csv"
+    result = runner.invoke(
+        app,
+        ["list", "-", "-o", str(out), "--delay", "0"],
+        input=f"{site}/\n# comment\n{site}/about\n\n{site}/missing\n",
+    )
+    assert result.exit_code == 0, result.output
+    with out.open(newline="", encoding="utf-8") as fh:
+        rows = {row["url"].removeprefix(site): row for row in csv.DictReader(fh)}
+    assert set(rows) == {"/", "/about", "/missing"}
+    assert rows["/missing"]["status"] == "404"
+    assert rows["/"]["found_on"] == "list"
+
+
+def test_list_from_file_with_db(site: str, tmp_path: Path) -> None:
+    urls = tmp_path / "urls.txt"
+    urls.write_text(f"{site}/about\n{site}/blog/post-1\n", encoding="utf-8")
+    db = tmp_path / "list.db"
+    result = runner.invoke(app, ["list", str(urls), "--db", str(db), "--delay", "0"])
+    assert result.exit_code == 0, result.output
+
+    from sitecrawler.store import open_store
+
+    with open_store(db) as store:
+        assert store.crawl().mode == "list"
+        assert store.count_pages("done") == 2
+
+
+def test_list_rejects_missing_file_and_empty_input(tmp_path: Path) -> None:
+    assert runner.invoke(app, ["list", str(tmp_path / "none.txt")]).exit_code == 2
+    assert runner.invoke(app, ["list", "-"], input="# nothing\n").exit_code == 2
+    assert runner.invoke(app, ["list", "-"], input="not a url\n").exit_code == 2

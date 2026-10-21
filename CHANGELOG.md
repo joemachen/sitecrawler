@@ -8,6 +8,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `sitecrawler list urls.txt` and `sitecrawler list -` fetch exactly the
+  given URLs (any hosts, robots.txt and `--delay` per host); `--follow` also
+  follows links within the listed hosts.
 - `crawl --db crawl.db` stores the crawl in SQLite as it runs (tables
   `crawls`, `pages`, `redirect_hops`, `page_html`, `links`, `sitemap_urls`),
   and `--resume` continues an interrupted crawl without re-fetching finished

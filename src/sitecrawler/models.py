@@ -31,7 +31,8 @@ class Outcome(StrEnum):
 class CrawlConfig:
     """Everything that controls a crawl, in one immutable object."""
 
-    start_url: str
+    start_url: str = ""
+    """Where a site crawl starts. Leave empty and set ``seed_urls`` for list mode."""
     max_pages: int = 5000
     delay_seconds: float = 0.5
     workers: int = 4
@@ -44,6 +45,10 @@ class CrawlConfig:
     """Give up on a redirect chain longer than this and report ``redirect_loop``."""
     http2: bool = True
     """Negotiate HTTP/2 when the server offers it (HTTPS only)."""
+    seed_urls: tuple[str, ...] = ()
+    """List mode: fetch exactly these URLs instead of spidering from ``start_url``."""
+    follow_links: bool = True
+    """Queue the links found on each page. Off by default in list mode (see CLI)."""
 
 
 @dataclass(slots=True, frozen=True)

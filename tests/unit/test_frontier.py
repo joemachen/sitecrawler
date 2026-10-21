@@ -58,3 +58,23 @@ def test_mark_seen_and_restore_for_resume() -> None:
     assert f.add("https://example.com/pending", 0, "s") is None
     assert len(f) == 1
     assert f.seen_count == 2
+
+
+def test_multi_host_scope() -> None:
+    f = Frontier({"a.test", "www.b.test"}, scheme=None)
+    assert f.add("https://a.test/x", 0, "s") is not None
+    assert f.add("http://b.test/y", 0, "s") is not None
+    assert f.add("https://c.test/z", 0, "s") is None
+    assert f.in_scope("B.TEST")
+    assert not f.in_scope("c.test")
+    assert [i.url for i in (f.pop(), f.pop()) if i] == ["https://a.test/x", "http://b.test/y"]
+
+
+def test_add_seed_bypasses_extension_filter_but_not_dedup() -> None:
+    f = Frontier("a.test", scheme=None)
+    assert f.add("https://a.test/report.pdf", 0, "s") is None
+    seed = f.add_seed("https://a.test/report.pdf", "list")
+    assert seed is not None
+    assert seed.depth == 0
+    assert f.add_seed("https://a.test/report.pdf", "list") is None
+    assert f.add_seed("not a url", "list") is None

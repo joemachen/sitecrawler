@@ -60,3 +60,18 @@ def test_strip_www_and_same_site() -> None:
 )
 def test_looks_like_page(url: str, expected: bool) -> None:
     assert looks_like_page(url) is expected
+
+
+def test_parse_url_list_skips_blanks_comments_and_duplicates() -> None:
+    from sitecrawler.crawl.urls import parse_url_list
+
+    lines = [
+        "# my list",
+        "",
+        "https://a.test/one  ",
+        "   ",
+        "https://a.test/two",
+        "https://a.test/one",
+        "\thttps://b.test/\r",
+    ]
+    assert parse_url_list(lines) == ["https://a.test/one", "https://a.test/two", "https://b.test/"]

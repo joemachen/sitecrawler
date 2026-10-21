@@ -33,6 +33,8 @@ stripped by default so `/faq?faq=shipping` and `/faq` are one page.
 | `--ignore-robots` | off | Crawl pages robots.txt disallows. Use only on sites you own. |
 | `-v, --verbose` | off | Debug logging |
 
+To fetch a fixed set of URLs instead, see [List mode](list-mode.md).
+
 ## Storing the crawl
 
 ```bash
