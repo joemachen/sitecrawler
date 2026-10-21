@@ -134,7 +134,7 @@ class CrawlInfo:
     mode: str
     version: str
     status: str
-    """``running``, ``done`` (frontier exhausted) or ``stopped`` (hit ``max_pages``)."""
+    """``running``, ``done`` (frontier exhausted) or ``stopped`` (capped or stopped on request)."""
     pages_done: int
     started_at: datetime
     finished_at: datetime | None = None

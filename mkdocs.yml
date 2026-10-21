@@ -38,6 +38,7 @@ nav:
           - 0004 One crawl per file: adr/0004-one-crawl-per-file-and-resume.md
           - 0005 Rules as code and docs: adr/0005-rules-as-code-and-docs.md
           - 0006 Web UI snapshot and grids: adr/0006-web-ui-snapshot-and-client-grids.md
+          - 0007 Live crawl session: adr/0007-live-crawl-session.md
   - API reference: reference.md
 
 markdown_extensions:

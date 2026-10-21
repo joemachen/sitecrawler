@@ -37,12 +37,15 @@ that pass between stages are typed records from `sitecrawler.models`.
                sitemap diff
 ```
 
-**Status (after Phase 3):** `crawl/`, `parse/`, `store/`, `export/`, `audit/`
-(51 rules), `cli/` and `web/` exist. `web/` is a FastAPI app over one
+**Status (Phase 4 in progress):** `crawl/`, `parse/`, `store/`, `export/`,
+`audit/` (51 rules), `cli/` and `web/` exist. `web/` is a FastAPI app over one
 in-memory snapshot of a stored crawl (ADR-0006): `data.py` builds the
 snapshot from the store's export tables and a `CrawlView`, `app.py` holds the
-routes, templates and vendored htmx/Tabulator sit beside them. `analysis/` is
-still an empty package.
+routes, templates and vendored htmx/Tabulator sit beside them. `session.py`
+(`CrawlSession`, ADR-0007) runs a crawl on a worker thread with pause and
+stop, audits it as pages arrive and writes the result to the file at the
+end; the web UI moves onto it during Phase 4. `analysis/` is still an empty
+package.
 
 ---
 
@@ -58,7 +61,8 @@ still an empty package.
 | `analysis` | Whole-crawl computations: link graph and PageRank, duplicate clusters, sitemap-vs-crawl diff. | Fetch anything. |
 | `export` | Writers: CSV, XLSX, JSON. | Compute anything new. |
 | `integrations` | Enrichers that pull external data (GSC, GA4, PSI, backlink APIs) keyed by URL. | Be required for a crawl to work. |
-| `web` | FastAPI app serving the local UI over the store. | Hold logic that the CLI can't also reach. |
+| `session` | One crawl from Start to an audited file: runs `crawl` on a worker thread, feeds `store`, re-runs `audit`, serves the result to any thread (ADR-0007). | Render anything. Know about HTTP routes. |
+| `web` | FastAPI app serving the local UI over a session. | Hold logic that the CLI can't also reach. |
 | `cli` | Typer commands: parse args, build config, call library, print. | Contain logic. |
 
 The dependency direction is strictly downward in this list: `cli` and `web`
@@ -111,8 +115,11 @@ old crawl file is cheap and never re-fetches.
   ends in `Outcome.REDIRECT_LOOP` after at most `max_redirects + 1` requests
   (ADR-0003). robots.txt and sitemaps go through the same fetcher and throttle.
 - `Crawler.run()` is synchronous (it owns the loop); `Crawler.arun()` is the
-  same crawl for callers that already have one, such as the web UI.
-- JS rendering (Phase 4) is a separate `Renderer` with its own, lower
+  same crawl for callers that already have one. A `CrawlControl` carries
+  pause and stop requests from any thread; the loop checks it between
+  fetches and wakes every 250 ms while waiting, so a request is honoured
+  promptly without the control needing a handle on the loop.
+- JS rendering (Phase 5) is a separate `Renderer` with its own, lower
   concurrency (browser tabs are expensive). Pages are rendered only when
   `--render` is on; the raw HTML fetch still happens first so both versions can
   be compared.

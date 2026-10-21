@@ -310,6 +310,16 @@ class Store:
                 page.indexability_reason = verdict.reason
             session.commit()
 
+    def indexability(self) -> dict[str, Indexability]:
+        """Stored indexability verdicts by URL; empty when no audit has been stored."""
+        with Session(self.engine) as session:
+            rows = session.execute(
+                select(PageRow.url, PageRow.indexable, PageRow.indexability_reason).where(
+                    PageRow.state == "done", PageRow.indexable.is_not(None)
+                )
+            ).all()
+        return {url: Indexability(bool(flag), reason) for url, flag, reason in rows}
+
     def iter_issues(self, rule_id: str | None = None) -> list[Issue]:
         """Stored issues, optionally for one rule, ordered by severity then URL."""
         stmt = select(IssueRow, PageRow.url).join(PageRow, IssueRow.page_id == PageRow.id)

@@ -17,7 +17,7 @@ Exports (`sitecrawler export`) read from these tables; see [Exporting](export.md
 
 | Table | One row per | Notable columns |
 | --- | --- | --- |
-| `crawls` | crawl | `start_url`, `mode`, `config_json`, `version`, `started_at`, `finished_at`, `status` (`running`, `done`, or `stopped` when `--max-pages` cut it short), `pages_done` |
+| `crawls` | crawl | `start_url`, `mode`, `config_json`, `version`, `started_at`, `finished_at`, `status` (`running`, `done`, or `stopped` when `--max-pages` cut it short or the crawl was stopped from the web UI), `pages_done` |
 | `pages` | URL ever queued | `state` (`pending` / `done`), `depth`, `found_on`, `outcome`, `status_code`, `final_url`, `content_type`, `size_bytes`, `fetch_ms`, `error`, `x_robots_tag`, `last_modified`, `headers_json`, `fetched_at` |
 | `redirect_hops` | redirect followed | `page_id`, `hop_no`, `from_url`, `to_url`, `status_code` |
 | `page_html` | fetched page | `title`, `meta_description`, `meta_robots`, `canonical`, `h1`, `h1s_json`, `h2s_json`, `lang`, `word_count`, `internal_links` |

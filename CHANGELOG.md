@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+Phase 4: live crawl UI (in progress).
+
+### Added
+
+- A running crawl can be paused, resumed and stopped from another thread
+  through `CrawlControl`; a stopped crawl marks its file `stopped` so the
+  CLI can resume it.
+- `CrawlSession` runs a crawl on a worker thread, keeps every page in
+  memory, re-runs the audit while pages arrive and writes issues and
+  verdicts to the file when the crawl ends. It also opens a finished file
+  read-only. New crawls go to `crawls/<host>-<timestamp>.db` (ADR-0007).
+- `Store.indexability()` reads stored verdicts back.
+
 ## [0.4.0] - 2026-10-21
 
 Phase 3: local web UI.
