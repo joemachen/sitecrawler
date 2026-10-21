@@ -1,0 +1,15 @@
+<h2><code>{{ rule.id }}</code> <span class="sev sev-{{ rule.severity.value }}">{{ rule.severity.value }}</span></h2>
+<p>{{ rule.summary }} <a href="/rules/{{ rule.id }}">Why and how to fix</a></p>
+<table class="plain urls" data-rule="{{ rule.id }}">
+  <thead><tr><th>URL</th><th>Detail</th></tr></thead>
+  <tbody>
+  {% for issue in issues %}
+    <tr data-url="{{ issue.url }}">
+      <td><a href="/page?url={{ issue.url | urlencode }}">{{ issue.url }}</a></td>
+      <td>{{ issue.message }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="2" class="muted">No URLs stored for this rule.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>

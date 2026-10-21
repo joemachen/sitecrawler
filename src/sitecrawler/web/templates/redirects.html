@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Redirects · sitecrawler{% endblock %}
+{% block content %}
+<section class="grid">
+  <div class="toolbar">
+    <input type="search" placeholder="Search every column" aria-label="Search" data-grid-search>
+    <span class="count" data-grid-count></span>
+    <button type="button" data-grid-download>Download CSV</button>
+  </div>
+  <div data-grid="/api/redirects" data-columns='{{ columns | tojson }}' data-download="redirects.csv"></div>
+</section>
+{% endblock %}

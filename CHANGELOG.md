@@ -9,9 +9,12 @@ All notable changes to this project are documented here. The format follows
 ### Added
 
 - `sitecrawler serve crawl.db` opens the local web UI on
-  `http://127.0.0.1:8765`: an Overview tab (status and depth breakdowns,
-  issue totals, indexability) and a Pages tab with a sortable, filterable
-  grid that downloads the filtered rows as CSV. `--port` and `--no-open`.
+  `http://127.0.0.1:8765`: Overview (status and depth breakdowns, issue
+  totals, indexability), Pages and Redirects grids (sortable, filterable,
+  the filtered rows download as CSV), an Issues tab grouped by rule with
+  the flagged URLs a click away, a page per rule explaining why and how to
+  fix, and a page detail with headers, parsed HTML, issues, inlinks and
+  outlinks. `--port` and `--no-open`.
   The crawl is read once into memory; FastAPI, uvicorn and Jinja2 are new
   dependencies, htmx and Tabulator are vendored (ADR-0006).
 
