@@ -52,6 +52,23 @@ def test_serve_binds_loopback_on_the_given_port(
     assert opened == []
 
 
+def test_serve_without_a_file_starts_idle(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    configs: list[uvicorn.Config] = []
+
+    def fake_run(self: uvicorn.Server) -> None:
+        configs.append(self.config)
+
+    monkeypatch.setattr(uvicorn.Server, "run", fake_run)
+    crawls = tmp_path / "mine"
+    result = runner.invoke(app, ["serve", "--no-open", "--crawls-dir", str(crawls)])
+    assert result.exit_code == 0, result.output
+    assert "Ready to crawl" in " ".join(result.output.split())
+    assert str(crawls) in "".join(result.output.split())  # Rich wraps long paths
+    assert len(configs) == 1
+    assert configs[0].app.state.session.state().status.value == "idle"  # type: ignore[union-attr]
+    assert configs[0].app.state.session.crawls_dir == crawls  # type: ignore[union-attr]
+
+
 class _Server:
     def __init__(self, started: bool) -> None:
         self.started = started

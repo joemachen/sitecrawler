@@ -195,17 +195,152 @@
   }
 
   // ---------------------------------------------------------------- data
-  function loadAll() {
-    return fetchJson("/api/rows?since=0&rev=0").then(function (page) {
-      pages = page.rows;
+  var seq = 0;
+  var rev = 0;
+  var crawl = { status: document.querySelector(".app").dataset.status };
+  var ACTIVE = { running: true, paused: true, stopping: true, finishing: true };
+  var ENABLED = {
+    idle: ["start"],
+    running: ["pause", "stop"],
+    paused: ["resume", "stop"],
+    stopping: [],
+    finishing: [],
+    done: ["start", "clear"],
+    stopped: ["start", "clear"],
+    error: ["start", "clear"],
+  };
+  var app = document.querySelector(".app");
+  var form = document.getElementById("crawl-form");
+  var pollTimer = null;
+
+  function formatElapsed(seconds) {
+    var s = Math.max(0, Math.round(seconds || 0));
+    var m = Math.floor(s / 60);
+    return m + ":" + String(s % 60).padStart(2, "0");
+  }
+
+  function applyCrawl(c) {
+    crawl = c;
+    app.dataset.status = c.status;
+    document.querySelector("[data-status-badge]").textContent = c.status;
+    var total = c.done + c.queued;
+    var bar = document.querySelector("[data-progress]");
+    bar.max = total || 1;
+    bar.value = c.done;
+    document.querySelector("[data-progress-text]").textContent =
+      c.start_url ? c.done + " done · " + c.queued + " queued · " + formatElapsed(c.elapsed) : "";
+    document.querySelector("[data-error]").textContent = c.error || "";
+    var dbNode = document.querySelector("[data-db]");
+    dbNode.textContent = c.db ? c.db.split(/[\\/]/).pop() : "";
+    dbNode.title = c.db || "";
+    var ro = document.querySelector("[data-read-only]");
+    if (ro) { ro.hidden = !c.read_only; }
+    var enabled = ENABLED[c.status] || [];
+    Array.prototype.forEach.call(form.querySelectorAll("[data-action]"), function (button) {
+      button.disabled = enabled.indexOf(button.dataset.action) === -1;
+    });
+    form.querySelector("[data-url-input]").disabled = enabled.indexOf("start") === -1;
+  }
+
+  function applyPatches(patches) {
+    if (!patches.length) { return; }
+    var byUrl = {};
+    pages.forEach(function (row) { byUrl[row.url] = row; });
+    patches.forEach(function (patch) {
+      var row = byUrl[patch.url];
+      if (row) { Object.keys(patch).forEach(function (key) { row[key] = patch[key]; }); }
+    });
+  }
+
+  function refreshRows() {
+    var url = "/api/rows?since=" + seq + "&rev=" + rev;
+    return fetchJson(url).then(function (page) {
+      var inGrid = loadedSource === "pages";
+      if (page.full || seq === 0) {
+        pages = page.rows;
+        if (inGrid) { table.replaceData(pages); }
+      } else {
+        pages = pages.concat(page.rows);
+        applyPatches(page.patches);
+        if (inGrid) {
+          if (page.rows.length) { table.addData(page.rows); }
+          if (page.patches.length) { table.updateData(page.patches); }
+        }
+      }
+      var revChanged = page.audit_rev !== rev;
+      seq = page.seq;
+      rev = page.audit_rev;
+      if (revChanged) { document.body.dispatchEvent(new CustomEvent("audit-changed")); }
       return fetchJson("/api/external");
     }).then(function (rows) {
       external = rows;
+      if (loadedSource === "external") { table.replaceData(external); }
       return fetchJson("/api/summary");
     }).then(function (s) {
       summary = s;
       renderSummary();
+      if (tabsById[current.tab]) {
+        renderFilterOptions(tabsById[current.tab]);
+        renderTree();
+        if (loadedSource) { applyFilter(); }
+      }
     });
+  }
+
+  function pollOnce() {
+    return fetchJson("/api/crawl").then(function (c) {
+      var moved = c.seq !== seq || c.audit_rev !== rev || c.status === "idle";
+      applyCrawl(c);
+      if (c.status === "idle" && seq !== 0) {
+        seq = 0; rev = 0; pages = []; external = [];
+        table.clearData();
+      }
+      return moved ? refreshRows() : null;
+    });
+  }
+
+  function schedule() {
+    clearTimeout(pollTimer);
+    if (ACTIVE[crawl.status]) {
+      pollTimer = setTimeout(function () { pollOnce().then(schedule, schedule); }, 1000);
+    }
+  }
+
+  function post(url, body) {
+    return fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: body ? JSON.stringify(body) : null,
+    }).then(function (r) {
+      return r.json().then(function (data) {
+        if (!r.ok) { throw new Error(data.detail || (url + " -> " + r.status)); }
+        return data;
+      });
+    });
+  }
+
+  function showError(err) {
+    document.querySelector("[data-error]").textContent = String(err.message || err);
+  }
+
+  function startCrawl() {
+    var data = new FormData(form);
+    var body = {
+      url: data.get("url"),
+      max_pages: Number(data.get("max_pages")) || 5000,
+      delay_seconds: Number(data.get("delay_seconds")),
+      workers: Number(data.get("workers")) || 4,
+      timeout_seconds: Number(data.get("timeout_seconds")) || 20,
+      use_sitemap: data.get("use_sitemap") === "on",
+      respect_robots: data.get("respect_robots") === "on",
+      keep_query: data.get("keep_query") === "on",
+    };
+    return post("/api/crawl/start", body).then(function (c) {
+      seq = 0; rev = 0; pages = []; external = []; summary = null;
+      table.clearData();
+      applyCrawl(c);
+      return refreshRows();
+    }).then(schedule).catch(showError);
   }
 
   function parseHash() {
@@ -240,12 +375,27 @@
     if (h.tab !== current.tab || h.filter !== current.filter) { selectTab(h.tab, h.filter); }
   });
 
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+    startCrawl();
+  });
+  form.addEventListener("click", function (event) {
+    var button = event.target.closest("button[data-action]");
+    if (!button || button.dataset.action === "start") { return; }
+    event.preventDefault();
+    post("/api/crawl/" + button.dataset.action).then(function (c) {
+      applyCrawl(c);
+      return pollOnce();
+    }).then(schedule).catch(showError);
+  });
+
   table.on("tableBuilt", function () {
-    loadAll().then(function () {
+    pollOnce().then(function () {
       var h = parseHash();
       selectTab(h.tab, h.filter);
+      schedule();
     });
   });
 
-  window.sitecrawler = { selectTab: selectTab, reload: loadAll, table: table };
+  window.sitecrawler = { selectTab: selectTab, poll: pollOnce, table: table };
 })();

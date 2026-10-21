@@ -1,4 +1,4 @@
-"""The ``sitecrawler serve`` command: the local web UI over a stored crawl."""
+"""The ``sitecrawler serve`` command: the local web UI, over a stored crawl or ready to crawl."""
 
 from __future__ import annotations
 
@@ -39,21 +39,30 @@ def open_when_started(server: _Startable, url: str, *, timeout: float = 10.0) ->
 
 
 def serve(
-    db: Annotated[Path, typer.Argument(help="Crawl database to browse; run audit on it first.")],
+    db: Annotated[
+        Path | None,
+        typer.Argument(help="Crawl database to browse read-only. Omit to start from an empty UI."),
+    ] = None,
     port: Annotated[int, typer.Option("--port", help="Port on 127.0.0.1 to listen on.")] = 8765,
     open_browser: Annotated[
         bool, typer.Option("--open/--no-open", help="Open the UI in your browser.")
     ] = True,
+    crawls_dir: Annotated[
+        Path,
+        typer.Option("--crawls-dir", help="Where crawls started from the UI are written."),
+    ] = Path("crawls"),
 ) -> None:
-    """Open the local web UI on a stored crawl."""
-    require_crawl_db(db)
+    """Open the local web UI: crawl from the browser, or browse a stored crawl."""
+    if db is not None:
+        require_crawl_db(db)
     try:
-        app = create_app(db)
+        app = create_app(db, crawls_dir=crawls_dir)
     except ValueError as exc:
         fail(str(exc))
         return
     url = f"http://{HOST}:{port}"
-    err.print(f"Serving {db} at [bold]{url}[/bold]  (Ctrl+C to stop)")
+    what = f"Serving {db} (read-only)" if db else f"Ready to crawl; new crawls go to {crawls_dir}"
+    err.print(f"{what} at [bold]{url}[/bold]  (Ctrl+C to stop)")
     server = uvicorn.Server(uvicorn.Config(app, host=HOST, port=port, log_level="warning"))
     if open_browser:
         threading.Thread(target=open_when_started, args=(server, url), daemon=True).start()

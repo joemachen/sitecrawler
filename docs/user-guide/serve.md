@@ -1,23 +1,51 @@
-# Browsing a crawl
+# The web UI
+
+```bash
+uv run sitecrawler serve
+```
+
+`serve` opens the local web UI at `http://127.0.0.1:8765` in your browser.
+It only ever listens on loopback and has no login: it is a tool for your
+own machine, not a service. Stop it with Ctrl+C.
+
+| Option | Meaning |
+| --- | --- |
+| `serve crawl.db` | Open a stored crawl read-only instead of starting empty |
+| `--port 8765` | Listen on another port, still on 127.0.0.1 |
+| `--no-open` | Print the URL instead of opening a browser |
+| `--crawls-dir crawls` | Where crawls started from the UI are written |
+
+## Crawling from the UI
+
+Type a URL in the bar and press **Start**. Pages appear in the grid as they
+are fetched, the counts in the tree and the filter dropdowns update, and
+the audit re-runs every couple of seconds so the Issues tab and the
+rule-backed filters fill while the crawl runs. **Pause** holds the crawl
+after the fetches in flight; **Resume** continues it; **Stop** ends it
+early; **Clear** forgets it and returns to an empty screen. **Settings**
+holds the same options as the `crawl` command: max pages, delay, workers,
+timeout, sitemaps, robots.txt, query strings.
+
+Each crawl is written to its own file, `crawls/<host>-<timestamp>.db`
+under `--crawls-dir`, as it runs. When the crawl ends the final audit is
+written there too, so the file is exactly what `sitecrawler crawl` plus
+`sitecrawler audit` would have produced, and `export` works on it. A crawl
+you stopped reads `stopped` in the file and can be continued from the
+command line with `sitecrawler crawl URL --db FILE --resume`.
+
+Starting a crawl while a stored file is open leaves that file untouched
+and writes the new crawl to a new file.
+
+## Browsing a stored crawl
 
 ```bash
 uv run sitecrawler crawl https://example.com --db example.db
 uv run sitecrawler serve example.db
 ```
 
-`serve` loads a stored crawl into memory and opens the local web UI at
-`http://127.0.0.1:8765` in your browser. It only ever listens on loopback
-and has no login: it is a viewer for files on your own machine, not a
-service. Stop it with Ctrl+C.
-
 A file that has not been audited is audited in memory when it opens, so
 the Issues tab and the filters are always filled. Nothing is written back;
 run `sitecrawler audit` to store the result in the file.
-
-| Option | Meaning |
-| --- | --- |
-| `--port 8765` | Listen on another port, still on 127.0.0.1 |
-| `--no-open` | Print the URL instead of opening a browser |
 
 ## The screen
 

@@ -28,6 +28,13 @@ Phase 4: live crawl UI (in progress).
   `/api/external`. A file that was never audited is audited in memory when
   `serve` opens it.
 
+- Crawl from the browser: `sitecrawler serve` with no file opens an empty
+  UI with a URL bar, Start / Pause / Resume / Stop / Clear, a progress bar
+  and a Settings panel with the `crawl` options. Rows, counts and the
+  Issues tab update while the crawl runs; each crawl is written to
+  `crawls/<host>-<timestamp>.db` (`--crawls-dir`) with its final audit.
+  `POST /api/crawl/start|pause|resume|stop|clear`.
+
 ### Removed
 
 - The Overview, Pages and Redirects pages and their `/api/pages` and

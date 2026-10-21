@@ -4,12 +4,34 @@
 <div class="app" data-status="{{ state.status.value }}">
   <header class="bar">
     <a class="brand" href="/">sitecrawler</a>
-    <div class="crawlbar">
-      <span class="crawl-url" data-start-url>{{ state.start_url or "No crawl loaded" }}</span>
+    <form class="crawlbar" id="crawl-form" autocomplete="off">
+      <input type="url" name="url" placeholder="Enter URL to crawl" value="{{ state.start_url }}" aria-label="Start URL" data-url-input required>
+      <button type="submit" data-action="start">Start</button>
+      <button type="button" data-action="pause">Pause</button>
+      <button type="button" data-action="resume">Resume</button>
+      <button type="button" data-action="stop">Stop</button>
+      <button type="button" data-action="clear">Clear</button>
+      <details class="settings">
+        <summary>Settings</summary>
+        <div class="settings-body">
+          <label>Max pages <input type="number" name="max_pages" value="5000" min="1"></label>
+          <label>Delay (s) <input type="number" name="delay_seconds" value="0.5" min="0" step="0.1"></label>
+          <label>Workers <input type="number" name="workers" value="4" min="1" max="32"></label>
+          <label>Timeout (s) <input type="number" name="timeout_seconds" value="20" min="1"></label>
+          <label><input type="checkbox" name="use_sitemap" checked> Seed from sitemaps</label>
+          <label><input type="checkbox" name="respect_robots" checked> Respect robots.txt</label>
+          <label><input type="checkbox" name="keep_query"> Keep query strings</label>
+        </div>
+      </details>
+    </form>
+    <div class="progress">
       <span class="badge" data-status-badge>{{ state.status.value }}</span>
-      {% if state.read_only %}<span class="badge muted">read-only</span>{% endif %}
+      {% if state.read_only %}<span class="badge muted" data-read-only>read-only</span>{% endif %}
+      <progress data-progress max="1" value="{{ 1 if state.done else 0 }}"></progress>
+      <span class="muted" data-progress-text></span>
+      <span class="error" data-error></span>
     </div>
-    <span class="db" title="{{ state.db or '' }}">{{ state.db.name if state.db else "" }}</span>
+    <span class="db" title="{{ state.db or '' }}" data-db>{{ state.db.name if state.db else "" }}</span>
   </header>
 
   <div class="workspace">
