@@ -13,7 +13,7 @@ coverage.xml
 htmlcov/
 
 # mkdocs build output
-site/
+/site/
 
 # Secrets and local config
 .env
