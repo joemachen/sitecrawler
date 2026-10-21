@@ -13,7 +13,7 @@ against `tests/fixtures/site/`, the user guide has a page for it, and
 | 0 | Foundation | v0.1.0 | Done (live-site check parked) |
 | 1 | Core crawl and storage | v0.2.0 | Done (2026-10-21) |
 | 2 | Audit checks and issues engine | v0.3.0 | Done (2026-10-21) |
-| 3 | Local web UI | v0.4.0 | |
+| 3 | Local web UI | v0.4.0 | Done (2026-10-21) |
 | 4 | JavaScript rendering | v0.5.0 | |
 | 5 | Custom extraction and search | v0.6.0 | |
 | 6 | XML sitemap audit and generation | v0.7.0 | |
@@ -113,8 +113,13 @@ Acceptance:
 
 Acceptance:
 
-- [ ] Playwright e2e test opens each tab on the fixture crawl and asserts key numbers.
-- [ ] Any Issues-tab row links to the rule's explanation page.
+- [x] Playwright e2e test opens each tab on the fixture crawl and asserts key numbers (`tests/e2e/test_web_ui.py`; every route is also covered through FastAPI's test client in `tests/integration/test_web.py` and `test_web_tabs.py`).
+- [x] Any Issues-tab row links to the rule's explanation page (`/rules/<id>`, rendered in the app from the rule class; `tests/integration/test_web_tabs.py`).
+
+Design notes: ADR-0006. The crawl is read once into memory and the file
+closed; grids sort, filter and export client-side; htmx and Tabulator are
+vendored. The UI reads `pages.indexable` from the export tables rather than
+through `PageRecord`, which has no verdict field.
 
 ---
 

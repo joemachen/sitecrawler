@@ -98,7 +98,7 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 # 2. Clone, then from the repo root:
 uv sync                       # creates .venv, installs runtime + dev deps from uv.lock
 uv run pre-commit install     # installs git hooks
-uv run playwright install chromium   # only needed once JS rendering lands (Phase 4)
+uv run playwright install chromium   # headless Chromium for the browser tests (tests/e2e/test_web_ui.py)
 
 # 3. Verify
 uv run ruff check .
