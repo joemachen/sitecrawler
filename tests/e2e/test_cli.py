@@ -24,6 +24,7 @@ def test_crawl_command_writes_csv(site: str, tmp_path: Path) -> None:
     assert rows["/"]["title"] == "Fixture Site Home"
     assert rows["/missing"]["status"] == "404"
     assert rows["/blocked/secret"]["status"] == "blocked"
+    assert rows["/loop-a"]["status"] == "redirect_loop"
     assert rows["/orphan"]["found_on"].startswith("sitemap:")
     assert len(rows) == 13
 

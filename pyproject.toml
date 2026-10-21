@@ -15,11 +15,11 @@ classifiers = [
   "Topic :: Internet :: WWW/HTTP :: Indexing/Search",
 ]
 dependencies = [
-  "requests>=2.32",
   "beautifulsoup4>=4.13",
   "lxml>=5.3",
   "typer>=0.15",
   "rich>=13.9",
+  "httpx[http2]>=0.28",
 ]
 
 [project.scripts]
@@ -32,7 +32,6 @@ Repository = "https://github.com/joemachen/sitecrawler"
 dev = [
   "ruff>=0.9",
   "mypy>=1.14",
-  "types-requests>=2.32",
   "lxml-stubs>=0.5",
   "pytest>=8.3",
   "pytest-cov>=6.0",
@@ -40,6 +39,8 @@ dev = [
   "pre-commit>=4.0",
   "mkdocs-material>=9.5",
   "mkdocstrings[python]>=0.27",
+  "pytest-asyncio>=0.25",
+  "respx>=0.22",
 ]
 
 [build-system]
@@ -101,6 +102,8 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q --strict-markers"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 markers = [
   "live: hits the real network; never run in CI",
 ]

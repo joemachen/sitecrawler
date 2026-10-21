@@ -11,6 +11,7 @@ Generated from docstrings.
 ::: sitecrawler.crawl.crawler
 ::: sitecrawler.crawl.frontier
 ::: sitecrawler.crawl.fetcher
+::: sitecrawler.crawl.throttle
 ::: sitecrawler.crawl.robots
 ::: sitecrawler.crawl.urls
 

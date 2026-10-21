@@ -13,9 +13,11 @@ def test_write_csv_round_trip(tmp_path: Path) -> None:
                    error="disallowed by robots.txt"),
         PageRecord(url="https://x/c", outcome=Outcome.ERROR, depth=1, found_on="https://x/a",
                    error="boom"),
+        PageRecord(url="https://x/d", outcome=Outcome.REDIRECT_LOOP, depth=1,
+                   found_on="https://x/a", error="redirect loop: https://x/d -> https://x/d"),
     ]  # fmt: skip
     out = tmp_path / "pages.csv"
-    assert write_csv(records, out) == 3
+    assert write_csv(records, out) == 4
 
     with out.open(newline="", encoding="utf-8") as fh:
         rows = list(csv.DictReader(fh))
@@ -25,3 +27,4 @@ def test_write_csv_round_trip(tmp_path: Path) -> None:
     assert rows[1]["status"] == "blocked"
     assert rows[2]["status"] == "error"
     assert rows[2]["error"] == "boom"
+    assert rows[3]["status"] == "redirect_loop"

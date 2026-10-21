@@ -7,5 +7,6 @@ newcomer. Copy `0000-template.md`, number it, fill it in, link it from the PR.
 | --- | --- | --- |
 | [0001](0001-python-uv-sqlite-stack.md) | Python, uv, SQLite as the core stack | Accepted |
 | [0002](0002-cli-first-web-ui-later.md) | CLI first, local web UI from Phase 3 | Accepted |
+| [0003](0003-httpx-asyncio-manual-redirects.md) | httpx + asyncio, redirects followed by hand | Accepted |
 
 Statuses: Proposed, Accepted, Superseded by ####, Deprecated.

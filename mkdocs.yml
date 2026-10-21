@@ -28,6 +28,7 @@ nav:
           - Index: adr/README.md
           - 0001 Python, uv, SQLite: adr/0001-python-uv-sqlite-stack.md
           - 0002 CLI first: adr/0002-cli-first-web-ui-later.md
+          - 0003 httpx and redirects: adr/0003-httpx-asyncio-manual-redirects.md
   - API reference: reference.md
 
 markdown_extensions:

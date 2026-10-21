@@ -22,6 +22,9 @@ class Outcome(StrEnum):
     ERROR = "error"
     """Network or protocol failure; no usable response."""
 
+    REDIRECT_LOOP = "redirect_loop"
+    """Redirects never resolved: a cycle, or more than ``max_redirects`` hops."""
+
 
 @dataclass(slots=True, frozen=True)
 class CrawlConfig:
@@ -36,6 +39,22 @@ class CrawlConfig:
     keep_query: bool = False
     respect_robots: bool = True
     user_agent: str = "sitecrawler/0.1 (+https://github.com/joemachen/sitecrawler)"
+    max_redirects: int = 10
+    """Give up on a redirect chain longer than this and report ``redirect_loop``."""
+    http2: bool = True
+    """Negotiate HTTP/2 when the server offers it (HTTPS only)."""
+
+
+@dataclass(slots=True, frozen=True)
+class RedirectHop:
+    """One step of a redirect chain, as the server sent it."""
+
+    hop_no: int
+    """1-based position in the chain."""
+    from_url: str
+    to_url: str
+    """Absolute target, resolved against ``from_url``."""
+    status_code: int
 
 
 @dataclass(slots=True, frozen=True)
@@ -57,8 +76,17 @@ class FetchResult:
     final_url: str = ""
     content_type: str = ""
     text: str = ""
+    """Decoded body, only when the response is HTML."""
+    content: bytes = b""
+    """Raw body of the final response, whatever its type."""
+    headers: dict[str, str] = field(default_factory=dict)
+    """Response headers of the final response, keys lower-cased."""
+    size_bytes: int = 0
     elapsed_ms: int = 0
+    """Wall time for the whole chain, redirects included."""
     error: str = ""
+    hops: tuple[RedirectHop, ...] = ()
+    """Every redirect followed before the final response, in order."""
 
     @property
     def is_html(self) -> bool:
@@ -97,6 +125,11 @@ class PageRecord:
     word_count: int = 0
     fetch_ms: int = 0
     error: str = ""
+    final_url: str = ""
+    """Where the request ended up after redirects; empty when there was no response."""
+    size_bytes: int = 0
+    headers: dict[str, str] = field(default_factory=dict)
+    redirect_hops: tuple[RedirectHop, ...] = ()
 
     @property
     def status(self) -> str:

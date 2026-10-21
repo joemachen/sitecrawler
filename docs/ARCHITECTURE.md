@@ -98,12 +98,17 @@ old crawl file is cheap and never re-fetches.
 
 ## 4. Concurrency and politeness
 
-- One crawl = one process. Workers share a global token-bucket style delay
-  (`Fetcher.throttle`) so concurrency never raises the request rate above
-  `1 / delay_seconds` per host.
-- Phase 0 uses threads + `requests`. Phase 1 switches to `asyncio` + `httpx`
-  so that thousands of in-flight URLs cost nothing and HTTP/2 multiplexing is
-  available. The `Frontier`/`Fetcher`/`Crawler` interfaces stay the same.
+- One crawl = one process, one `asyncio` event loop. `workers` is the number
+  of in-flight requests; `HostThrottle` (`crawl/throttle.py`) spaces requests
+  to each host `delay_seconds` apart, so concurrency never raises the request
+  rate above `1 / delay_seconds` per host.
+- The fetcher is `httpx.AsyncClient` with HTTP/2 enabled and redirect
+  following turned off: `Fetcher.fetch` walks the chain itself so every hop
+  becomes data, and a revisited URL or a chain longer than `max_redirects`
+  ends in `Outcome.REDIRECT_LOOP` after at most `max_redirects + 1` requests
+  (ADR-0003). robots.txt and sitemaps go through the same fetcher and throttle.
+- `Crawler.run()` is synchronous (it owns the loop); `Crawler.arun()` is the
+  same crawl for callers that already have one, such as the web UI.
 - JS rendering (Phase 4) is a separate `Renderer` with its own, lower
   concurrency (browser tabs are expensive). Pages are rendered only when
   `--render` is on; the raw HTML fetch still happens first so both versions can
