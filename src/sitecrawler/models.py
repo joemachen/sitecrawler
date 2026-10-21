@@ -197,4 +197,9 @@ class PageRecord:
     @property
     def status(self) -> str:
         """Status code as text, or the outcome name when there was no response."""
-        return str(self.status_code) if self.status_code is not None else self.outcome.value
+        return self.status_text(self.status_code, self.outcome.value)
+
+    @staticmethod
+    def status_text(status_code: int | None, outcome: str) -> str:
+        """The rule behind :attr:`status`, shared with the store's export views."""
+        return str(status_code) if status_code is not None else outcome

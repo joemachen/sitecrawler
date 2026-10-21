@@ -22,9 +22,10 @@ def write_json(crawl: CrawlInfo, tables: Iterable[TableDump], path: Path) -> int
     Returns:
         Total number of rows written across all tables.
     """
-    document: dict[str, object] = {
-        "crawl": {key: _plain(value) for key, value in asdict(crawl).items()}
-    }
+    summary = {key: _plain(value) for key, value in asdict(crawl).items()}
+    # The config is stored as a JSON string; give consumers a real object instead.
+    summary["config"] = json.loads(str(summary.pop("config_json") or "{}"))
+    document: dict[str, object] = {"crawl": summary}
     count = 0
     for table in tables:
         rows = [dict(zip(table.columns, row, strict=True)) for row in table.rows]

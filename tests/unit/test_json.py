@@ -16,6 +16,7 @@ def test_json_document_shape(tmp_path: Path) -> None:
         pages_done=1,
         started_at=datetime(2026, 10, 21, 10, 0, 0),
         finished_at=None,
+        config_json='{"max_pages": 5}',
     )
     tables = [TableDump("pages", ("url", "title"), [("https://x/", "Hé")])]
     out = tmp_path / "crawl.json"
@@ -25,4 +26,6 @@ def test_json_document_shape(tmp_path: Path) -> None:
     assert data["crawl"]["start_url"] == "https://x/"
     assert data["crawl"]["started_at"] == "2026-10-21T10:00:00"
     assert data["crawl"]["finished_at"] is None
+    assert data["crawl"]["config"] == {"max_pages": 5}
+    assert "config_json" not in data["crawl"]
     assert data["pages"] == [{"url": "https://x/", "title": "Hé"}]

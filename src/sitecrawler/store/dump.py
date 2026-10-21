@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from sitecrawler.models import PageRecord
 from sitecrawler.store.schema import LinkRow, PageRow, RedirectHopRow, SitemapUrlRow
 
 if TYPE_CHECKING:
@@ -67,10 +68,9 @@ def _iso(value: datetime | None) -> str | None:
 
 def _page_row(page: PageRow) -> tuple[Cell, ...]:
     html = page.html
-    status = str(page.status_code) if page.status_code is not None else (page.outcome or "")
     return (
         page.url,
-        status,
+        PageRecord.status_text(page.status_code, page.outcome or ""),
         page.outcome,
         page.status_code,
         page.final_url,
