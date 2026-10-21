@@ -10,7 +10,10 @@ from sitecrawler.models import CrawlConfig, Outcome, PageRecord
 
 @pytest.fixture
 def crawled(site: str) -> dict[str, PageRecord]:
-    config = CrawlConfig(start_url=site, delay_seconds=0, workers=2)
+    # One worker keeps discovery order deterministic. ``depth`` is the depth at
+    # which a URL was first seen, so with several workers it can vary from run
+    # to run; shortest-path depth arrives with the link graph in Phase 7.
+    config = CrawlConfig(start_url=site, delay_seconds=0, workers=1)
     records = Crawler(config).run()
     return {r.url.removeprefix(site): r for r in records}
 

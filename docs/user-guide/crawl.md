@@ -46,7 +46,7 @@ uv run sitecrawler crawl https://example.com -o pages.csv 2> crawl.log
 | `h1` | First `<h1>` on the page |
 | `canonical` | `<link rel="canonical">` href, or the final URL if the request redirected |
 | `content_type` | Response MIME type |
-| `depth` | Link hops from the start URL. Sitemap URLs are depth 0. |
+| `depth` | Link hops from the start URL along the path that first discovered the page. Sitemap URLs are depth 0. With several workers this can differ from the shortest path by a hop or two; exact shortest-path depth comes with the link-graph phase. |
 | `found_on` | Page (or `sitemap:URL`) where this URL was first discovered |
 | `internal_links` | Count of distinct same-site hrefs on the page |
 | `word_count` | Visible words, with scripts and styles removed |
