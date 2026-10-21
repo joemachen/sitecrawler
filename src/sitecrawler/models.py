@@ -40,7 +40,7 @@ class CrawlConfig:
     use_sitemap: bool = True
     keep_query: bool = False
     respect_robots: bool = True
-    user_agent: str = "sitecrawler/0.2 (+https://github.com/joemachen/sitecrawler)"
+    user_agent: str = "sitecrawler/0.3 (+https://github.com/joemachen/sitecrawler)"
     max_redirects: int = 10
     """Give up on a redirect chain longer than this and report ``redirect_loop``."""
     http2: bool = True
