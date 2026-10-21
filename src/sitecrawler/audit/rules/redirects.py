@@ -6,7 +6,7 @@ from collections.abc import Iterable
 
 from sitecrawler.audit.rule import HtmlPageRule, PageRule
 from sitecrawler.audit.view import CrawlView
-from sitecrawler.models import Issue, Outcome, PageRecord, Severity
+from sitecrawler.models import Issue, Outcome, PageRecord, RedirectHop, Severity
 
 CATEGORY = "Redirects"
 TEMPORARY = frozenset({302, 307})
@@ -14,6 +14,16 @@ TEMPORARY = frozenset({302, 307})
 
 def _chain(page: PageRecord) -> str:
     return " -> ".join([page.url, *(hop.to_url for hop in page.redirect_hops)])
+
+
+def _real_hops(page: PageRecord, crawl: CrawlView) -> list[RedirectHop]:
+    """Hops that move to a different page.
+
+    A hop between two forms of the same URL (``/blog`` to ``/blog/``, ``www.``
+    or not) is usually the server answering the crawler's normalised request,
+    not something a visitor following the site's own links would see.
+    """
+    return [hop for hop in page.redirect_hops if not crawl.same_page(hop.from_url, hop.to_url)]
 
 
 class Chain(PageRule):
@@ -34,8 +44,8 @@ class Chain(PageRule):
     )
 
     def check_page(self, page: PageRecord, crawl: CrawlView) -> Iterable[Issue]:
-        """Flag fetched pages with two or more hops."""
-        if page.outcome is Outcome.FETCHED and len(page.redirect_hops) > 1:
+        """Flag fetched pages with two or more hops between different pages."""
+        if page.outcome is Outcome.FETCHED and len(_real_hops(page, crawl)) > 1:
             yield self.issue(page, f"{len(page.redirect_hops)} hops: {_chain(page)}")
 
 
@@ -135,7 +145,7 @@ class Temporary(PageRule):
 
         Chains that end on an error, loop or another site have their own rules.
         """
-        temporary = [hop for hop in page.redirect_hops if hop.status_code in TEMPORARY]
+        temporary = [hop for hop in _real_hops(page, crawl) if hop.status_code in TEMPORARY]
         if (
             page.outcome is Outcome.FETCHED
             and temporary

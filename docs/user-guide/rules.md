@@ -46,7 +46,7 @@ Two canonicals for one page is a contradiction search engines resolve by ignorin
 
 Without a canonical, search engines pick which of a page's URL variants (trailing slash, query strings, http/https, www) to index, and may split signals across several. A self-referencing canonical settles it.
 
-**Fix:** Add <link rel="canonical" href="..."> pointing at the page's preferred URL.
+**Fix:** Add &lt;link rel="canonical" href="..."&gt; pointing at the page's preferred URL.
 
 ### `canonical.not_self_referencing`
 
@@ -154,7 +154,7 @@ Each page in a language cluster must list every version including its own; witho
 
 ``x-default`` tells search engines which version to show users whose language matches none of the alternates. Without it they pick one, often the wrong one.
 
-**Fix:** Add <link rel="alternate" hreflang="x-default" href=...> pointing at the fallback page.
+**Fix:** Add &lt;link rel="alternate" hreflang="x-default" href=...&gt; pointing at the fallback page.
 
 ### `hreflang.to_non_200`
 
@@ -206,7 +206,7 @@ The description is the snippet under the title in search results. Without one Go
 
 Two descriptions usually mean two plugins or templates writing the head; which one search engines use is undefined.
 
-**Fix:** Keep one <meta name="description">.
+**Fix:** Keep one &lt;meta name="description"&gt;.
 
 ### `meta_description.too_long`
 
@@ -408,15 +408,15 @@ Identical titles tell search engines the pages are about the same thing, so they
 
 The title is the headline of the search result and the strongest on-page relevance signal. Without one Google invents a title from the content or the anchor text, usually badly.
 
-**Fix:** Add a unique, descriptive <title> of roughly 30 to 60 characters.
+**Fix:** Add a unique, descriptive &lt;title&gt; of roughly 30 to 60 characters.
 
 ### `title.multiple`
 
-**Page has more than one <title> element** (severity: medium)
+**Page has more than one &lt;title&gt; element** (severity: medium)
 
 Which title search engines use is undefined; usually the first, sometimes the last. A second title normally means two templates or plugins are both writing the head.
 
-**Fix:** Keep exactly one <title> in the <head>.
+**Fix:** Keep exactly one &lt;title&gt; in the &lt;head&gt;.
 
 ### `title.same_as_h1`
 

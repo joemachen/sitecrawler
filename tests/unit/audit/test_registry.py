@@ -40,9 +40,11 @@ def test_duplicate_ids_are_rejected(monkeypatch: pytest.MonkeyPatch, tmp_path: P
         load_rules()
 
 
-def test_rules_page_lists_every_rule() -> None:
+def test_rules_page_lists_every_rule_and_escapes_tags() -> None:
     rules = load_rules()
     text = render_rules_page(rules)
     for rule in rules:
         assert f"### `{rule.id}`" in text
         assert f"## {rule.category}" in text
+    assert "<title>" not in text
+    assert "&lt;title&gt;" in text

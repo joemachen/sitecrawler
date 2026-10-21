@@ -25,6 +25,11 @@ by the highest-severity rule, not by the number of rows.
 """
 
 
+def _text(value: str) -> str:
+    """Rule prose for Markdown: tag-like text such as ``<title>`` must not render as HTML."""
+    return value.strip().replace("<", "&lt;").replace(">", "&gt;")
+
+
 def render_rules_page(rules: Iterable[Rule]) -> str:
     """Markdown for the rules reference, grouped by category then rule id."""
     by_category: dict[str, list[Rule]] = defaultdict(list)
@@ -37,8 +42,8 @@ def render_rules_page(rules: Iterable[Rule]) -> str:
         for rule in sorted(by_category[category], key=lambda r: r.id):
             parts.append(
                 f"\n### `{rule.id}`\n\n"
-                f"**{rule.summary}** (severity: {rule.severity.value})\n\n"
-                f"{rule.why.strip()}\n\n"
-                f"**Fix:** {rule.fix.strip()}\n"
+                f"**{_text(rule.summary)}** (severity: {rule.severity.value})\n\n"
+                f"{_text(rule.why)}\n\n"
+                f"**Fix:** {_text(rule.fix)}\n"
             )
     return "".join(parts)

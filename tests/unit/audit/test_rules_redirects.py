@@ -26,6 +26,19 @@ def test_chain_needs_two_hops() -> None:
     assert hits["/a"].message == f"2 hops: {SITE}/a -> {SITE}/b -> {SITE}/c"
 
 
+def test_same_page_hops_are_not_chains_or_temporary() -> None:
+    slash_then_move = page(
+        "/dir",
+        final_url=f"{SITE}/new",
+        redirect_hops=hops(("/dir", "/dir/", 302), ("/dir/", "/new", 301)),
+    )
+    slash_only = page(
+        "/blog", final_url=f"{SITE}/blog/", redirect_hops=hops(("/blog", "/blog/", 302))
+    )
+    assert flagged(Chain(), [slash_then_move, slash_only]) == {}
+    assert flagged(Temporary(), [slash_then_move, slash_only]) == {}
+
+
 def test_loop() -> None:
     loop = page("/l", None, outcome=Outcome.REDIRECT_LOOP, error="redirect loop: l -> m -> l")
     hits = flagged(Loop(), [loop, page("/ok")])
