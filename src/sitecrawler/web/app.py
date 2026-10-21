@@ -11,9 +11,11 @@ from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel, Field
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from sitecrawler.session import CrawlSession
+from sitecrawler.models import CrawlConfig
+from sitecrawler.session import CrawlSession, SessionBusyError
 from sitecrawler.web.rows import RowStore
 from sitecrawler.web.tabs import TABS, to_json
 
@@ -126,7 +128,69 @@ def api_issues(request: Request) -> JSONResponse:
     return JSONResponse(_rows(request).issue_rows())
 
 
-async def _not_found(request: Request, exc: StarletteHTTPException) -> HTMLResponse:
+class StartRequest(BaseModel):
+    """Body of ``POST /api/crawl/start``: the crawl options the UI exposes."""
+
+    url: str
+    max_pages: int = Field(default=5000, ge=1)
+    delay_seconds: float = Field(default=0.5, ge=0)
+    workers: int = Field(default=4, ge=1, le=32)
+    timeout_seconds: float = Field(default=20.0, gt=0)
+    use_sitemap: bool = True
+    keep_query: bool = False
+    respect_robots: bool = True
+
+    def to_config(self) -> CrawlConfig:
+        """The crawl config these options describe."""
+        return CrawlConfig(
+            start_url=self.url.strip(),
+            max_pages=self.max_pages,
+            delay_seconds=self.delay_seconds,
+            workers=self.workers,
+            timeout_seconds=self.timeout_seconds,
+            use_sitemap=self.use_sitemap,
+            keep_query=self.keep_query,
+            respect_robots=self.respect_robots,
+        )
+
+
+@router.post("/api/crawl/start")
+def api_crawl_start(request: Request, body: StartRequest) -> JSONResponse:
+    """Start a crawl into a new file. 400 for a bad URL, 409 while one is running."""
+    rows = _rows(request)
+    try:
+        rows.session.start(body.to_config())
+    except SessionBusyError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return JSONResponse(crawl_json(rows))
+
+
+@router.post("/api/crawl/{action}")
+def api_crawl_action(request: Request, action: str) -> JSONResponse:
+    """``pause``, ``resume``, ``stop`` or ``clear`` the crawl; 409 when the status forbids it."""
+    rows = _rows(request)
+    session = rows.session
+    actions = {
+        "pause": session.pause,
+        "resume": session.resume,
+        "stop": session.stop,
+        "clear": session.clear,
+    }
+    transition = actions.get(action)
+    if transition is None:
+        raise HTTPException(status_code=404, detail=f"unknown action {action!r}")
+    try:
+        transition()
+    except SessionBusyError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return JSONResponse(crawl_json(rows))
+
+
+async def _not_found(request: Request, exc: StarletteHTTPException) -> HTMLResponse | JSONResponse:
+    if request.url.path.startswith("/api/"):
+        return JSONResponse({"detail": str(exc.detail)}, status_code=exc.status_code)
     if exc.status_code != 404:
         return HTMLResponse(str(exc.detail), status_code=exc.status_code)
     return _render(request, "404.html", status_code=404, detail=exc.detail)

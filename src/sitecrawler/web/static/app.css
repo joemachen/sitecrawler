@@ -41,8 +41,51 @@ header .crawl, header .db {
 header .crawl { margin-left: auto; }
 header .db { margin-left: auto; max-width: 24rem; font-family: ui-monospace, monospace; font-size: 0.85em; }
 
-.crawlbar { display: flex; align-items: center; gap: 0.6rem; min-width: 0; flex: 1 1 auto; }
-.crawl-url { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.crawlbar { display: flex; align-items: center; gap: 0.4rem; min-width: 0; flex: 1 1 auto; margin: 0; position: relative; }
+.crawlbar input[type="url"] {
+  flex: 1 1 18rem;
+  min-width: 10rem;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font: inherit;
+}
+.crawlbar button {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  font: inherit;
+}
+.crawlbar button:hover:not(:disabled) { background: #f1f3f6; }
+.crawlbar button:disabled { opacity: 0.45; cursor: default; }
+.crawlbar button[data-action="start"] { background: #188038; border-color: #188038; color: #fff; font-weight: 600; }
+.crawlbar button[data-action="stop"]:not(:disabled) { color: #d93025; }
+.settings { position: relative; }
+.settings summary { cursor: pointer; color: var(--accent); padding: 0.3rem 0.4rem; list-style: none; }
+.settings-body {
+  position: absolute;
+  right: 0;
+  top: 2rem;
+  z-index: 20;
+  display: grid;
+  gap: 0.4rem;
+  padding: 0.75rem;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  white-space: nowrap;
+}
+.settings-body label { display: flex; justify-content: space-between; gap: 1rem; align-items: center; }
+.settings-body input[type="number"] { width: 6rem; padding: 0.2rem 0.4rem; border: 1px solid var(--line); border-radius: 4px; }
+.progress { display: flex; align-items: center; gap: 0.5rem; white-space: nowrap; min-width: 0; overflow: hidden; }
+.app { overflow: hidden; }
+.progress progress { width: 10rem; height: 0.8rem; }
+.progress .error { color: #d93025; max-width: 20rem; overflow: hidden; text-overflow: ellipsis; }
+.app[data-status="idle"] .progress progress, .app[data-status="done"] .progress progress,
+.app[data-status="stopped"] .progress progress, .app[data-status="error"] .progress progress { opacity: 0.4; }
 .badge {
   padding: 0.1rem 0.5rem;
   border-radius: 3px;
@@ -167,3 +210,9 @@ h1.url a { color: var(--fg); text-decoration: none; }
 
 article.rule { max-width: 48rem; }
 article.rule .summary { font-size: 1.05rem; }
+
+/* ----------------------------------------------------- narrow windows */
+@media (max-width: 1200px) {
+  header .db, [data-progress-text] { display: none; }
+  .workspace { grid-template-columns: minmax(0, 1fr) 240px; }
+}

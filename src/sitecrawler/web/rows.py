@@ -290,6 +290,7 @@ class RowStore:
         """Wrap ``session``; nothing is read until the first call."""
         self.session = session
         self._lock = threading.RLock()
+        self._generation: float | None = None
         self._rules: dict[str, Rule] = {r.id: r for r in session.rules}
         self._reset()
 
@@ -310,10 +311,9 @@ class RowStore:
         """Pull new records and the latest audit from the session."""
         with self._lock:
             state = self.session.state()
-            if state.status.value == "idle" and self._base:
-                self._reset()
-            if state.done < len(self._base):  # a new crawl replaced the old one
-                self._reset()
+            if state.started_at != self._generation or state.done < len(self._base):
+                self._reset()  # a new crawl (or none) replaced the one these rows came from
+                self._generation = state.started_at
             keep_query = self.session.config.keep_query
             if len(self._base) < state.done:
                 self._refresh_sitemap(keep_query)
