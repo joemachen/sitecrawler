@@ -18,7 +18,7 @@ runner = CliRunner()
 def test_serve_rejects_a_missing_file(tmp_path: Path) -> None:
     result = runner.invoke(app, ["serve", str(tmp_path / "nope.db")])
     assert result.exit_code == 2
-    assert "not a file" in result.output
+    assert "not a file" in " ".join(result.output.split())
 
 
 def test_serve_rejects_an_empty_store(tmp_path: Path) -> None:
@@ -26,7 +26,7 @@ def test_serve_rejects_an_empty_store(tmp_path: Path) -> None:
     open_store(path).close()
     result = runner.invoke(app, ["serve", str(path), "--no-open"])
     assert result.exit_code == 2
-    assert "holds no crawl" in result.output
+    assert "holds no crawl" in " ".join(result.output.split())
 
 
 def test_serve_binds_loopback_on_the_given_port(
@@ -48,7 +48,7 @@ def test_serve_binds_loopback_on_the_given_port(
         8999,
         "warning",
     )
-    assert "http://127.0.0.1:8999" in result.output
+    assert "http://127.0.0.1:8999" in " ".join(result.output.split())
     assert opened == []
 
 
