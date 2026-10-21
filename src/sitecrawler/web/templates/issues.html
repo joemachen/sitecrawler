@@ -11,7 +11,7 @@
       <thead><tr><th>Severity</th><th>Rule</th><th class="num">URLs</th><th>Summary</th></tr></thead>
       <tbody>
       {% for row in rows %}
-        <tr data-rule="{{ row.rule.id }}" hx-get="/issues/{{ row.rule.id }}" hx-target="#issue-urls" hx-swap="innerHTML" tabindex="0">
+        <tr data-rule="{{ row.rule.id }}" hx-get="/issues/{{ row.rule.id }}" hx-target="#issue-urls" hx-swap="innerHTML" hx-trigger="click, keyup[key=='Enter']" tabindex="0">
           <td><span class="sev sev-{{ row.rule.severity.value }}">{{ row.rule.severity.value }}</span></td>
           <td><a href="/rules/{{ row.rule.id }}" class="rule-link"><code>{{ row.rule.id }}</code></a></td>
           <td class="num" data-count="{{ row.count }}">{{ row.count }}</td>

@@ -63,7 +63,7 @@ def test_every_rule_has_an_explanation_page(client: TestClient) -> None:
 
 
 def test_unknown_rule_and_page_render_the_404_page(client: TestClient) -> None:
-    for path in ("/rules/nope", "/issues/nope", "/page?url=https://elsewhere.test/"):
+    for path in ("/rules/nope", "/issues/nope", "/page?url=https://elsewhere.test/", "/page"):
         response = client.get(path)
         assert response.status_code == 404, path
         assert "<h1>Not found</h1>" in response.text

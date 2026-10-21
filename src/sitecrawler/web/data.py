@@ -21,6 +21,8 @@ from sitecrawler.store.dump import Cell, TableDump, dump_tables
 Row = dict[str, Cell]
 """One grid row: column name to cell value, as the JSON endpoints send it."""
 
+_RANK = {s.value: s.rank for s in Severity}
+
 
 @dataclass(slots=True, frozen=True)
 class Overview:
@@ -134,7 +136,7 @@ class CrawlSnapshot:
 
     def issues_for(self, rule_id: str) -> list[Row]:
         """The stored issues of one rule, as rows, in URL order."""
-        return [row for row in to_rows(self.issues) if row["rule_id"] == rule_id]
+        return to_rows(self._issues_where("rule_id", rule_id))
 
     def page_detail(self, url: str) -> PageDetail | None:
         """Everything about the page at ``url`` (any form), or ``None`` if it was not crawled."""
@@ -157,10 +159,9 @@ class CrawlSnapshot:
                 "summary": self._summary(row["rule_id"]),
                 "message": row["message"],
             }
-            for row in to_rows(self.issues)
-            if row["url"] == page.url
+            for row in to_rows(self._issues_where("url", page.url))
         ]
-        issues.sort(key=lambda r: (Severity(str(r["severity"])).rank, str(r["rule_id"])))
+        issues.sort(key=lambda r: (_RANK.get(str(r["severity"]), len(_RANK)), str(r["rule_id"])))
         return PageDetail(
             page=page,
             indexable=indexable,
@@ -168,6 +169,11 @@ class CrawlSnapshot:
             issues=issues,
             inlinks=self.view.inlinks_to(page.url),
         )
+
+    def _issues_where(self, column: str, value: Cell) -> TableDump:
+        col = self.issues.columns.index(column)
+        rows = [row for row in self.issues.rows if row[col] == value]
+        return TableDump(self.issues.name, self.issues.columns, rows)
 
     def _summary(self, rule_id: Cell) -> str:
         rule = self.rules.get(str(rule_id))

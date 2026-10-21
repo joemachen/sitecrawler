@@ -92,9 +92,9 @@ def redirects(request: Request) -> HTMLResponse:
 
 
 @router.get("/page", response_class=HTMLResponse)
-def page_detail(request: Request, url: str) -> HTMLResponse:
+def page_detail(request: Request, url: str = "") -> HTMLResponse:
     """Page detail: everything stored about one URL, its issues and its inlinks."""
-    detail = _snapshot(request).page_detail(url)
+    detail = _snapshot(request).page_detail(url) if url else None
     if detail is None:
         raise HTTPException(status_code=404, detail=f"{url} is not in this crawl")
     return _render(request, "page.html", "Pages", detail=detail)
