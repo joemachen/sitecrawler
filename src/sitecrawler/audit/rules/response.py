@@ -97,22 +97,22 @@ class BlockedByRobots(PageRule):
     """robots.txt disallowed a URL that the site links to."""
 
     id = "response.blocked_by_robots"
-    severity = Severity.MEDIUM
+    severity = Severity.LOW
     category = CATEGORY
-    summary = "Linked page is blocked by robots.txt"
+    summary = "Sitemap or list URL is blocked by robots.txt"
     why = (
         "Search engines will not fetch a disallowed URL, so whatever it contains "
-        "cannot rank. When it is also linked internally or listed in the sitemap, "
-        "the site is sending mixed signals and leaking link equity into a page "
-        "that cannot use it."
+        "cannot rank. A blocked URL that arrived via the sitemap or your URL list "
+        "is the site advertising a page it also forbids. Blocked URLs that internal "
+        "links point at are reported by robots.blocked_but_linked."
     )
     fix = (
-        "If the page should rank, remove the Disallow rule. If it should not, stop "
-        "linking to it internally and take it out of the sitemap; use noindex "
-        "rather than robots.txt when it must stay reachable but unindexed."
+        "If the page should rank, remove the Disallow rule. If it should not, take "
+        "it out of the sitemap; use noindex rather than robots.txt when it must "
+        "stay reachable but unindexed."
     )
 
     def check_page(self, page: PageRecord, crawl: CrawlView) -> Iterable[Issue]:
-        """Flag ``Outcome.BLOCKED``."""
-        if page.outcome is Outcome.BLOCKED:
+        """Flag ``Outcome.BLOCKED`` pages that no internal link points at."""
+        if page.outcome is Outcome.BLOCKED and not crawl.inlinks_to(page.url):
             yield self.issue(page, _linked_from(page, crawl))

@@ -99,6 +99,11 @@ def test_max_pages_caps_the_crawl(site: str) -> None:
     assert len(records) == 3
 
 
+def test_sitemap_only_blocked_page_is_recorded(crawled: dict[str, PageRecord]) -> None:
+    assert crawled["/blocked/sitemap-only"].outcome is Outcome.BLOCKED
+    assert crawled["/blocked/sitemap-only"].found_on.startswith("sitemap:")
+
+
 def test_no_sitemap_means_no_orphan(site: str) -> None:
     records = Crawler(CrawlConfig(start_url=site, use_sitemap=False, delay_seconds=0)).run()
     assert not any(r.url.endswith("/orphan") for r in records)
@@ -126,4 +131,4 @@ def test_parser_failure_becomes_error_record(site: str, monkeypatch: pytest.Monk
     assert by_path["/"].outcome is Outcome.ERROR
     assert "parser exploded" in by_path["/"].error
     assert by_path["/about"].outcome is Outcome.ERROR  # the crawl carried on (sitemap URL)
-    assert len(records) == 4  # start URL plus the three other sitemap URLs
+    assert len(records) == 6  # start URL plus the five other sitemap URLs

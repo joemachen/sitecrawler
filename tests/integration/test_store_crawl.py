@@ -66,7 +66,14 @@ def test_headers_and_sitemap_urls_are_stored(site: str, tmp_path: Path) -> None:
             assert notitle.x_robots_tag == "noindex"
             assert notitle.last_modified == "Wed, 21 Oct 2026 10:00:00 GMT"
             locs = set(s.scalars(select(SitemapUrlRow.loc)))
-    assert locs == {f"{site}/", f"{site}/about", f"{site}/orphan", f"{site}/blocked/secret"}
+    assert locs == {
+        f"{site}/",
+        f"{site}/about",
+        f"{site}/orphan",
+        f"{site}/blocked/secret",
+        f"{site}/blocked/sitemap-only",
+        f"{site}/audit/noindex-in-sitemap",
+    }
 
 
 def test_resume_after_crash_does_not_refetch(

@@ -30,11 +30,21 @@ OLD_HTML = {
 }
 """Phase 0 pages: written before the content rules existed, so they trip several."""
 
+CANONICALISED = {
+    "/about",
+    "/audit/canonical-to-404",
+    "/audit/canonical-off-site",
+    "/audit/canonical-chain-1",
+    "/audit/canonical-chain-2",
+    "/audit/canonical-conflict",
+}
+"""Linked pages whose effective canonical is a different URL."""
+
 TRIGGERS: dict[str, set[str]] = {
     "response.4xx": {"/missing"},
     "response.5xx": {"/audit/server-error"},
     "response.error": {"/audit/truncated"},
-    "response.blocked_by_robots": {"/blocked/secret"},
+    "response.blocked_by_robots": {"/blocked/sitemap-only"},
     "redirect.chain": {"/redirect-start"},
     "redirect.loop": {"/loop-a"},
     "redirect.to_error": {"/audit/redirect-to-missing"},
@@ -61,6 +71,31 @@ TRIGGERS: dict[str, set[str]] = {
     "h1.duplicate": {"/audit/h1-dup-1", "/audit/h1-dup-2"},
     "h1.too_long": {"/audit/h1-long"},
     "h2.missing": OLD_HTML,
+    "canonical.missing": (OLD_HTML - {"/", "/about"}) | {"/audit/canonical-missing"},
+    "canonical.to_non_200": {"/audit/canonical-to-404"},
+    "canonical.off_site": {"/about", "/audit/canonical-off-site"},
+    "canonical.chain": {"/audit/canonical-chain-1"},
+    "canonical.canonicalised_but_linked": CANONICALISED,
+    "canonical.not_self_referencing": CANONICALISED,
+    "canonical.og_url_mismatch": {"/audit/og-url-mismatch"},
+    "canonical.conflict": {"/audit/canonical-conflict"},
+    "robots.noindex": {
+        "/notitle",
+        "/audit/noindex",
+        "/audit/noindex-in-sitemap",
+        "/audit/robots-conflict",
+    },
+    "robots.nofollow": {"/audit/nofollow"},
+    "robots.none": {"/audit/robots-none"},
+    "robots.conflicting": {"/audit/robots-conflict"},
+    "robots.noindex_in_sitemap": {"/audit/noindex-in-sitemap"},
+    "robots.noindex_linked": {
+        "/notitle",
+        "/audit/noindex",
+        "/audit/robots-conflict",
+        "/audit/robots-none",
+    },
+    "robots.blocked_but_linked": {"/blocked/secret"},
 }
 
 NON_INDEXABLE: dict[str, str] = {
@@ -74,7 +109,18 @@ NON_INDEXABLE: dict[str, str] = {
     "/audit/redirect-off-site": "redirects to https://example.org/elsewhere",
     "/about": "canonicalised to https://www.fixture.test/about",
     "/notitle": "noindex",
+    "/blocked/sitemap-only": "blocked by robots.txt",
+    "/audit/noindex": "noindex",
+    "/audit/noindex-in-sitemap": "noindex",
+    "/audit/robots-none": "noindex",
+    "/audit/robots-conflict": "noindex",
+    "/audit/canonical-to-404": "canonicalised to",
+    "/audit/canonical-off-site": "canonicalised to https://example.org/elsewhere",
+    "/audit/canonical-chain-1": "canonicalised to",
+    "/audit/canonical-chain-2": "canonicalised to",
+    "/audit/canonical-conflict": "canonicalised to",
 }
+TRIGGERS["page.non_indexable"] = set(NON_INDEXABLE)
 
 
 @pytest.fixture

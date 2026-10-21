@@ -48,7 +48,7 @@ def test_export_xlsx_has_a_sheet_per_table(db: Path) -> None:
         # chain 2, loop 2, /blog and /audit trailing-slash 301s, redirect-to-missing, off-site
         assert len(redirects) == 1 + 8
         assert redirects[0] == ("url", "hop_no", "from_url", "to_url", "status_code")
-        assert len(list(workbook["sitemap_urls"].iter_rows(values_only=True))) == 1 + 4
+        assert len(list(workbook["sitemap_urls"].iter_rows(values_only=True))) == 1 + 6
     finally:
         workbook.close()
 
