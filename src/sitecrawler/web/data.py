@@ -74,7 +74,9 @@ class CrawlSnapshot:
         yes = no = 0
         for row in self.pages.rows:
             code = row[status_code]
-            buckets[f"{code // 100}xx" if isinstance(code, int) else str(row[outcome])] += 1
+            buckets[
+                f"{code // 100}xx" if isinstance(code, int) else str(row[outcome] or "error")
+            ] += 1
             d = row[depth]
             depths[d if isinstance(d, int) else 0] += 1
             if row[indexable] is True:
@@ -84,7 +86,8 @@ class CrawlSnapshot:
         severity = self.issues.columns.index("severity")
         by_severity = {s.value: 0 for s in Severity}
         for row in self.issues.rows:
-            by_severity[str(row[severity])] += 1
+            level = str(row[severity])  # a db from a newer sitecrawler may know more levels
+            by_severity[level] = by_severity.get(level, 0) + 1
         return Overview(
             pages=len(self.pages.rows),
             status_buckets=dict(sorted(buckets.items())),
@@ -110,7 +113,7 @@ def load_snapshot(path: Path) -> CrawlSnapshot:
     with open_store(path) as store:
         info = store.crawl()
         view = CrawlView.from_store(store)
-        tables = {t.name: t for t in dump_tables(store)}
+        tables = {t.name: t for t in dump_tables(store, ("pages", "issues", "redirects"))}
         counts = store.issue_counts()
     return CrawlSnapshot(
         path=path,
