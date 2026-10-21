@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from sitecrawler.audit.rule import PageRule
+from sitecrawler.audit.rules._common import describe_sources
 from sitecrawler.audit.view import CrawlView
 from sitecrawler.models import Issue, Outcome, PageRecord, Severity
 
@@ -15,9 +16,7 @@ def _linked_from(page: PageRecord, crawl: CrawlView) -> str:
     sources = crawl.inlinks_to(page.url)
     if not sources:
         return f"no internal links; found via {page.found_on}"
-    first = sources[0].src
-    more = f" and {len(sources) - 1} more" if len(sources) > 1 else ""
-    return f"linked from {first}{more}"
+    return describe_sources([s.src for s in sources])
 
 
 class ClientError(PageRule):

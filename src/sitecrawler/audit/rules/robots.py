@@ -6,6 +6,7 @@ from collections.abc import Iterable
 
 from sitecrawler.audit.engine import NOINDEX_TOKENS, robots_directives
 from sitecrawler.audit.rule import HtmlPageRule, PageRule
+from sitecrawler.audit.rules._common import describe_sources
 from sitecrawler.audit.view import CrawlView
 from sitecrawler.models import Issue, Outcome, PageRecord, Severity
 
@@ -160,5 +161,4 @@ class BlockedButLinked(PageRule):
         if page.outcome is Outcome.BLOCKED:
             sources = crawl.inlinks_to(page.url)
             if sources:
-                more = f" and {len(sources) - 1} more" if len(sources) > 1 else ""
-                yield self.issue(page, f"linked from {sources[0].src}{more}")
+                yield self.issue(page, describe_sources([s.src for s in sources]))

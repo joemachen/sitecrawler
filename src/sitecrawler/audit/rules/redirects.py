@@ -131,9 +131,18 @@ class Temporary(PageRule):
     )
 
     def check_page(self, page: PageRecord, crawl: CrawlView) -> Iterable[Issue]:
-        """Flag chains that contain a 302 or 307 hop."""
+        """Flag chains ending on a live internal page that contain a 302 or 307 hop.
+
+        Chains that end on an error, loop or another site have their own rules.
+        """
         temporary = [hop for hop in page.redirect_hops if hop.status_code in TEMPORARY]
-        if page.outcome is Outcome.FETCHED and temporary:
+        if (
+            page.outcome is Outcome.FETCHED
+            and temporary
+            and page.status_code is not None
+            and 200 <= page.status_code < 300
+            and crawl.is_internal(page.final_url)
+        ):
             codes = ", ".join(str(hop.status_code) for hop in temporary)
             yield self.issue(page, f"{codes} in {_chain(page)}")
 

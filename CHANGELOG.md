@@ -26,7 +26,10 @@ All notable changes to this project are documented here. The format follows
   `.canonicalised_but_linked`, `.not_self_referencing`, `.og_url_mismatch`,
   `.conflict`; `robots.noindex`, `.nofollow`, `.none`, `.conflicting`,
   `.noindex_in_sitemap`, `.noindex_linked`, `.blocked_but_linked`;
-  `page.non_indexable` (the verdict as a list).
+  `page.non_indexable` (the verdict as a list); `hreflang.invalid_lang`,
+  `.missing_self`, `.missing_x_default`, `.missing_return_link`, `.to_non_200`,
+  `.to_non_canonical`; `pagination.to_non_200`, `.canonical_to_first`,
+  `.broken_sequence`.
 - The fetcher stops at the first redirect hop that leaves the crawl's hosts
   and reports the redirect instead of fetching the other site.
 - The parser keeps the title and meta description counts, `og:url`, hreflang

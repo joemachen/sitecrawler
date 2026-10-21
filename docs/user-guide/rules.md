@@ -116,6 +116,56 @@ Sub-headings break content into scannable sections and give search engines the p
 
 **Fix:** Add H2s for each section of a page that has more than a few paragraphs.
 
+## Hreflang
+
+### `hreflang.invalid_lang`
+
+**hreflang uses an invalid language or region code** (severity: medium)
+
+Hreflang values must be ISO 639-1 language codes, optionally with an ISO 3166-1 region (``en-GB``) or script, or ``x-default``. Anything else (``en-UK``, ``english``, ``uk``) is ignored, silently.
+
+**Fix:** Use the ISO codes: language in lowercase, region in uppercase, joined by a hyphen.
+
+### `hreflang.missing_return_link`
+
+**hreflang alternate does not link back to this page** (severity: high)
+
+Hreflang only works when both pages confirm the relationship. If the alternate does not list this page, Google ignores the annotation on both.
+
+**Fix:** Add the matching hreflang link on every alternate page.
+
+### `hreflang.missing_self`
+
+**hreflang set does not reference the page itself** (severity: low)
+
+Each page in a language cluster must list every version including its own; without the self reference the annotations on this page may be discarded.
+
+**Fix:** Add an hreflang link whose href is this page's own canonical URL.
+
+### `hreflang.missing_x_default`
+
+**hreflang set has no x-default** (severity: low)
+
+``x-default`` tells search engines which version to show users whose language matches none of the alternates. Without it they pick one, often the wrong one.
+
+**Fix:** Add <link rel="alternate" hreflang="x-default" href=...> pointing at the fallback page.
+
+### `hreflang.to_non_200`
+
+**hreflang points at a URL that is not a 200 page** (severity: high)
+
+An alternate that is missing, errors or redirects breaks the whole cluster for that language and wastes crawl budget.
+
+**Fix:** Point hreflang at the final, live URL of each language version.
+
+### `hreflang.to_non_canonical`
+
+**hreflang points at a URL whose canonical is a different page** (severity: medium)
+
+Hreflang must reference canonical URLs. Pointing at a page that defers to another URL sends search engines a contradiction, and the alternate is dropped.
+
+**Fix:** Use each alternate's canonical URL in the hreflang link.
+
 ## Indexability
 
 ### `page.non_indexable`
@@ -167,6 +217,32 @@ Snippets are cut at about 155 characters on desktop and less on mobile.
 A few words do not earn a click, and Google will usually replace them.
 
 **Fix:** Use the room: one or two full sentences that promise what the page delivers.
+
+## Pagination
+
+### `pagination.broken_sequence`
+
+**rel=next target does not link back with rel=prev** (severity: medium)
+
+prev/next should form a chain that reads the same in both directions. A next page whose prev points somewhere else (or nowhere) means the series has a gap or two series are tangled.
+
+**Fix:** Make the next page's rel=prev point back at this page.
+
+### `pagination.canonical_to_first`
+
+**Paginated page canonicalises to another page in the series** (severity: medium)
+
+Pointing page 2, 3, ... at page 1 tells search engines those pages are duplicates, so the items listed only on them are never discovered. Each page in a series should be its own canonical.
+
+**Fix:** Give every paginated page a self-referencing canonical.
+
+### `pagination.to_non_200`
+
+**rel=prev or rel=next points at a URL that is not a 200 page** (severity: high)
+
+A pagination link to a missing or redirecting page breaks the series: crawlers stop there and the pages beyond it lose their path in.
+
+**Fix:** Point rel=prev/next at the live URL of the neighbouring page.
 
 ## Redirects
 
