@@ -4,4 +4,6 @@
   <url><loc>/about</loc></url>
   <url><loc>/orphan</loc></url>
   <url><loc>/blocked/secret</loc></url>
+  <url><loc>/blocked/sitemap-only</loc></url>
+  <url><loc>/audit/noindex-in-sitemap</loc></url>
 </urlset>

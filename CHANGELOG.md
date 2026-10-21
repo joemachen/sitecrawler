@@ -22,7 +22,11 @@ All notable changes to this project are documented here. The format follows
   `title.too_short`, `title.multiple`, `title.same_as_h1`;
   `meta_description.missing`, `.duplicate`, `.too_long`, `.too_short`,
   `.multiple`; `h1.missing`, `h1.multiple`, `h1.duplicate`, `h1.too_long`,
-  `h2.missing`.
+  `h2.missing`; `canonical.missing`, `.to_non_200`, `.off_site`, `.chain`,
+  `.canonicalised_but_linked`, `.not_self_referencing`, `.og_url_mismatch`,
+  `.conflict`; `robots.noindex`, `.nofollow`, `.none`, `.conflicting`,
+  `.noindex_in_sitemap`, `.noindex_linked`, `.blocked_but_linked`;
+  `page.non_indexable` (the verdict as a list).
 - The fetcher stops at the first redirect hop that leaves the crawl's hosts
   and reports the redirect instead of fetching the other site.
 - The parser keeps the title and meta description counts, `og:url`, hreflang

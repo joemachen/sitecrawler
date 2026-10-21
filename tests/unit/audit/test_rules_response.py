@@ -37,8 +37,8 @@ def test_fetch_error() -> None:
     assert hits["/t"].message == "timed out"
 
 
-def test_blocked_by_robots() -> None:
+def test_blocked_by_robots_only_when_unlinked() -> None:
     home = page("/", links=links("/b"))
-    hits = flagged(BlockedByRobots(), [home, blocked("/b"), page("/ok")])
-    assert set(hits) == {"/b"}
-    assert hits["/b"].message == f"linked from {SITE}/"
+    hits = flagged(BlockedByRobots(), [home, blocked("/b"), blocked("/s"), page("/ok")])
+    assert set(hits) == {"/s"}
+    assert hits["/s"].message == f"no internal links; found via {SITE}/"

@@ -8,6 +8,72 @@ Severity: **critical** blocks indexing or breaks pages site-wide, **high** costs
 rankings on affected pages, **medium** is worth fixing in the next sprint,
 **low** is hygiene, **info** is a fact to know rather than a problem.
 
+## Canonicals
+
+### `canonical.canonicalised_but_linked`
+
+**Internal links point at a page that canonicalises elsewhere** (severity: low)
+
+Links are sending users and crawlers to a URL the site itself says is not the one to index. Linking to the canonical URL instead keeps the signals in one place.
+
+**Fix:** Update internal links to the canonical URL.
+
+### `canonical.chain`
+
+**Canonical target has a different canonical of its own** (severity: medium)
+
+Search engines do not follow canonical chains reliably; the signal may stop at the first hop or be ignored altogether.
+
+**Fix:** Point every page in the group straight at the final canonical URL.
+
+### `canonical.conflict`
+
+**HTML canonical and Link header canonical disagree** (severity: medium)
+
+Two canonicals for one page is a contradiction search engines resolve by ignoring both. It usually means a CDN or framework adds a header the template does not know about.
+
+**Fix:** Remove one of them, or make both say the same URL.
+
+### `canonical.missing`
+
+**Page declares no canonical URL** (severity: low)
+
+Without a canonical, search engines pick which of a page's URL variants (trailing slash, query strings, http/https, www) to index, and may split signals across several. A self-referencing canonical settles it.
+
+**Fix:** Add <link rel="canonical" href="..."> pointing at the page's preferred URL.
+
+### `canonical.not_self_referencing`
+
+**Canonical points at a different URL** (severity: info)
+
+Not a problem by itself: this is how duplicates are meant to be handled. Listed so you can confirm every one of these is intentional.
+
+**Fix:** Check the list; if a page should rank on its own, make its canonical self-referencing.
+
+### `canonical.off_site`
+
+**Canonical points at another site** (severity: medium)
+
+A cross-domain canonical hands this page's ranking to the other site. That is right for syndicated content and wrong for almost everything else, including staging sites that kept the production canonical.
+
+**Fix:** Unless the content is deliberately syndicated, point the canonical at this site's own URL.
+
+### `canonical.og_url_mismatch`
+
+**og:url differs from the canonical** (severity: low)
+
+Social networks treat og:url as the page's identity, search engines use the canonical. When they disagree, shares and links accumulate on two URLs.
+
+**Fix:** Set og:url to the same URL as the canonical.
+
+### `canonical.to_non_200`
+
+**Canonical points at a URL that is not a 200 page** (severity: high)
+
+A canonical is a request to index a different URL instead of this one. If that URL is missing, errors or redirects, the request is ignored at best, and at worst this page drops out while nothing replaces it.
+
+**Fix:** Point the canonical at a URL that returns 200 directly (no redirect).
+
 ## Headings
 
 ### `h1.duplicate`
@@ -49,6 +115,16 @@ A heading that runs to a paragraph is hard to scan and usually says too much.
 Sub-headings break content into scannable sections and give search engines the page's sub-topics. Short pages do not need them; long ones do.
 
 **Fix:** Add H2s for each section of a page that has more than a few paragraphs.
+
+## Indexability
+
+### `page.non_indexable`
+
+**Page cannot be indexed** (severity: info)
+
+One list of everything search engines will not index, whatever the cause: robots.txt, errors, redirects, noindex or a canonical pointing elsewhere. The specific rules say which of these are problems; this one is the roll-up to check against what you expect the site to show in search.
+
+**Fix:** Scan the reasons; anything you did not intend has its own rule and fix above.
 
 ## Meta descriptions
 
@@ -162,11 +238,11 @@ Server errors mean the page could not be served at all. Repeated 5xx responses m
 
 ### `response.blocked_by_robots`
 
-**Linked page is blocked by robots.txt** (severity: medium)
+**Sitemap or list URL is blocked by robots.txt** (severity: low)
 
-Search engines will not fetch a disallowed URL, so whatever it contains cannot rank. When it is also linked internally or listed in the sitemap, the site is sending mixed signals and leaking link equity into a page that cannot use it.
+Search engines will not fetch a disallowed URL, so whatever it contains cannot rank. A blocked URL that arrived via the sitemap or your URL list is the site advertising a page it also forbids. Blocked URLs that internal links point at are reported by robots.blocked_but_linked.
 
-**Fix:** If the page should rank, remove the Disallow rule. If it should not, stop linking to it internally and take it out of the sitemap; use noindex rather than robots.txt when it must stay reachable but unindexed.
+**Fix:** If the page should rank, remove the Disallow rule. If it should not, take it out of the sitemap; use noindex rather than robots.txt when it must stay reachable but unindexed.
 
 ### `response.error`
 
@@ -175,6 +251,64 @@ Search engines will not fetch a disallowed URL, so whatever it contains cannot r
 A timeout or connection failure means the crawler, and probably search engines, got nothing back. Pages that fail this way are not indexed and may be slow for users too.
 
 **Fix:** Open the URL in a browser. If it loads, check for slow responses, aggressive rate limiting or bot blocking; if it does not, fix the server or DNS.
+
+## Robots directives
+
+### `robots.blocked_but_linked`
+
+**Internal links point at a URL blocked by robots.txt** (severity: medium)
+
+Crawlers follow the link, hit the Disallow rule and stop: the page can still be indexed (URL only, no content) and the link equity goes nowhere useful.
+
+**Fix:** If the page should rank, allow it in robots.txt. If it should not, use noindex instead of Disallow, or stop linking to it.
+
+### `robots.conflicting`
+
+**Robots directives contradict each other** (severity: medium)
+
+index and noindex (or follow and nofollow) on the same page, across the meta tag and the X-Robots-Tag header, leave the outcome to each search engine's tie-break rule. Google takes the most restrictive.
+
+**Fix:** Decide what the page should do and keep a single consistent directive.
+
+### `robots.nofollow`
+
+**Page is set to nofollow** (severity: low)
+
+A page-level nofollow tells crawlers to ignore every link on the page, so nothing it links to gets any equity from it. Rarely what anyone intends.
+
+**Fix:** Remove nofollow from meta robots or X-Robots-Tag; use rel=nofollow on individual links instead.
+
+### `robots.noindex`
+
+**Page is set to noindex** (severity: info)
+
+The page asks not to be indexed, via meta robots or X-Robots-Tag. Correct for thank-you pages and internal search; a disaster when it is left on after a launch.
+
+**Fix:** Confirm each listed page should stay out of search; remove the directive otherwise.
+
+### `robots.noindex_in_sitemap`
+
+**Noindex page is listed in the sitemap** (severity: medium)
+
+The sitemap says 'please index this' and the page says 'do not'. Search engines follow the page, and lose a little trust in the sitemap.
+
+**Fix:** Remove noindex pages from the sitemap (or drop the noindex if they should rank).
+
+### `robots.noindex_linked`
+
+**Noindex page receives internal links** (severity: low)
+
+Links into a page that cannot rank are wasted link equity, and over time Google stops following links from long-term noindex pages too.
+
+**Fix:** Link to an indexable page instead, or reconsider whether this page should be noindex.
+
+### `robots.none`
+
+**Page uses the robots directive none (noindex and nofollow)** (severity: low)
+
+``none`` is shorthand for noindex plus nofollow. It is easy to misread as 'no directives' and is best spelled out.
+
+**Fix:** Replace it with the explicit directives you mean, or remove it.
 
 ## Titles
 

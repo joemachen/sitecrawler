@@ -14,6 +14,9 @@
   "truncated": ["/audit/truncated"],
   "dead_links": ["/missing"],
   "headers": {
+    "/audit/canonical-conflict": {
+      "Link": "</audit/canonical-conflict-header>; rel=\"canonical\""
+    },
     "/notitle": {
       "X-Robots-Tag": "noindex",
       "Last-Modified": "Wed, 21 Oct 2026 10:00:00 GMT"
