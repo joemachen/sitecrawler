@@ -1,18 +1,29 @@
 from sitecrawler.audit.rules.response import BlockedByRobots, ClientError, FetchError, ServerError
-from sitecrawler.models import Outcome
+from sitecrawler.models import Outcome, RedirectHop
 from tests.unit.audit.helpers import SITE, blocked, flagged, links, page
 
 
 def test_client_error_only_4xx_with_link_context() -> None:
     home = page("/", links=links("/gone", "/also"))
     other = page("/c", links=links("/gone"))
-    hits = flagged(ClientError(), [home, other, page("/gone", 404), page("/ok"), page("/e", 503)])
-    assert set(hits) == {"/gone"}
+    via_redirect = page(
+        "/old", 404, redirect_hops=(RedirectHop(1, f"{SITE}/old", f"{SITE}/gone", 301),)
+    )
+    hits = flagged(
+        ClientError(),
+        [home, other, page("/gone", 404), page("/ok"), page("/e", 503), via_redirect],
+    )
+    assert set(hits) == {"/gone"}  # the redirected one is redirect.to_error's job
     assert hits["/gone"].message == f"404, linked from {SITE}/ and 1 more"
 
 
 def test_server_error_message_without_inlinks() -> None:
-    hits = flagged(ServerError(), [page("/boom", 500), page("/gone", 404), page("/ok")])
+    via_redirect = page(
+        "/r", 503, redirect_hops=(RedirectHop(1, f"{SITE}/r", f"{SITE}/boom", 302),)
+    )
+    hits = flagged(
+        ServerError(), [page("/boom", 500), page("/gone", 404), page("/ok"), via_redirect]
+    )
     assert set(hits) == {"/boom"}
     assert hits["/boom"].message == "500, no internal links; found via start"
 

@@ -118,7 +118,8 @@ def site(httpserver: HTTPServer) -> str:
             _redirect(httpserver, path[:-1], f"{base}{path}", status=301)
 
     for path, target in routes["redirects"].items():
-        _redirect(httpserver, path, f"{base}{target}", status=302)
+        location = target if target.startswith("http") else f"{base}{target}"
+        _redirect(httpserver, path, location, status=302)
     for path, status in routes.get("statuses", {}).items():
         httpserver.expect_request(path).respond_with_data(
             b"<html><title>Error</title></html>", status=status, content_type="text/html"

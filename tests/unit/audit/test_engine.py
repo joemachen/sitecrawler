@@ -32,6 +32,11 @@ def test_robots_directives(meta: str, header: str, expected: set[str]) -> None:
         (page("/loop", None, outcome=Outcome.REDIRECT_LOOP), False, "redirect loop"),
         (page("/err", None, outcome=Outcome.ERROR, error="boom"), False, "fetch error: boom"),
         (page("/missing", 404), False, "status 404"),
+        (
+            page("/r404", 404, final_url=f"{SITE}/gone"),
+            False,
+            f"redirects to {SITE}/gone",
+        ),
         (page("/odd", 302), False, "status 302 without a target"),
         (page("/r", final_url=f"{SITE}/elsewhere"), False, f"redirects to {SITE}/elsewhere"),
         (page("/pdf", content_type="application/pdf"), False, "not HTML (application/pdf)"),

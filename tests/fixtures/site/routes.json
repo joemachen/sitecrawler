@@ -4,7 +4,9 @@
     "/redirect-start": "/redirect-middle",
     "/redirect-middle": "/about",
     "/loop-a": "/loop-b",
-    "/loop-b": "/loop-a"
+    "/loop-b": "/loop-a",
+    "/audit/redirect-to-missing": "/missing",
+    "/audit/redirect-off-site": "https://example.org/elsewhere"
   },
   "statuses": {
     "/audit/server-error": 500

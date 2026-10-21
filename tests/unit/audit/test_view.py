@@ -90,3 +90,10 @@ def test_group_and_sitemap() -> None:
     assert not v.listed_in_sitemap(f"{SITE}/b")
     assert not v.listed_in_sitemap("nope")
     assert [p.url for p in v.pages_matching(lambda p: p.title == "")] == [f"{SITE}/c"]
+
+
+def test_redirected_pages_are_not_html_pages() -> None:
+    moved = page("/old", final_url=f"{SITE}/new")
+    slash = page("/dir", final_url=f"{SITE}/dir/")
+    v = view([moved, slash, page("/ok")])
+    assert [p.url.removeprefix(SITE) for p in v.html_pages] == ["/dir", "/ok"]

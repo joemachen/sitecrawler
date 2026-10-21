@@ -17,11 +17,50 @@ from sitecrawler.crawl import Crawler
 from sitecrawler.models import CrawlConfig
 from sitecrawler.store import open_store
 
+OLD_HTML = {
+    "/",
+    "/about",
+    "/blog",
+    "/blog/post-1",
+    "/blog/post-2",
+    "/notitle",
+    "/dup-title-1",
+    "/dup-title-2",
+    "/orphan",
+}
+"""Phase 0 pages: written before the content rules existed, so they trip several."""
+
 TRIGGERS: dict[str, set[str]] = {
     "response.4xx": {"/missing"},
     "response.5xx": {"/audit/server-error"},
     "response.error": {"/audit/truncated"},
     "response.blocked_by_robots": {"/blocked/secret"},
+    "redirect.chain": {"/redirect-start"},
+    "redirect.loop": {"/loop-a"},
+    "redirect.to_error": {"/audit/redirect-to-missing"},
+    "redirect.off_site": {"/audit/redirect-off-site"},
+    "redirect.temporary": {
+        "/redirect-start",
+        "/audit/redirect-to-missing",
+        "/audit/redirect-off-site",
+    },
+    "link.to_redirect": {"/", "/audit"},
+    "title.missing": {"/notitle"},
+    "title.duplicate": {"/dup-title-1", "/dup-title-2"},
+    "title.too_long": {"/audit/title-long"},
+    "title.too_short": (OLD_HTML - {"/notitle"}) | {"/audit", "/audit/title-short"},
+    "title.multiple": {"/audit/title-multiple"},
+    "title.same_as_h1": {"/blog", "/blog/post-1", "/blog/post-2", "/audit/title-same-as-h1"},
+    "meta_description.missing": OLD_HTML - {"/", "/about"},
+    "meta_description.duplicate": {"/audit/meta-dup-1", "/audit/meta-dup-2"},
+    "meta_description.too_long": {"/audit/meta-long"},
+    "meta_description.too_short": {"/", "/about", "/audit", "/audit/meta-short"},
+    "meta_description.multiple": {"/audit/meta-multiple"},
+    "h1.missing": {"/notitle"},
+    "h1.multiple": {"/about"},
+    "h1.duplicate": {"/audit/h1-dup-1", "/audit/h1-dup-2"},
+    "h1.too_long": {"/audit/h1-long"},
+    "h2.missing": OLD_HTML,
 }
 
 NON_INDEXABLE: dict[str, str] = {
@@ -31,6 +70,8 @@ NON_INDEXABLE: dict[str, str] = {
     "/blocked/secret": "blocked by robots.txt",
     "/loop-a": "redirect loop",
     "/redirect-start": "redirects to",
+    "/audit/redirect-to-missing": "redirects to",
+    "/audit/redirect-off-site": "redirects to https://example.org/elsewhere",
     "/about": "canonicalised to https://www.fixture.test/about",
     "/notitle": "noindex",
 }

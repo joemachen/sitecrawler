@@ -38,7 +38,9 @@ class ClientError(PageRule):
     )
 
     def check_page(self, page: PageRecord, crawl: CrawlView) -> Iterable[Issue]:
-        """Flag 400-499."""
+        """Flag 400-499 on pages that did not get there by redirect (see redirect.to_error)."""
+        if page.redirect_hops:
+            return
         if page.status_code is not None and 400 <= page.status_code < 500:
             yield self.issue(page, f"{page.status_code}, {_linked_from(page, crawl)}")
 
@@ -61,7 +63,9 @@ class ServerError(PageRule):
     )
 
     def check_page(self, page: PageRecord, crawl: CrawlView) -> Iterable[Issue]:
-        """Flag 500-599."""
+        """Flag 500-599 on pages that did not get there by redirect (see redirect.to_error)."""
+        if page.redirect_hops:
+            return
         if page.status_code is not None and page.status_code >= 500:
             yield self.issue(page, f"{page.status_code}, {_linked_from(page, crawl)}")
 

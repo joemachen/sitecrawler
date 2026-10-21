@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from types import TracebackType
 from urllib.parse import urljoin, urlparse
 
@@ -56,10 +57,24 @@ class Fetcher:
         max_redirects: int = 10,
         http2: bool = True,
         client: httpx.AsyncClient | None = None,
+        hop_allowed: Callable[[str], bool] | None = None,
     ) -> None:
-        """Create a fetcher. ``client`` lets tests inject a pre-configured client."""
+        """Create a fetcher.
+
+        Args:
+            user_agent: Sent as ``User-Agent``.
+            delay_seconds: Minimum gap between requests to one host.
+            timeout_seconds: Per-request timeout.
+            max_redirects: Chains longer than this report ``redirect_loop``.
+            http2: Negotiate HTTP/2 when offered.
+            client: A pre-configured client, for tests.
+            hop_allowed: Called with each redirect target; when it returns
+                ``False`` the chain stops there and the redirect response is
+                returned as the result, so out-of-scope sites are never fetched.
+        """
         self.throttle = HostThrottle(delay_seconds)
         self._max_redirects = max_redirects
+        self._hop_allowed = hop_allowed
         self._client = client or httpx.AsyncClient(
             headers={"User-Agent": user_agent, "Accept": _ACCEPT},
             timeout=httpx.Timeout(timeout_seconds),
@@ -102,6 +117,8 @@ class Fetcher:
                     break
                 target = urljoin(current, location)
                 hops.append(RedirectHop(len(hops) + 1, current, target, response.status_code))
+                if self._hop_allowed is not None and not self._hop_allowed(target):
+                    return self._result(url, response, hops, started, final_url=target)
                 reason = ""
                 if _loop_key(target) in visited:
                     chain = " -> ".join([url, *(hop.to_url for hop in hops)])
@@ -115,12 +132,23 @@ class Fetcher:
         except (httpx.HTTPError, httpx.InvalidURL) as exc:
             return self._failed(url, Outcome.ERROR, str(exc)[:200], hops, started)
 
+        return self._result(url, response, hops, started)
+
+    @staticmethod
+    def _result(
+        url: str,
+        response: httpx.Response,
+        hops: list[RedirectHop],
+        started: float,
+        *,
+        final_url: str | None = None,
+    ) -> FetchResult:
         content_type = response.headers.get("content-type", "").split(";")[0].strip()
         return FetchResult(
             url=url,
             outcome=Outcome.FETCHED,
             status_code=response.status_code,
-            final_url=str(response.url),
+            final_url=final_url if final_url is not None else str(response.url),
             content_type=content_type,
             text=response.text if "html" in content_type else "",
             content=response.content,

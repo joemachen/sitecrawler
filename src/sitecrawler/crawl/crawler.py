@@ -63,14 +63,6 @@ class Crawler:
         self.list_mode = bool(config.seed_urls)
         self.robots = RobotsCache(config.user_agent)
         self.records: list[PageRecord] = []
-        self.fetcher = Fetcher(
-            config.user_agent,
-            config.delay_seconds,
-            config.timeout_seconds,
-            max_redirects=config.max_redirects,
-            http2=config.http2,
-        )
-
         if self.list_mode:
             self.seeds = self._validate_seeds(config)
             self.start_url = ""
@@ -92,6 +84,14 @@ class Crawler:
             self.frontier = Frontier(
                 urlparse(start).netloc, scheme=self.scheme, keep_query=config.keep_query
             )
+        self.fetcher = Fetcher(
+            config.user_agent,
+            config.delay_seconds,
+            config.timeout_seconds,
+            max_redirects=config.max_redirects,
+            http2=config.http2,
+            hop_allowed=lambda target: self.frontier.in_scope(urlparse(target).netloc),
+        )
 
     @staticmethod
     def _validate_seeds(config: CrawlConfig) -> tuple[str, ...]:

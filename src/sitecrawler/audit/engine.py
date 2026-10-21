@@ -36,12 +36,12 @@ def indexability(page: PageRecord, crawl: CrawlView) -> Indexability:
         return Indexability(False, "redirect loop")
     if page.outcome is Outcome.ERROR:
         return Indexability(False, f"fetch error: {page.error}"[:80])
+    if page.final_url and not crawl.same_page(page.final_url, page.url):
+        return Indexability(False, f"redirects to {page.final_url}")
     if page.status_code is None or page.status_code >= 400:
         return Indexability(False, f"status {page.status_code}")
     if page.status_code >= 300:
         return Indexability(False, f"status {page.status_code} without a target")
-    if page.final_url and not crawl.same_page(page.final_url, page.url):
-        return Indexability(False, f"redirects to {page.final_url}")
     if "html" not in page.content_type:
         return Indexability(False, f"not HTML ({page.content_type or 'unknown type'})")
     if NOINDEX_TOKENS & robots_directives(page):
