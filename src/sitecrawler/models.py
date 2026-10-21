@@ -84,6 +84,48 @@ class ResumeState:
     """Pages already fetched, so ``max_pages`` counts across runs."""
 
 
+class Severity(StrEnum):
+    """How much an issue matters; the Issues report is sorted by this."""
+
+    CRITICAL = "critical"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+    INFO = "info"
+
+    @property
+    def rank(self) -> int:
+        """0 for CRITICAL up to 4 for INFO, for sorting."""
+        return list(Severity).index(self)
+
+
+@dataclass(slots=True, frozen=True)
+class Issue:
+    """One audit finding on one URL."""
+
+    url: str
+    rule_id: str
+    severity: Severity
+    message: str = ""
+    """Detail for this URL (the duplicate's partner, the hop count, ...)."""
+
+
+@dataclass(slots=True, frozen=True)
+class Indexability:
+    """Whether a page can appear in search results, and if not, why."""
+
+    indexable: bool
+    reason: str = ""
+
+
+@dataclass(slots=True, frozen=True)
+class HreflangRef:
+    """One ``<link rel="alternate" hreflang=...>`` entry."""
+
+    lang: str
+    href: str
+
+
 @dataclass(slots=True, frozen=True)
 class CrawlInfo:
     """Summary of a stored crawl, as read back from a store."""
@@ -162,6 +204,12 @@ class ParsedPage:
     """Content of ``<meta name="robots">``, if present."""
     lang: str = ""
     """``<html lang>`` attribute, if present."""
+    title_count: int = 0
+    meta_description_count: int = 0
+    og_url: str = ""
+    hreflang: list[HreflangRef] = field(default_factory=list)
+    rel_prev: str = ""
+    rel_next: str = ""
 
 
 @dataclass(slots=True)
@@ -193,6 +241,14 @@ class PageRecord:
     h2s: tuple[str, ...] = ()
     meta_robots: str = ""
     lang: str = ""
+    title_count: int = 0
+    meta_description_count: int = 0
+    og_url: str = ""
+    canonical_header: str = ""
+    """Canonical declared in the HTTP ``Link`` header, if any."""
+    hreflang: tuple[HreflangRef, ...] = ()
+    rel_prev: str = ""
+    rel_next: str = ""
 
     @property
     def status(self) -> str:

@@ -20,7 +20,7 @@ from sitecrawler.models import (
     QueueItem,
     ResumeState,
 )
-from sitecrawler.parse import parse_html, parse_sitemap
+from sitecrawler.parse import link_header_rels, parse_html, parse_sitemap
 
 log = logging.getLogger(__name__)
 
@@ -217,6 +217,15 @@ class Crawler:
         record.lang = page.lang
         record.word_count = page.word_count
         record.links = tuple(page.anchors)
+        record.title_count = page.title_count
+        record.meta_description_count = page.meta_description_count
+        record.og_url = page.og_url
+        record.hreflang = tuple(page.hreflang)
+        record.rel_prev = page.rel_prev
+        record.rel_next = page.rel_next
+        record.canonical_header = link_header_rels(
+            result.headers.get("link", ""), result.final_url
+        ).get("canonical", "")
         if page.canonical:
             record.canonical = page.canonical
 

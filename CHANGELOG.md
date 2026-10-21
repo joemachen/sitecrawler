@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `sitecrawler audit crawl.db` runs every audit rule over a stored crawl,
+  writes the `issues` table and an indexability verdict per page, and prints
+  the fix list grouped by severity. `sitecrawler issues crawl.db --rule ID`
+  lists the affected URLs.
+- Rule framework under `audit/`: `Rule`, `PageRule`, `HtmlPageRule`,
+  `CrawlView`; rules are discovered from `audit/rules/` and the rules
+  reference page is generated from them.
+- First rules: `response.4xx`, `response.5xx`, `response.error`,
+  `response.blocked_by_robots`.
+- The parser keeps the title and meta description counts, `og:url`, hreflang
+  alternates and `rel=prev/next`; the crawler keeps a `Link` header canonical.
+  Stored in `page_html` and the new `hreflang` table; exports gain `issues`
+  and `hreflang` sheets and the `indexable` columns.
+
 ## [0.2.0] - 2026-10-21
 
 Phase 1: core crawl and storage.

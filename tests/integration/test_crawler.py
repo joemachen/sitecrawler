@@ -18,22 +18,11 @@ def crawled(site: str) -> dict[str, PageRecord]:
     return {r.url.removeprefix(site): r for r in records}
 
 
-def test_discovers_every_in_scope_page(crawled: dict[str, PageRecord]) -> None:
-    assert set(crawled) == {
-        "/",
-        "/about",
-        "/blog",
-        "/blog/post-1",
-        "/blog/post-2",
-        "/notitle",
-        "/dup-title-1",
-        "/dup-title-2",
-        "/redirect-start",
-        "/loop-a",
-        "/missing",
-        "/blocked/secret",
-        "/orphan",  # sitemap only
-    }
+def test_discovers_every_in_scope_page(
+    crawled: dict[str, PageRecord], pages: frozenset[str]
+) -> None:
+    assert set(crawled) == pages
+    assert {"/orphan", "/blocked/secret", "/missing", "/loop-a"} <= set(crawled)
 
 
 def test_ignores_out_of_scope_links(crawled: dict[str, PageRecord]) -> None:
@@ -90,8 +79,8 @@ def test_parsed_fields(crawled: dict[str, PageRecord]) -> None:
     assert about.internal_links == 2
 
     home = crawled["/"]
-    # 12 page anchors collapse to 9 distinct URLs, plus the same-site PDF and image links.
-    assert home.internal_links == 11
+    # 13 page anchors collapse to 10 distinct URLs, plus the same-site PDF and image links.
+    assert home.internal_links == 12
     assert "ignored" not in home.title
 
     assert crawled["/notitle"].title == ""

@@ -28,15 +28,15 @@ def _requested_paths(httpserver: HTTPServer) -> set[str]:
     return {request.path for request, _ in httpserver.log} - _REDIRECT_TARGETS
 
 
-def test_full_crawl_is_stored(site: str, tmp_path: Path) -> None:
+def test_full_crawl_is_stored(site: str, tmp_path: Path, pages: frozenset[str]) -> None:
     with open_store(tmp_path / "c.db") as store:
         records = Crawler(_config(site), sink=store).run()
-        assert store.count_pages("done") == len(records) == 13
+        assert store.count_pages("done") == len(records) == len(pages)
         assert store.count_pages("pending") == 0
         stored = {r.url.removeprefix(site): r for r in store.iter_pages()}
         crawl = store.crawl()
     assert crawl.status == "done"
-    assert crawl.pages_done == 13
+    assert crawl.pages_done == len(pages)
     assert stored["/about"].title == "About the Fixture Site"
     assert stored["/about"].internal_links == 2
     assert stored["/orphan"].found_on.startswith("sitemap:")
@@ -70,7 +70,7 @@ def test_headers_and_sitemap_urls_are_stored(site: str, tmp_path: Path) -> None:
 
 
 def test_resume_after_crash_does_not_refetch(
-    site: str, tmp_path: Path, httpserver: HTTPServer
+    site: str, tmp_path: Path, httpserver: HTTPServer, pages: frozenset[str]
 ) -> None:
     path = tmp_path / "c.db"
     done_first: list[str] = []
@@ -88,10 +88,10 @@ def test_resume_after_crash_does_not_refetch(
     httpserver.clear_log()
     with open_store(path) as store:
         second = Crawler(_config(site), sink=store, resume=True).run()
-        assert store.count_pages("done") == 13
+        assert store.count_pages("done") == len(pages)
         assert store.count_pages("pending") == 0
         assert store.crawl().status == "done"
-    assert len(second) == 10
+    assert len(second) == len(pages) - 3
     assert not set(done_first) & {r.url for r in second}
 
     requested = _requested_paths(httpserver)
@@ -100,7 +100,9 @@ def test_resume_after_crash_does_not_refetch(
     assert "/robots.txt" in requested
 
 
-def test_resume_after_max_pages(site: str, tmp_path: Path, httpserver: HTTPServer) -> None:
+def test_resume_after_max_pages(
+    site: str, tmp_path: Path, httpserver: HTTPServer, pages: frozenset[str]
+) -> None:
     path = tmp_path / "c.db"
     with open_store(path) as store:
         first = Crawler(_config(site, max_pages=4), sink=store).run()
@@ -109,8 +111,8 @@ def test_resume_after_max_pages(site: str, tmp_path: Path, httpserver: HTTPServe
     httpserver.clear_log()
     with open_store(path) as store:
         second = Crawler(_config(site, max_pages=100), sink=store, resume=True).run()
-        assert store.count_pages("done") == 13
-    assert len(first) + len(second) == 13
+        assert store.count_pages("done") == len(pages)
+    assert len(first) + len(second) == len(pages)
     assert not {r.url for r in first} & {r.url for r in second}
     assert not {r.url.removeprefix(site) for r in first} & _requested_paths(httpserver)
 

@@ -15,7 +15,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from sitecrawler.models import PageRecord
-from sitecrawler.store.schema import LinkRow, PageRow, RedirectHopRow, SitemapUrlRow
+from sitecrawler.store.schema import (
+    HreflangRow,
+    IssueRow,
+    LinkRow,
+    PageRow,
+    RedirectHopRow,
+    SitemapUrlRow,
+)
 
 if TYPE_CHECKING:
     from sitecrawler.store.store import Store
@@ -23,7 +30,14 @@ if TYPE_CHECKING:
 Cell = str | int | float | bool | None
 """Values a dumped cell may hold; every writer can serialise these."""
 
-EXPORT_TABLES: tuple[str, ...] = ("pages", "links", "redirects", "sitemap_urls")
+EXPORT_TABLES: tuple[str, ...] = (
+    "pages",
+    "issues",
+    "links",
+    "redirects",
+    "hreflang",
+    "sitemap_urls",
+)
 """Names (and order) of the tables every export contains."""
 
 
@@ -59,6 +73,8 @@ _PAGE_COLUMNS = (
     "fetch_ms",
     "error",
     "fetched_at",
+    "indexable",
+    "indexability_reason",
 )
 
 
@@ -91,6 +107,8 @@ def _page_row(page: PageRow) -> tuple[Cell, ...]:
         page.fetch_ms,
         page.error,
         _iso(page.fetched_at),
+        page.indexable,
+        page.indexability_reason,
     )
 
 
@@ -116,8 +134,23 @@ def dump_tables(store: Store) -> list[TableDump]:
         sitemap_urls = session.scalars(
             select(SitemapUrlRow).order_by(SitemapUrlRow.sitemap_url, SitemapUrlRow.loc)
         ).all()
+        issues = session.execute(
+            select(PageRow.url, IssueRow)
+            .join(IssueRow, IssueRow.page_id == PageRow.id)
+            .order_by(IssueRow.rule_id, PageRow.url)
+        ).all()
+        hreflang = session.execute(
+            select(PageRow.url, HreflangRow)
+            .join(HreflangRow, HreflangRow.page_id == PageRow.id)
+            .order_by(PageRow.url, HreflangRow.id)
+        ).all()
         return [
             TableDump("pages", _PAGE_COLUMNS, [_page_row(p) for p in pages]),
+            TableDump(
+                "issues",
+                ("url", "rule_id", "severity", "message"),
+                [(url, i.rule_id, i.severity, i.message) for url, i in issues],
+            ),
             TableDump(
                 "links",
                 ("src_url", "dst_url", "anchor_text", "rel", "nofollow", "is_internal"),
@@ -130,6 +163,11 @@ def dump_tables(store: Store) -> list[TableDump]:
                 "redirects",
                 ("url", "hop_no", "from_url", "to_url", "status_code"),
                 [(url, h.hop_no, h.from_url, h.to_url, h.status_code) for url, h in hops],
+            ),
+            TableDump(
+                "hreflang",
+                ("url", "lang", "href"),
+                [(url, h.lang, h.href) for url, h in hreflang],
             ),
             TableDump(
                 "sitemap_urls",

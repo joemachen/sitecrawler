@@ -22,10 +22,18 @@ Generated from docstrings.
 ::: sitecrawler.store.schema
 ::: sitecrawler.store.dump
 
+## Audit
+
+::: sitecrawler.audit.rule
+::: sitecrawler.audit.view
+::: sitecrawler.audit.engine
+::: sitecrawler.audit.registry
+
 ## Parse
 
 ::: sitecrawler.parse.html
 ::: sitecrawler.parse.sitemap
+::: sitecrawler.parse.headers
 
 ## Export
 

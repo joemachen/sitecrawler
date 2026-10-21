@@ -8,11 +8,12 @@ from pathlib import Path
 from typer.testing import CliRunner
 
 from sitecrawler.cli.main import app
+from tests.conftest import site_pages
 
 runner = CliRunner()
 
 
-def test_crawl_command_writes_csv(site: str, tmp_path: Path) -> None:
+def test_crawl_command_writes_csv(site: str, tmp_path: Path, pages: frozenset[str]) -> None:
     out = tmp_path / "pages.csv"
     result = runner.invoke(app, ["crawl", site, "-o", str(out), "--delay", "0"])
     assert result.exit_code == 0, result.output
@@ -26,7 +27,7 @@ def test_crawl_command_writes_csv(site: str, tmp_path: Path) -> None:
     assert rows["/blocked/secret"]["status"] == "blocked"
     assert rows["/loop-a"]["status"] == "redirect_loop"
     assert rows["/orphan"]["found_on"].startswith("sitemap:")
-    assert len(rows) == 13
+    assert len(rows) == len(pages)
 
 
 def test_invalid_url_exits_2() -> None:
@@ -57,7 +58,7 @@ def test_crawl_with_db_then_resume(site: str, tmp_path: Path) -> None:
     assert resumed.exit_code == 0, resumed.output
     with out.open(newline="", encoding="utf-8") as fh:
         rows = list(csv.DictReader(fh))
-    assert len(rows) == 13  # the CSV comes from the store, so it has both runs
+    assert len(rows) == len(site_pages())  # the CSV comes from the store, so it has both runs
     assert list(rows[0].keys())[:2] == ["url", "status"]
 
 
