@@ -80,7 +80,11 @@ class Crawler:
         else:
             start = normalize(config.start_url, keep_query=config.keep_query)
             if start is None:
-                msg = f"Invalid start URL: {config.start_url!r}"
+                msg = (
+                    "Give a start_url or seed_urls"
+                    if not config.start_url
+                    else f"Invalid start URL: {config.start_url!r}"
+                )
                 raise ValueError(msg)
             self.seeds = ()
             self.start_url = start
@@ -93,10 +97,10 @@ class Crawler:
     def _validate_seeds(config: CrawlConfig) -> tuple[str, ...]:
         seeds: list[str] = []
         bad: list[str] = []
-        for line_no, raw in enumerate(config.seed_urls, start=1):
+        for raw in config.seed_urls:
             url = normalize(raw, keep_query=config.keep_query)
             if url is None:
-                bad.append(f"line {line_no}: {raw!r}")
+                bad.append(repr(raw))
             elif url not in seeds:
                 seeds.append(url)
         if bad:
@@ -194,7 +198,7 @@ class Crawler:
 
         page_host = urlparse(item.url).netloc
         final = self._normalize(result.final_url)
-        if final and not same_site(urlparse(final).netloc, page_host):
+        if final and not self.frontier.in_scope(urlparse(final).netloc):
             record.error = f"redirected off-site to {result.final_url}"
             return record, []
         if final and final != item.url:

@@ -6,7 +6,7 @@ from collections import deque
 from collections.abc import Iterable
 from urllib.parse import urlparse
 
-from sitecrawler.crawl.urls import looks_like_page, normalize, same_site, strip_www
+from sitecrawler.crawl.urls import looks_like_page, normalize, strip_www
 from sitecrawler.models import QueueItem
 
 
@@ -42,7 +42,7 @@ class Frontier:
 
     def in_scope(self, host: str) -> bool:
         """True when ``host`` is one of the frontier's hosts (``www.`` ignored)."""
-        return any(same_site(host, h) for h in self._hosts)
+        return strip_www(host) in self._hosts
 
     def add(self, url: str, depth: int, found_on: str) -> QueueItem | None:
         """Queue ``url`` if it is in scope and new. Returns the queued item, else ``None``."""

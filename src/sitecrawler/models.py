@@ -31,7 +31,8 @@ class Outcome(StrEnum):
 class CrawlConfig:
     """Everything that controls a crawl, in one immutable object."""
 
-    start_url: str
+    start_url: str = ""
+    """Where a site crawl starts. Leave empty and set ``seed_urls`` for list mode."""
     max_pages: int = 5000
     delay_seconds: float = 0.5
     workers: int = 4

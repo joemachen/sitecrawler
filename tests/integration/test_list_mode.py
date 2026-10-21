@@ -13,7 +13,6 @@ from sitecrawler.models import CrawlConfig, Outcome
 
 def _config(seeds: list[str], *, follow_links: bool = True) -> CrawlConfig:
     return CrawlConfig(
-        start_url="",
         seed_urls=tuple(seeds),
         follow_links=follow_links,
         delay_seconds=0,
@@ -43,15 +42,37 @@ def test_follow_stays_on_listed_hosts(site: str) -> None:
 
 
 def test_invalid_seed_is_rejected_before_any_request(httpserver: HTTPServer) -> None:
-    with pytest.raises(ValueError, match="line 2: 'nope'"):
+    with pytest.raises(ValueError, match=r"Invalid URL\(s\) in list: 'nope'"):
         Crawler(_config(["https://a.test/", "nope"]))
     assert httpserver.log == []
 
 
 def test_empty_list_is_rejected() -> None:
-    config = CrawlConfig(start_url="", seed_urls=(), delay_seconds=0)
-    with pytest.raises(ValueError, match="Invalid start URL"):
-        Crawler(config)
+    with pytest.raises(ValueError, match="Give a start_url or seed_urls"):
+        Crawler(CrawlConfig(seed_urls=(), delay_seconds=0))
+
+
+def test_redirect_to_another_listed_host_is_in_scope(site: str, second_site: HTTPServer) -> None:
+    other = second_site.url_for("/").rstrip("/")
+    second_site.expect_request("/go").respond_with_data(
+        b"", status=302, headers={"Location": f"{site}/about"}
+    )
+    records = Crawler(_config([f"{other}/go", f"{site}/"], follow_links=False)).run()
+    by_url = {r.url: r for r in records}
+    assert by_url[f"{other}/go"].title == "About the Fixture Site"
+    assert by_url[f"{other}/go"].error == ""
+    assert len(by_url[f"{other}/go"].redirect_hops) == 1
+
+
+def test_redirect_off_every_listed_host_is_flagged(site: str, second_site: HTTPServer) -> None:
+    other = second_site.url_for("/").rstrip("/")
+    # The fixture site is reachable but not in this list, so it counts as off-site.
+    second_site.expect_request("/away").respond_with_data(
+        b"", status=302, headers={"Location": f"{site}/about"}
+    )
+    records = Crawler(_config([f"{other}/away"], follow_links=False)).run()
+    assert records[0].error.startswith("redirected off-site")
+    assert records[0].title == ""
 
 
 @pytest.fixture

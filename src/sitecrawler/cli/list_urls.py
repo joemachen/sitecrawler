@@ -57,7 +57,6 @@ def list_urls(
         fail("no URLs found in the list")
 
     config = CrawlConfig(
-        start_url="",
         seed_urls=tuple(urls),
         follow_links=follow,
         max_pages=max_pages,
