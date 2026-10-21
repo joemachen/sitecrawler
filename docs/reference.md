@@ -20,6 +20,7 @@ Generated from docstrings.
 
 ::: sitecrawler.store.store
 ::: sitecrawler.store.schema
+::: sitecrawler.store.dump
 
 ## Parse
 
@@ -29,3 +30,5 @@ Generated from docstrings.
 ## Export
 
 ::: sitecrawler.export.csv
+::: sitecrawler.export.xlsx
+::: sitecrawler.export.json

@@ -11,6 +11,8 @@ One file holds exactly one crawl. That keeps every table free of a crawl id
 you would otherwise have to filter on, and makes a crawl something you can
 copy, email or diff.
 
+Exports (`sitecrawler export`) read from these tables; see [Exporting](export.md).
+
 ## Tables
 
 | Table | One row per | Notable columns |
