@@ -1,0 +1,35 @@
+# Runs on every `git commit`. Install once with: uv run pre-commit install
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+        args: ["--maxkb=500"]
+      - id: detect-private-key
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.10
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+      - id: ruff-format
+
+  # Local hooks run inside the project venv so they see the real dependencies.
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: uv run mypy
+        language: system
+        pass_filenames: false
+        types: [python]
+      - id: pytest-unit
+        name: pytest (unit)
+        entry: uv run pytest tests/unit -q
+        language: system
+        pass_filenames: false
+        types: [python]

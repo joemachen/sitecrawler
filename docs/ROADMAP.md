@@ -1,0 +1,239 @@
+# Roadmap
+
+Phases are ordered so that every one ships something usable on its own and
+each later phase builds on stored data from earlier ones. Each phase maps to a
+GitHub milestone and ends with a tagged release.
+
+A phase is **done** when every acceptance criterion is covered by a test
+against `tests/fixtures/site/`, the user guide has a page for it, and
+`CHANGELOG.md` has the entry.
+
+| Phase | Name | Release | Status |
+| --- | --- | --- | --- |
+| 0 | Foundation | v0.1.0 | In progress |
+| 1 | Core crawl and storage | v0.2.0 | |
+| 2 | Audit checks and issues engine | v0.3.0 | |
+| 3 | Local web UI | v0.4.0 | |
+| 4 | JavaScript rendering | v0.5.0 | |
+| 5 | Custom extraction and search | v0.6.0 | |
+| 6 | XML sitemap audit and generation | v0.7.0 | |
+| 7 | Internal linking analysis | v0.8.0 | |
+| 8 | Duplicate content detection | v0.9.0 | |
+| 9 | Structured data validation | v1.0.0 | |
+| 10 | API integrations | v1.x | |
+
+---
+
+## Phase 0: Foundation
+
+**Goal:** a project that is safe to change. Tooling, tests, docs, CI, and the
+original crawler ported into a package without behaviour changes.
+
+Deliverables:
+
+- `src/sitecrawler` package, `uv`, ruff, mypy strict, pytest, pre-commit, CI on Windows + Linux.
+- `sitecrawler crawl URL -o out.csv` reproducing the original script's output.
+- Fixture site covering redirects, loops, 404, robots blocking, sitemap-only page, off-site links.
+- `docs/DEVELOPMENT.md`, `docs/ARCHITECTURE.md`, this roadmap, ADRs.
+
+Acceptance:
+
+- [ ] All quality gates green locally and in CI.
+- [ ] A capped crawl of mabelslabels.com matches the original CSV row for row.
+
+---
+
+## Phase 1: Core crawl and storage
+
+**Goal:** the crawler records everything a later phase could need, and keeps
+it in a database rather than a CSV.
+
+Deliverables:
+
+- `asyncio` + `httpx` fetcher with per-host rate limit and HTTP/2.
+- SQLite store (`store/`): schema from ARCHITECTURE §3; `--db crawl.db`.
+- Full redirect capture: every hop, status, and final URL. Chains and loops detectable from data.
+- Response headers stored (`X-Robots-Tag`, `Content-Type`, `Last-Modified`, size).
+- **List mode:** `sitecrawler list urls.txt` and `sitecrawler list -` (stdin). Crawls exactly the given URLs, no link following unless `--follow`.
+- Exports: `sitecrawler export crawl.db --format csv|xlsx|json`. XLSX has one sheet per table.
+- Resume: a crashed crawl can continue from its DB.
+
+Acceptance:
+
+- [ ] Fixture redirect chain yields two `redirect_hops` rows; the loop yields a `redirect_loop` outcome after N hops, not a timeout.
+- [ ] List mode on the fixture sitemap's URLs fetches exactly those and nothing else.
+- [ ] `export --format xlsx` opens in Excel with pages, links, redirects sheets.
+- [ ] Killing a crawl and re-running with `--resume` finishes without re-fetching done pages.
+
+---
+
+## Phase 2: Audit checks and issues engine
+
+**Goal:** the reason the tool exists. Every "must-have" on-page check, and a
+ranked, explained fix list.
+
+Checks (each is a `Rule` with fixture coverage):
+
+- **Response codes:** 4xx, 5xx, blocked by robots, timeouts, off-site redirects.
+- **Redirects:** chains (> 1 hop), loops, redirect to 4xx, HTTP→HTTPS missing, temporary (302/307) where permanent expected, internal links pointing at redirects.
+- **Titles:** missing, duplicate, too long (> 60 chars / ~580 px), too short, multiple `<title>`, same as H1.
+- **Meta descriptions:** missing, duplicate, too long (> 155), too short, multiple.
+- **Headings:** missing H1, multiple H1, duplicate H1, missing H2s, H1 too long.
+- **Canonicals:** missing, pointing to non-200, pointing off-site, canonical chain, canonicalised page that is linked internally, self-referencing check, canonical vs. `og:url` mismatch, conflicting canonicals (HTML vs header).
+- **Robots directives:** `noindex` (meta or `X-Robots-Tag`), `nofollow`, `none`, conflicting directives, noindex page in sitemap, noindex page with internal links, blocked by robots.txt but linked.
+- **Hreflang:** missing return links, invalid language codes, pointing to non-200 or non-canonical URLs, missing `x-default`, self-reference missing.
+- **Pagination:** `rel=prev/next` pointing to non-200, paginated pages with canonical to page 1, sequence gaps.
+- **Indexability verdict** per page: indexable / non-indexable with reason.
+
+Engine:
+
+- `sitecrawler audit crawl.db` runs all rules, writes `issues` table, prints a table grouped by severity with counts and a one-line explanation.
+- `sitecrawler issues crawl.db --rule title.missing` lists affected URLs.
+- Rule docs auto-generated into `docs/user-guide/rules/`.
+
+Acceptance:
+
+- [ ] 100% branch coverage on `audit/`.
+- [ ] Every rule has a triggering and a non-triggering fixture page.
+- [ ] `audit` on a stored 10k-page crawl runs in under 10 s.
+
+---
+
+## Phase 3: Local web UI
+
+**Goal:** the "Issues tab" and friends in a browser, over a stored crawl.
+
+- `sitecrawler serve crawl.db` opens `http://127.0.0.1:8765`.
+- FastAPI + Jinja2 + HTMX; Tabulator for sortable, filterable, exportable grids.
+- Tabs: **Overview** (counts, status breakdown, depth histogram), **Pages** (all columns, filter, search), **Issues** (grouped by rule, ranked by severity, click to see URLs and explanation), **Redirects**, **Page detail** (everything we know about one URL, including inlinks).
+- Export any filtered grid to CSV.
+- No login, binds to localhost only.
+
+Acceptance:
+
+- [ ] Playwright e2e test opens each tab on the fixture crawl and asserts key numbers.
+- [ ] Any Issues-tab row links to the rule's explanation page.
+
+---
+
+## Phase 4: JavaScript rendering
+
+**Goal:** see what Google sees on JS-heavy and app-injected pages.
+
+- `--render` flag uses Playwright headless Chromium. Raw fetch still happens first.
+- Stores both raw and rendered HTML; parses both.
+- Diff report: links, titles, canonicals, metas that exist only after rendering (or only before).
+- Configurable wait strategy (`networkidle`, selector, timeout) and resource blocking (images, fonts, analytics) for speed.
+- Render concurrency separate from fetch concurrency (default 2 tabs).
+
+Acceptance:
+
+- [ ] Fixture page that injects its title, canonical and three links via JS is reported correctly only with `--render`.
+- [ ] Rendered-vs-raw diff lists exactly those injected items.
+
+---
+
+## Phase 5: Custom extraction and custom search
+
+**Goal:** pull anything off any page, across a whole site.
+
+- `--extract name=css:SELECTOR`, `--extract name=xpath:EXPR`, `--extract name=regex:PATTERN`, repeatable; also loadable from a TOML file.
+- Modes per extractor: text, inner HTML, attribute, all matches vs. first.
+- `--search "pattern"` (regex, case-insensitive) flags pages containing / not containing text or HTML (e.g. a GA4 tag ID).
+- Results stored in `extractions`, shown as columns in Pages tab and exports.
+- Works on rendered HTML when `--render` is on.
+
+Acceptance:
+
+- [ ] Extracting price via CSS, SKU via XPath and GA tag via regex from fixture product pages yields expected values.
+- [ ] `--search` lists pages missing the GA tag.
+
+---
+
+## Phase 6: XML sitemap audit and generation
+
+**Goal:** sitemaps that match reality.
+
+- Parse every sitemap and sitemap index (gz supported); store all URLs with source.
+- Reports: **orphans** (in sitemap, not reachable by links), **non-indexable in sitemap** (noindex, 3xx, 4xx, canonicalised elsewhere), **indexable missing from sitemap**, sitemap URLs on other hosts, duplicates across sitemaps.
+- `sitecrawler sitemap generate crawl.db` writes a valid sitemap (or index when > 50k) of indexable 200 pages, with optional `lastmod` from headers.
+
+Acceptance:
+
+- [ ] Fixture `orphan` page is reported as an orphan; `blocked/secret` is reported as non-indexable-in-sitemap; `blog/post-2` as missing-from-sitemap.
+- [ ] Generated sitemap validates against the sitemaps.org XSD.
+
+---
+
+## Phase 7: Internal linking analysis
+
+**Goal:** the quick wins.
+
+- Inlinks and outlinks per page with anchor text, rel, position, nofollow.
+- Crawl depth from the start URL (already) plus shortest-path depth.
+- **Link Score:** PageRank over the internal follow graph, scaled 0-100.
+- Reports: pages with few inlinks, high-depth pages, links to redirects/404s, generic anchors ("click here"), nofollow internal links, pages with excessive outlinks.
+- Anchor text per target URL (what the site "calls" each page).
+
+Acceptance:
+
+- [ ] Link Score of the fixture home page is highest; the orphan's is lowest.
+- [ ] Every internal link to a 404 or redirect in the fixture site appears in the report with its source and anchor.
+
+---
+
+## Phase 8: Duplicate and near-duplicate content
+
+- Exact duplicates via content hash of main text (boilerplate stripped).
+- Near-duplicates via SimHash with a configurable Hamming threshold; clusters reported with a representative URL.
+- Low-content pages (word count below threshold).
+- Cross-check against canonicals: duplicates without a shared canonical are the issue.
+
+Acceptance:
+
+- [ ] Two fixture pages differing by one sentence cluster together; unrelated pages do not.
+
+---
+
+## Phase 9: Structured data validation
+
+- Extract JSON-LD, microdata and RDFa (`extruct`).
+- Validate types and properties against the schema.org vocabulary (bundled JSON-LD, updated by a script).
+- Google rich-result rules per type (Product, Article, BreadcrumbList, FAQPage, Organization, LocalBusiness, Recipe, Event, VideoObject, ...): required vs. recommended properties.
+- Reports: invalid JSON, unknown types/properties, missing required fields, multiple conflicting entities.
+
+Acceptance:
+
+- [ ] Fixture product page with a missing `offers.price` is flagged; a complete one passes.
+
+---
+
+## Phase 10: API integrations (future)
+
+Each integration is an `Enricher`: given URLs, return extra columns stored in
+the crawl DB and shown next to crawl data.
+
+- **Google Search Console:** clicks, impressions, CTR, position per URL; URL Inspection API for indexing status and last crawl.
+- **GA4:** sessions, conversions per landing page.
+- **PageSpeed Insights / CrUX:** Core Web Vitals, lab scores.
+- **Ahrefs / Majestic / Moz:** backlinks and authority per URL.
+
+OAuth and API keys via `.env`; all integrations are optional and off by default.
+
+Acceptance:
+
+- [ ] "Thin title with 40k impressions" is a single filter in the Issues tab.
+
+---
+
+## Ideas parked for later
+
+Not scheduled; captured so they are not forgotten.
+
+- Scheduled re-crawls and crawl-to-crawl diff ("what changed since last week").
+- Core Web Vitals from the Playwright run itself.
+- Image audit (alt text, size, lazy loading).
+- Spelling and grammar.
+- AMP, mobile usability.
+- Log file analysis.
+- Packaging as a single executable.

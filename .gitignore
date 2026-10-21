@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# mkdocs build output
+site/
+
+# Secrets and local config
+.env
+*.local.toml
+
+# Crawl outputs (keep the repo free of data)
+*.db
+*.sqlite
+*.csv
+*.xlsx
+*.log
+!tests/fixtures/**/*.csv
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

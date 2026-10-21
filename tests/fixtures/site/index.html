@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Fixture Site Home</title>
+  <meta name="description" content="A tiny site that exercises every crawler feature.">
+  <link rel="canonical" href="/">
+</head>
+<body>
+  <h1>Welcome to the fixture site</h1>
+  <p>Links in scope:</p>
+  <ul>
+    <li><a href="/about">About</a></li>
+    <li><a href="/blog/">Blog</a></li>
+    <li><a href="/notitle">Page without a title</a></li>
+    <li><a href="/dup-title-1">Duplicate title one</a></li>
+    <li><a href="/dup-title-2">Duplicate title two</a></li>
+    <li><a href="/redirect-start">Two-hop redirect</a></li>
+    <li><a href="/loop-a">Redirect loop</a></li>
+    <li><a href="/missing">Dead link</a></li>
+    <li><a href="/blocked/secret">Robots-blocked page</a></li>
+    <li><a href="/about#team">Same page, fragment</a></li>
+    <li><a href="/about?utm_source=newsletter">Same page, tracking param</a></li>
+    <li><a href="/about/">Same page, trailing slash</a></li>
+  </ul>
+  <p>Links that must be ignored:</p>
+  <ul>
+    <li><a href="https://example.org/elsewhere">Off-site</a></li>
+    <li><a href="/brochure.pdf">PDF</a></li>
+    <li><a href="/logo.png">Image</a></li>
+    <li><a href="mailto:hello@example.test">Email</a></li>
+    <li><a href="tel:+15555550100">Phone</a></li>
+    <li><a href="javascript:void(0)">Script</a></li>
+    <li><a href="#top">Anchor</a></li>
+  </ul>
+  <script>var ignored = "these words must not be counted";</script>
+</body>
+</html>

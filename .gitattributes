@@ -1,0 +1,7 @@
+# Normalise line endings to LF in the repository and on checkout, so that
+# Windows and Linux contributors (and CI) see identical files.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary

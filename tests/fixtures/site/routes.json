@@ -1,0 +1,9 @@
+{
+  "_comment": "Non-file routes served by the fixture server. Redirects map path -> Location.",
+  "redirects": {
+    "/redirect-start": "/redirect-middle",
+    "/redirect-middle": "/about",
+    "/loop-a": "/loop-b",
+    "/loop-b": "/loop-a"
+  }
+}

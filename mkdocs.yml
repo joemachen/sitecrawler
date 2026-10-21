@@ -1,0 +1,48 @@
+site_name: sitecrawler
+site_description: SEO site-audit crawler
+repo_url: https://github.com/joemachen/sitecrawler
+docs_dir: docs
+strict: true
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+  palette:
+    - scheme: default
+      toggle: { icon: material/brightness-7, name: Dark mode }
+    - scheme: slate
+      toggle: { icon: material/brightness-4, name: Light mode }
+
+nav:
+  - Home: index.md
+  - User guide:
+      - Crawling a site: user-guide/crawl.md
+  - Project:
+      - Development process: DEVELOPMENT.md
+      - Architecture: ARCHITECTURE.md
+      - Roadmap: ROADMAP.md
+      - Decisions:
+          - Index: adr/README.md
+          - 0001 Python, uv, SQLite: adr/0001-python-uv-sqlite-stack.md
+          - 0002 CLI first: adr/0002-cli-first-web-ui-later.md
+  - API reference: reference.md
+
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.superfences
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            show_source: false
