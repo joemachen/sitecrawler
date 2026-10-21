@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
@@ -136,10 +137,21 @@ def site(httpserver: HTTPServer) -> str:
 
 @pytest.fixture
 def crawled_db(site: str, tmp_path: Path) -> Path:
-    """A complete crawl of the fixture site in a closed SQLite file, not yet audited."""
+    """A complete crawl of the fixture site in a closed SQLite file, not yet audited.
+
+    The crawl runs in a worker thread because ``Crawler.run`` calls
+    ``asyncio.run``, which refuses to start while another loop is running on
+    the main thread, and Playwright's sync API keeps one running for the whole
+    session once its fixtures are up.
+    """
     path = tmp_path / "crawl.db"
-    with open_store(path) as store:
-        Crawler(CrawlConfig(start_url=site, delay_seconds=0, workers=1), sink=store).run()
+
+    def crawl() -> None:
+        with open_store(path) as store:
+            Crawler(CrawlConfig(start_url=site, delay_seconds=0, workers=1), sink=store).run()
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        pool.submit(crawl).result()
     return path
 
 

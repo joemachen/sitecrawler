@@ -37,9 +37,12 @@ that pass between stages are typed records from `sitecrawler.models`.
                sitemap diff
 ```
 
-**Status (Phase 0):** `crawl/`, `parse/html`, `parse/sitemap`, `export/csv`
-and `cli/` exist. The store is not built yet: records are held in memory and
-written straight to CSV. `audit/`, `analysis/`, `store/` are empty packages.
+**Status (after Phase 3):** `crawl/`, `parse/`, `store/`, `export/`, `audit/`
+(51 rules), `cli/` and `web/` exist. `web/` is a FastAPI app over one
+in-memory snapshot of a stored crawl (ADR-0006): `data.py` builds the
+snapshot from the store's export tables and a `CrawlView`, `app.py` holds the
+routes, templates and vendored htmx/Tabulator sit beside them. `analysis/` is
+still an empty package.
 
 ---
 
