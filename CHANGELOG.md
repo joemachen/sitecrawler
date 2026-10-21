@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-21
+
+Phase 1: core crawl and storage.
+
 ### Added
 
 - `sitecrawler export crawl.db --format csv|xlsx|json`: csv is the pages table,
