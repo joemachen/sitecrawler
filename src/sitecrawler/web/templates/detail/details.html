@@ -1,0 +1,14 @@
+{% from "detail/_macros.html" import field %}
+{% set page = detail.page %}
+<h2>Response</h2>
+<table class="plain fields">
+  {{ field("Outcome", page.outcome.value) }}
+  {{ field("Status code", page.status_code) }}
+  {{ field("Final URL", page.final_url) }}
+  {{ field("Content type", page.content_type) }}
+  {{ field("Size (bytes)", page.size_bytes) }}
+  {{ field("Fetch time (ms)", page.fetch_ms) }}
+  {{ field("Error", page.error) }}
+  {{ field("Depth", page.depth) }}
+  {{ field("Found on", page.found_on) }}
+</table>

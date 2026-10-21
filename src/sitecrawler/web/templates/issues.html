@@ -1,16 +1,12 @@
-{% extends "base.html" %}
-{% block title %}Issues · sitecrawler{% endblock %}
-{% block content %}
-{% if not snapshot.audited %}
-<p class="notice">No audit stored yet.
-  Run <code>sitecrawler audit {{ snapshot.path.name }}</code> and restart <code>serve</code>.</p>
+{% if not audited %}
+<p class="notice">No audit has run yet; the rule list fills in as pages arrive.</p>
 {% endif %}
 <div class="split">
   <section class="rules">
     <table class="plain rules" id="rules">
       <thead><tr><th>Severity</th><th>Rule</th><th class="num">URLs</th><th>Summary</th></tr></thead>
       <tbody>
-      {% for row in rows %}
+      {% for row in rule_rows %}
         <tr data-rule="{{ row.rule.id }}" hx-get="/issues/{{ row.rule.id }}" hx-target="#issue-urls" hx-swap="innerHTML" hx-trigger="click, keyup[key=='Enter']" tabindex="0">
           <td><span class="sev sev-{{ row.rule.severity.value }}">{{ row.rule.severity.value }}</span></td>
           <td><a href="/rules/{{ row.rule.id }}" class="rule-link"><code>{{ row.rule.id }}</code></a></td>
@@ -18,7 +14,7 @@
           <td>{{ row.rule.summary }}</td>
         </tr>
       {% else %}
-        <tr><td colspan="4" class="muted">No issues stored.</td></tr>
+        <tr><td colspan="4" class="muted">No issues found.</td></tr>
       {% endfor %}
       </tbody>
     </table>
@@ -27,4 +23,3 @@
     <p class="muted">Click a rule to see the URLs it flagged.</p>
   </section>
 </div>
-{% endblock %}

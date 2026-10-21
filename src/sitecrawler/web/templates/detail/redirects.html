@@ -1,0 +1,12 @@
+{% set page = detail.page %}
+<h2>Redirect hops <span class="muted">({{ page.redirect_hops | length }})</span></h2>
+<table class="plain hops">
+  <thead><tr><th>#</th><th>From</th><th>To</th><th>Status</th></tr></thead>
+  <tbody>
+  {% for hop in page.redirect_hops %}
+    <tr><td>{{ hop.hop_no }}</td><td>{{ hop.from_url }}</td><td>{{ hop.to_url }}</td><td>{{ hop.status_code }}</td></tr>
+  {% else %}
+    <tr><td colspan="4" class="muted">No redirects.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>

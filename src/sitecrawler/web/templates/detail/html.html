@@ -1,0 +1,20 @@
+{% from "detail/_macros.html" import field %}
+{% set page = detail.page %}
+<h2>HTML</h2>
+<table class="plain fields">
+  {{ field("Title", page.title) }}
+  {{ field("Title tags", page.title_count) }}
+  {{ field("Meta description", page.meta_description) }}
+  {{ field("Meta description tags", page.meta_description_count) }}
+  {{ field("H1", page.h1s | join(" | ")) }}
+  {{ field("H2", page.h2s | join(" | ")) }}
+  {{ field("Canonical", page.canonical) }}
+  {{ field("Canonical (Link header)", page.canonical_header) }}
+  {{ field("Meta robots", page.meta_robots) }}
+  {{ field("og:url", page.og_url) }}
+  {{ field("Language", page.lang) }}
+  {{ field("Word count", page.word_count) }}
+  {{ field("Internal links", page.internal_links) }}
+  {{ field("rel=prev", page.rel_prev) }}
+  {{ field("rel=next", page.rel_next) }}
+</table>

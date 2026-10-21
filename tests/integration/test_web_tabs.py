@@ -1,4 +1,4 @@
-"""Issues, rules, redirects and page detail over the stored fixture crawl."""
+"""Issues, rules and page detail over the stored fixture crawl."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ def client(audited_db: Path) -> Iterator[TestClient]:
         yield c
 
 
-def test_issues_tab_lists_every_rule_that_fired_with_a_rule_link(client: TestClient) -> None:
+def test_issues_fragment_lists_every_rule_that_fired_with_a_rule_link(client: TestClient) -> None:
     html = client.get("/issues").text
     fired = {rule for rule, paths in TRIGGERS.items() if paths}
     assert set(re.findall(r'data-rule="([^"]+)"', html)) == fired
@@ -69,15 +69,17 @@ def test_unknown_rule_and_page_render_the_404_page(client: TestClient) -> None:
         assert "<h1>Not found</h1>" in response.text
 
 
-def test_redirects_tab_and_its_json(client: TestClient, site: str) -> None:
-    assert 'data-grid="/api/redirects"' in client.get("/redirects").text
-    rows = client.get("/api/redirects").json()
-    chain = [r for r in rows if r["url"] == f"{site}/redirect-start"]
-    assert [r["hop_no"] for r in chain] == list(range(1, len(chain) + 1))
-    assert all(r["status_code"] in (301, 302) for r in rows)
+def test_redirected_pages_are_counted_under_3xx(client: TestClient, site: str) -> None:
+    rows = client.get("/api/rows").json()["rows"]
+    with_hops = {r["url"] for r in rows if r["redirect_hops"]}
+    assert f"{site}/redirect-start" in with_hops
+    assert {r["url"] for r in rows if r["status_class"] == "3xx"} == with_hops
+    assert client.get("/api/summary").json()["tabs"]["response_codes"]["3xx"] == len(with_hops)
+    start = next(r for r in rows if r["url"] == f"{site}/redirect-start")
+    assert (start["first_status"], start["status_code"]) == (302, 200)
 
 
-def test_page_detail_shows_verdict_issues_and_inlinks(client: TestClient, site: str) -> None:
+def test_page_detail_shows_verdict_issues_and_links(client: TestClient, site: str) -> None:
     html = client.get("/page", params={"url": f"{site}/missing"}).text
     assert "non-indexable" in html
     assert "status 404" in html
@@ -88,6 +90,7 @@ def test_page_detail_shows_verdict_issues_and_inlinks(client: TestClient, site: 
     assert "indexable" in ok
     assert "non-indexable" not in ok
     assert "<h2>Outlinks" in ok
+    assert f'data-url="{site}/blog"' in ok  # a crawled outlink is a link
 
 
 def test_page_detail_accepts_any_url_form(client: TestClient, site: str) -> None:

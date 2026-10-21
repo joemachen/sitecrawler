@@ -1,0 +1,15 @@
+<h2>Issues <span class="muted">({{ detail.issues | length }})</span></h2>
+<table class="plain issues">
+  <thead><tr><th>Severity</th><th>Rule</th><th>Detail</th></tr></thead>
+  <tbody>
+  {% for issue in detail.issues %}
+    <tr data-rule="{{ issue.rule_id }}">
+      <td><span class="sev sev-{{ issue.severity }}">{{ issue.severity }}</span></td>
+      <td><a href="/rules/{{ issue.rule_id }}" title="{{ issue.summary }}"><code>{{ issue.rule_id }}</code></a></td>
+      <td>{{ issue.message }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="3" class="muted">None</td></tr>
+  {% endfor %}
+  </tbody>
+</table>

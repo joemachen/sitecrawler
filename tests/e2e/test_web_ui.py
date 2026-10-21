@@ -1,4 +1,4 @@
-"""Every tab of the web UI in a real browser, on the audited fixture crawl.
+"""The web UI in a real browser, on the audited fixture crawl.
 
 The numbers asserted here are the ones ``tests/integration/test_audit.py``
 already pins down. Needs ``uv run playwright install chromium``; deselect
@@ -22,7 +22,8 @@ import pytest
 import uvicorn
 from playwright.sync_api import Browser, Page, expect, sync_playwright
 
-from sitecrawler.web import create_app, load_snapshot
+from sitecrawler.session import CrawlSession
+from sitecrawler.web import RowStore, Summary, create_app
 from tests.conftest import site_pages
 
 pytestmark = pytest.mark.browser
@@ -64,19 +65,26 @@ def ui(audited_db: Path) -> Iterator[str]:
     thread.join(timeout=10)
 
 
-def test_overview_shows_the_page_count(page: Page, ui: str, audited_db: Path) -> None:
-    overview = load_snapshot(audited_db).overview()
+@pytest.fixture
+def summary(audited_db: Path, tmp_path: Path) -> Summary:
+    session = CrawlSession.open(audited_db, tmp_path / "crawls")
+    try:
+        return RowStore(session).summary()
+    finally:
+        session.close()
+
+
+def test_sidebar_shows_the_crawl_numbers(page: Page, ui: str, summary: Summary) -> None:
     page.goto(ui)
     expect(page.locator('[data-stat="pages"]')).to_have_text(str(len(site_pages())))
-    expect(page.locator('[data-status="4xx"]')).to_have_text(str(overview.status_buckets["4xx"]))
-    expect(page.locator('[data-stat="non_indexable"]')).to_have_text(str(overview.non_indexable))
-    expect(page.locator('[data-severity="high"]')).to_have_text(
-        str(overview.issues_by_severity["high"])
-    )
+    expect(page.locator('[data-stat="non_indexable"]')).to_have_text(str(summary.non_indexable))
+    expect(page.locator('[data-stat="issues"]')).to_have_text(str(sum(summary.issues.values())))
+    node = page.locator('[data-tree] a[data-tab="response_codes"][data-filter="4xx"] [data-count]')
+    expect(node).to_have_text(str(summary.tabs["response_codes"]["4xx"]))
 
 
-def test_pages_grid_lists_every_page_and_filters(page: Page, ui: str) -> None:
-    page.goto(f"{ui}/pages")
+def test_internal_grid_lists_every_page_and_filters(page: Page, ui: str) -> None:
+    page.goto(f"{ui}/#internal/all")
     counter = page.locator("[data-grid-count]")
     expect(counter).to_have_attribute("data-rows", str(len(site_pages())))
     page.fill("[data-grid-search]", "blocked/sitemap-only")
@@ -85,8 +93,22 @@ def test_pages_grid_lists_every_page_and_filters(page: Page, ui: str) -> None:
     expect(counter).to_have_attribute("data-rows", str(len(site_pages())))
 
 
+def test_tab_and_filter_narrow_the_grid(page: Page, ui: str, summary: Summary) -> None:
+    page.goto(ui)
+    page.click('[data-tabstrip] [data-tab="titles"]')
+    page.select_option("[data-filter]", "missing")
+    counter = page.locator("[data-grid-count]")
+    expect(counter).to_have_attribute("data-rows", str(summary.tabs["titles"]["missing"]))
+    expect(page).to_have_url(f"{ui}/#titles/missing")
+    page.click('[data-tree] a[data-tab="response_codes"][data-filter="3xx"]')
+    expect(counter).to_have_attribute("data-rows", str(summary.tabs["response_codes"]["3xx"]))
+    expect(page.locator('[data-tabstrip] [data-tab="response_codes"]')).to_have_attribute(
+        "aria-selected", "true"
+    )
+
+
 def test_issues_row_loads_its_urls_and_links_to_the_rule(page: Page, ui: str, site: str) -> None:
-    page.goto(f"{ui}/issues")
+    page.goto(f"{ui}/#issues/all")
     row = page.locator('tr[data-rule="response.4xx"]')
     expect(row.locator("[data-count]")).to_have_text("1")
     row.locator("td").last.click()
@@ -100,14 +122,8 @@ def test_issues_row_loads_its_urls_and_links_to_the_rule(page: Page, ui: str, si
     expect(page.locator("[data-count]")).to_have_attribute("data-count", "1")
 
 
-def test_redirects_grid_lists_every_hop(page: Page, ui: str, audited_db: Path) -> None:
-    hops = len(load_snapshot(audited_db).redirects.rows)
-    page.goto(f"{ui}/redirects")
-    expect(page.locator("[data-grid-count]")).to_have_attribute("data-rows", str(hops))
-
-
 def test_page_detail_reached_from_the_grid_shows_inlinks(page: Page, ui: str, site: str) -> None:
-    page.goto(f"{ui}/pages")
+    page.goto(f"{ui}/#internal/all")
     page.fill("[data-grid-search]", f"{site}/missing")
     page.locator(".tabulator-cell a", has_text=f"{site}/missing").first.click()
     expect(page).to_have_url(

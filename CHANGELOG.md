@@ -18,6 +18,21 @@ Phase 4: live crawl UI (in progress).
   verdicts to the file when the crawl ends. It also opens a finished file
   read-only. New crawls go to `crawls/<host>-<timestamp>.db` (ADR-0007).
 - `Store.indexability()` reads stored verdicts back.
+- The web UI is one page with a Screaming-Frog-style layout: a tab strip
+  (Internal, External, Response Codes, URL, Page Titles, Meta Description,
+  H1, H2, Canonicals, Pagination, Directives, Hreflang, Links, Sitemaps,
+  Issues) with a filter dropdown per tab over one grid, an Overview tree
+  with a count per filter, and `#tab/filter` in the address bar. Filters
+  that correspond to an audit rule show exactly the URLs it flagged. New
+  JSON endpoints: `/api/crawl`, `/api/rows`, `/api/summary`,
+  `/api/external`. A file that was never audited is audited in memory when
+  `serve` opens it.
+
+### Removed
+
+- The Overview, Pages and Redirects pages and their `/api/pages` and
+  `/api/redirects` endpoints; the same data is on the Internal and Response
+  Codes tabs and in `/api/rows`.
 
 ## [0.4.0] - 2026-10-21
 

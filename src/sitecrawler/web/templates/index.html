@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ state.start_url or "sitecrawler" }}{% endblock %}
+{% block body %}
+<div class="app" data-status="{{ state.status.value }}">
+  <header class="bar">
+    <a class="brand" href="/">sitecrawler</a>
+    <div class="crawlbar">
+      <span class="crawl-url" data-start-url>{{ state.start_url or "No crawl loaded" }}</span>
+      <span class="badge" data-status-badge>{{ state.status.value }}</span>
+      {% if state.read_only %}<span class="badge muted">read-only</span>{% endif %}
+    </div>
+    <span class="db" title="{{ state.db or '' }}">{{ state.db.name if state.db else "" }}</span>
+  </header>
+
+  <div class="workspace">
+    <section class="main">
+      <nav class="tabstrip" role="tablist" data-tabstrip>
+        {% for tab in tabs %}
+        <button type="button" role="tab" data-tab="{{ tab.id }}" aria-selected="false">{{ tab.label }}</button>
+        {% endfor %}
+      </nav>
+
+      <div class="toolbar">
+        <select data-filter aria-label="Filter"></select>
+        <input type="search" placeholder="Search every column" aria-label="Search" data-grid-search>
+        <span class="count" data-grid-count></span>
+        <button type="button" data-grid-download>Export CSV</button>
+      </div>
+
+      <div class="gridwrap">
+        <div id="grid"></div>
+        <div id="issues-panel" class="issues-panel" hidden
+             hx-get="/issues" hx-trigger="load, audit-changed from:body" hx-swap="innerHTML"></div>
+      </div>
+
+      <section class="detail-pane" id="detail" aria-label="URL details">
+        <p class="muted">Click a URL in the grid to see its details.</p>
+      </section>
+    </section>
+
+    <aside class="sidebar" aria-label="Overview">
+      <h2>Summary</h2>
+      <table class="plain stats-table">
+        <tr><th>Pages</th><td class="num" data-stat="pages"></td></tr>
+        <tr><th>Indexable</th><td class="num" data-stat="indexable"></td></tr>
+        <tr><th>Non-indexable</th><td class="num" data-stat="non_indexable"></td></tr>
+        <tr><th>Issues</th><td class="num" data-stat="issues"></td></tr>
+      </table>
+      <nav class="tree" data-tree></nav>
+    </aside>
+  </div>
+</div>
+<script type="application/json" id="tab-specs">{{ specs | tojson }}</script>
+{% endblock %}

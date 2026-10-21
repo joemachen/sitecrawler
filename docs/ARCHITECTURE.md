@@ -38,14 +38,16 @@ that pass between stages are typed records from `sitecrawler.models`.
 ```
 
 **Status (Phase 4 in progress):** `crawl/`, `parse/`, `store/`, `export/`,
-`audit/` (51 rules), `cli/` and `web/` exist. `web/` is a FastAPI app over one
-in-memory snapshot of a stored crawl (ADR-0006): `data.py` builds the
-snapshot from the store's export tables and a `CrawlView`, `app.py` holds the
-routes, templates and vendored htmx/Tabulator sit beside them. `session.py`
+`audit/` (51 rules), `cli/`, `session.py` and `web/` exist. `session.py`
 (`CrawlSession`, ADR-0007) runs a crawl on a worker thread with pause and
 stop, audits it as pages arrive and writes the result to the file at the
-end; the web UI moves onto it during Phase 4. `analysis/` is still an empty
-package.
+end, or opens a finished file read-only into the same shape. `web/` is a
+FastAPI app over a session: `tabs.py` declares the tab strip and each tab's
+filters as data, `rows.py` turns page records into grid rows (base cells
+once, audit cells per audit revision) and computes the summary counts,
+`app.py` holds the routes; the one-page shell, templates and vendored
+htmx/Tabulator sit beside them (ADR-0006 for the client-side grids).
+`analysis/` is still an empty package.
 
 ---
 
