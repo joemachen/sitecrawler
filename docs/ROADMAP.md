@@ -38,8 +38,8 @@ Deliverables:
 
 Acceptance:
 
-- [ ] All quality gates green locally and in CI.
-- [ ] A capped crawl of mabelslabels.com matches the original CSV row for row.
+- [x] All quality gates green locally and in CI (2026-10-21).
+- [ ] A capped crawl of mabelslabels.com matches the original CSV row for row (blocked: site returning 503 after the first full crawl; retry with a longer delay).
 
 ---
 
