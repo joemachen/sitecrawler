@@ -1,6 +1,7 @@
-"""Local web UI: a FastAPI app over one stored crawl, opened by ``sitecrawler serve``."""
+"""Local web UI: a FastAPI app over one crawl session, opened by ``sitecrawler serve``."""
 
 from sitecrawler.web.app import create_app
-from sitecrawler.web.data import CrawlSnapshot, Overview, load_snapshot, to_rows
+from sitecrawler.web.rows import RowStore, Summary
+from sitecrawler.web.tabs import TABS, FilterSpec, TabSpec
 
-__all__ = ["CrawlSnapshot", "Overview", "create_app", "load_snapshot", "to_rows"]
+__all__ = ["TABS", "FilterSpec", "RowStore", "Summary", "TabSpec", "create_app"]
