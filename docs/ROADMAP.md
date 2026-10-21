@@ -12,7 +12,7 @@ against `tests/fixtures/site/`, the user guide has a page for it, and
 | --- | --- | --- | --- |
 | 0 | Foundation | v0.1.0 | Done (live-site check parked) |
 | 1 | Core crawl and storage | v0.2.0 | Done (2026-10-21) |
-| 2 | Audit checks and issues engine | v0.3.0 | |
+| 2 | Audit checks and issues engine | v0.3.0 | Done (2026-10-21) |
 | 3 | Local web UI | v0.4.0 | |
 | 4 | JavaScript rendering | v0.5.0 | |
 | 5 | Custom extraction and search | v0.6.0 | |
@@ -85,6 +85,8 @@ Checks (each is a `Rule` with fixture coverage):
 - **Pagination:** `rel=prev/next` pointing to non-200, paginated pages with canonical to page 1, sequence gaps.
 - **Indexability verdict** per page: indexable / non-indexable with reason.
 
+Deferred from this phase: `redirect.http_to_https_missing` needs an HTTPS fixture server (pytest-httpserver with a self-signed certificate and a `--insecure` crawl flag); it lands with the first phase that adds TLS to the test site.
+
 Engine:
 
 - `sitecrawler audit crawl.db` runs all rules, writes `issues` table, prints a table grouped by severity with counts and a one-line explanation.
@@ -93,9 +95,9 @@ Engine:
 
 Acceptance:
 
-- [ ] 100% branch coverage on `audit/`.
-- [ ] Every rule has a triggering and a non-triggering fixture page.
-- [ ] `audit` on a stored 10k-page crawl runs in under 10 s.
+- [x] 100% branch coverage on `audit/` (enforced by a CI step).
+- [x] Every rule has a triggering and a non-triggering fixture page (`tests/integration/test_audit.py` maps each rule to the exact fixture paths it flags).
+- [x] `audit` on a stored 10k-page crawl runs in under 10 s (3.5 s on a synthetic 10k-page, 300k-link crawl in SQLite: 0.9 s load, 1.4 s rules, 1.3 s storing issues; measured 2026-10-21 on the development machine).
 
 ---
 

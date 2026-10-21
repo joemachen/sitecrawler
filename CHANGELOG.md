@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-21
+
+Phase 2: audit checks and issues engine, 51 rules.
+
 ### Added
 
 - `sitecrawler audit crawl.db` runs every audit rule over a stored crawl,
