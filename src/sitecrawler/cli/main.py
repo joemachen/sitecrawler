@@ -11,6 +11,7 @@ from rich.logging import RichHandler
 
 from sitecrawler import __version__
 from sitecrawler.cli._run import err, run_crawl
+from sitecrawler.cli.audit_cmd import audit, issues
 from sitecrawler.cli.export_cmd import export
 from sitecrawler.cli.list_urls import list_urls
 from sitecrawler.models import CrawlConfig
@@ -93,3 +94,5 @@ def crawl(
 
 app.command("list")(list_urls)
 app.command("export")(export)
+app.command("audit")(audit)
+app.command("issues")(issues)

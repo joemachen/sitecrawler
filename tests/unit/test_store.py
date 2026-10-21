@@ -184,6 +184,21 @@ def test_finish_incomplete_is_stopped(store: Store) -> None:
     assert store.crawl().status == "stopped"
 
 
+def test_issues_for_unknown_urls_are_dropped_with_a_warning(
+    store: Store, caplog: pytest.LogCaptureFixture
+) -> None:
+    from sitecrawler.models import Issue, Severity
+
+    store.begin(CONFIG, resume=False)
+    store.page_done(_page("https://x.test/", status_code=200), [])
+    issues = [
+        Issue("https://x.test/", "r.one", Severity.LOW),
+        Issue("https://x.test/not-crawled", "r.one", Severity.LOW),
+    ]
+    assert store.replace_issues(issues) == 1
+    assert "1 issue(s) refer to URLs that are not in this crawl" in caplog.text
+
+
 def test_writing_before_begin_fails(store: Store) -> None:
     with pytest.raises(RuntimeError, match="begin"):
         store.seeded([QueueItem("https://x.test/", 0, "start")], [])

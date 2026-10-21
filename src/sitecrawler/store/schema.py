@@ -64,6 +64,9 @@ class PageRow(Base):
     last_modified: Mapped[str | None] = mapped_column(default=None)
     headers_json: Mapped[str] = mapped_column(default="{}")
     fetched_at: Mapped[datetime | None] = mapped_column(default=None)
+    indexable: Mapped[bool | None] = mapped_column(default=None)
+    """Set by ``audit``: can this page appear in search results?"""
+    indexability_reason: Mapped[str] = mapped_column(default="")
 
     html: Mapped[PageHtmlRow | None] = relationship(
         back_populates="page", cascade="all, delete-orphan", uselist=False
@@ -73,6 +76,9 @@ class PageRow(Base):
     )
     links: Mapped[list[LinkRow]] = relationship(
         back_populates="page", cascade="all, delete-orphan", order_by="LinkRow.id"
+    )
+    hreflang: Mapped[list[HreflangRow]] = relationship(
+        back_populates="page", cascade="all, delete-orphan", order_by="HreflangRow.id"
     )
 
 
@@ -107,8 +113,42 @@ class PageHtmlRow(Base):
     lang: Mapped[str] = mapped_column(default="")
     word_count: Mapped[int] = mapped_column(default=0)
     internal_links: Mapped[int] = mapped_column(default=0)
+    title_count: Mapped[int] = mapped_column(default=0)
+    meta_description_count: Mapped[int] = mapped_column(default=0)
+    og_url: Mapped[str] = mapped_column(default="")
+    canonical_header: Mapped[str] = mapped_column(default="")
+    rel_prev: Mapped[str] = mapped_column(default="")
+    rel_next: Mapped[str] = mapped_column(default="")
 
     page: Mapped[PageRow] = relationship(back_populates="html")
+
+
+class HreflangRow(Base):
+    """One hreflang alternate declared on ``page``."""
+
+    __tablename__ = "hreflang"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    page_id: Mapped[int] = mapped_column(ForeignKey("pages.id"))
+    lang: Mapped[str]
+    href: Mapped[str]
+
+    page: Mapped[PageRow] = relationship(back_populates="hreflang")
+
+
+class IssueRow(Base):
+    """One audit finding; the table is rebuilt on every ``audit`` run."""
+
+    __tablename__ = "issues"
+    __table_args__ = (Index("ix_issues_rule", "rule_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    page_id: Mapped[int] = mapped_column(ForeignKey("pages.id"))
+    rule_id: Mapped[str]
+    severity: Mapped[str]
+    message: Mapped[str] = mapped_column(default="")
+
+    page: Mapped[PageRow] = relationship()
 
 
 class LinkRow(Base):

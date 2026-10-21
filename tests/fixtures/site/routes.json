@@ -1,11 +1,16 @@
 {
-  "_comment": "Non-file routes served by the fixture server. Redirects map path -> Location. Headers are added to the named page's response.",
+  "_comment": "Non-file routes served by the fixture server. redirects: path -> Location (302). statuses: path -> status code with an empty HTML body. truncated: paths whose response announces more bytes than it sends, so the fetch fails. dead_links: paths that are linked but have no handler (404). headers: extra response headers per page.",
   "redirects": {
     "/redirect-start": "/redirect-middle",
     "/redirect-middle": "/about",
     "/loop-a": "/loop-b",
     "/loop-b": "/loop-a"
   },
+  "statuses": {
+    "/audit/server-error": 500
+  },
+  "truncated": ["/audit/truncated"],
+  "dead_links": ["/missing"],
   "headers": {
     "/notitle": {
       "X-Robots-Tag": "noindex",

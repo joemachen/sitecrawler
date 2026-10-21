@@ -12,6 +12,7 @@ from typer.testing import CliRunner
 
 from sitecrawler.cli.main import app
 from sitecrawler.export import CSV_FIELDS
+from tests.conftest import site_pages
 
 runner = CliRunner()
 
@@ -32,13 +33,20 @@ def test_export_xlsx_has_a_sheet_per_table(db: Path) -> None:
     out = db.with_suffix(".xlsx")
     workbook = load_workbook(out, read_only=True)
     try:
-        assert workbook.sheetnames == ["pages", "links", "redirects", "sitemap_urls"]
+        assert workbook.sheetnames == [
+            "pages",
+            "issues",
+            "links",
+            "redirects",
+            "hreflang",
+            "sitemap_urls",
+        ]
         pages = list(workbook["pages"].iter_rows(values_only=True))
         assert pages[0][0] == "url"
-        assert len(pages) == 1 + 13
+        assert len(pages) == 1 + len(site_pages())
         redirects = list(workbook["redirects"].iter_rows(values_only=True))
-        # two hops for the chain, two for the loop, one for /blog -> /blog/
-        assert len(redirects) == 1 + 5
+        # two hops for the chain, two for the loop, one each for /blog and /audit -> trailing slash
+        assert len(redirects) == 1 + 6
         assert redirects[0] == ("url", "hop_no", "from_url", "to_url", "status_code")
         assert len(list(workbook["sitemap_urls"].iter_rows(values_only=True))) == 1 + 4
     finally:
@@ -53,7 +61,7 @@ def test_export_csv_matches_crawl_output(db: Path, site: str, tmp_path: Path) ->
         reader = csv.DictReader(fh)
         rows = {row["url"].removeprefix(site): row for row in reader}
         assert reader.fieldnames == list(CSV_FIELDS)
-    assert len(rows) == 13
+    assert len(rows) == len(site_pages())
     assert rows["/about"]["title"] == "About the Fixture Site"
     assert rows["/loop-a"]["status"] == "redirect_loop"
 
@@ -64,11 +72,12 @@ def test_export_json(db: Path, site: str) -> None:
     data = json.loads(db.with_suffix(".json").read_text(encoding="utf-8"))
     assert data["crawl"]["status"] == "done"
     assert data["crawl"]["start_url"] == site + "/"
-    assert len(data["pages"]) == 13
+    assert len(data["pages"]) == len(site_pages())
     assert {row["url"].removeprefix(site) for row in data["redirects"]} == {
         "/redirect-start",
         "/loop-a",
         "/blog",
+        "/audit",
     }
     assert all(row["src_url"] for row in data["links"])
 

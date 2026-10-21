@@ -1,0 +1,103 @@
+"""Every rule against the stored fixture crawl: exactly these pages trigger it.
+
+Add a line to ``TRIGGERS`` for every new rule. A rule that is missing from the
+table fails the test, and so does a rule that fires on a page not listed
+here, so each rule has a triggering page and the rest of the site is the
+non-triggering case.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from sitecrawler.audit import CrawlView, load_rules, run_audit
+from sitecrawler.crawl import Crawler
+from sitecrawler.models import CrawlConfig
+from sitecrawler.store import open_store
+
+TRIGGERS: dict[str, set[str]] = {
+    "response.4xx": {"/missing"},
+    "response.5xx": {"/audit/server-error"},
+    "response.error": {"/audit/truncated"},
+    "response.blocked_by_robots": {"/blocked/secret"},
+}
+
+NON_INDEXABLE: dict[str, str] = {
+    "/missing": "status 404",
+    "/audit/server-error": "status 500",
+    "/audit/truncated": "fetch error",
+    "/blocked/secret": "blocked by robots.txt",
+    "/loop-a": "redirect loop",
+    "/redirect-start": "redirects to",
+    "/about": "canonicalised to https://www.fixture.test/about",
+    "/notitle": "noindex",
+}
+
+
+@pytest.fixture
+def audited(site: str, tmp_path: Path) -> tuple[CrawlView, dict[str, set[str]]]:
+    path = tmp_path / "crawl.db"
+    with open_store(path) as store:
+        Crawler(CrawlConfig(start_url=site, delay_seconds=0, workers=1), sink=store).run()
+        crawl = CrawlView.from_store(store)
+        result = run_audit(crawl)
+        store.replace_issues(result.issues)
+        store.set_indexability(result.verdicts)
+        stored = store.iter_issues()
+    by_rule: dict[str, set[str]] = {r.id: set() for r in load_rules()}
+    for issue in stored:
+        by_rule[issue.rule_id].add(issue.url.removeprefix(site))
+    return crawl, by_rule
+
+
+def test_every_rule_is_in_the_table() -> None:
+    assert sorted(TRIGGERS) == [r.id for r in load_rules()]
+
+
+@pytest.mark.parametrize("rule_id", sorted(TRIGGERS))
+def test_rule_fires_on_exactly_its_fixture_pages(
+    audited: tuple[CrawlView, dict[str, set[str]]], rule_id: str
+) -> None:
+    _, by_rule = audited
+    assert by_rule[rule_id] == TRIGGERS[rule_id]
+
+
+def test_indexability_verdicts(
+    audited: tuple[CrawlView, dict[str, set[str]]], site: str, pages: frozenset[str]
+) -> None:
+    crawl, _ = audited
+    result = run_audit(crawl)
+    non_indexable = {
+        url.removeprefix(site): v.reason for url, v in result.verdicts.items() if not v.indexable
+    }
+    assert set(non_indexable) == set(NON_INDEXABLE)
+    for path, reason in NON_INDEXABLE.items():
+        assert non_indexable[path].startswith(reason), path
+    assert len(result.verdicts) == len(pages)
+
+
+def test_audit_table_and_verdicts_are_stored(site: str, tmp_path: Path) -> None:
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from sitecrawler.store.schema import PageRow
+
+    path = tmp_path / "c.db"
+    with open_store(path) as store:
+        Crawler(CrawlConfig(start_url=site, delay_seconds=0, workers=1), sink=store).run()
+        result = run_audit(CrawlView.from_store(store))
+        assert store.replace_issues(result.issues) == len(result.issues)
+        store.set_indexability(result.verdicts)
+        assert store.issue_counts()["response.4xx"] == 1
+        assert [i.rule_id for i in store.iter_issues("response.5xx")] == ["response.5xx"]
+        with Session(store.engine) as s:
+            row = s.scalars(select(PageRow).where(PageRow.url == f"{site}/missing")).one()
+            assert row.indexable is False
+            assert row.indexability_reason == "status 404"
+            ok = s.scalars(select(PageRow).where(PageRow.url == f"{site}/blog/post-1")).one()
+            assert ok.indexable is True
+        # a second run replaces rather than appends
+        assert store.replace_issues(result.issues) == len(result.issues)
+        assert sum(store.issue_counts().values()) == len(result.issues)

@@ -7,7 +7,7 @@ from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup, Tag
 
-from sitecrawler.models import LinkRef, ParsedPage
+from sitecrawler.models import HreflangRef, LinkRef, ParsedPage
 
 _DESCRIPTION = re.compile("^description$", re.IGNORECASE)
 _ROBOTS = re.compile("^robots$", re.IGNORECASE)
@@ -60,10 +60,27 @@ def parse_html(html: str, base_url: str) -> ParsedPage:
     page.h1s = _headings(soup, "h1")
     page.h2s = _headings(soup, "h2")
     page.h1 = page.h1s[0] if page.h1s else ""
+    page.title_count = len(soup.find_all("title"))
+    page.meta_description_count = len(soup.find_all("meta", attrs={"name": _DESCRIPTION}))
 
-    canonical = soup.find("link", rel=lambda v: bool(v) and "canonical" in v)
-    if isinstance(canonical, Tag) and _attr(canonical, "href"):
-        page.canonical = urljoin(base_url, _attr(canonical, "href"))
+    og_url = soup.find("meta", attrs={"property": "og:url"})
+    if isinstance(og_url, Tag) and _attr(og_url, "content").strip():
+        page.og_url = urljoin(base_url, _attr(og_url, "content").strip())
+
+    for link in soup.find_all("link", href=True):
+        rels = _attr(link, "rel").lower().split()
+        href = _attr(link, "href").strip()
+        if not href:
+            continue
+        absolute = urljoin(base_url, href)
+        if "canonical" in rels and not page.canonical:
+            page.canonical = absolute
+        if "alternate" in rels and _attr(link, "hreflang"):
+            page.hreflang.append(HreflangRef(_attr(link, "hreflang").strip(), absolute))
+        if "prev" in rels and not page.rel_prev:
+            page.rel_prev = absolute
+        if "next" in rels and not page.rel_next:
+            page.rel_next = absolute
 
     for anchor in soup.find_all("a", href=True):
         href = _attr(anchor, "href").strip()

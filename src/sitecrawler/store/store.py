@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Iterator, Sequence
 from dataclasses import asdict
 from datetime import UTC, datetime
@@ -11,7 +12,7 @@ from types import TracebackType
 from typing import Any
 from urllib.parse import urlparse
 
-from sqlalchemy import Engine, create_engine, event, func, select
+from sqlalchemy import Engine, create_engine, delete, event, func, select
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import Session, selectinload
 
@@ -20,22 +21,30 @@ from sitecrawler.crawl.urls import normalize, same_site
 from sitecrawler.models import (
     CrawlConfig,
     CrawlInfo,
+    HreflangRef,
+    Indexability,
+    Issue,
     LinkRef,
     Outcome,
     PageRecord,
     QueueItem,
     RedirectHop,
     ResumeState,
+    Severity,
 )
 from sitecrawler.store.schema import (
     Base,
     CrawlRow,
+    HreflangRow,
+    IssueRow,
     LinkRow,
     PageHtmlRow,
     PageRow,
     RedirectHopRow,
     SitemapUrlRow,
 )
+
+log = logging.getLogger(__name__)
 
 
 def _now() -> datetime:
@@ -199,10 +208,17 @@ class Store:
                     lang=record.lang,
                     word_count=record.word_count,
                     internal_links=record.internal_links,
+                    title_count=record.title_count,
+                    meta_description_count=record.meta_description_count,
+                    og_url=record.og_url,
+                    canonical_header=record.canonical_header,
+                    rel_prev=record.rel_prev,
+                    rel_next=record.rel_next,
                 )
                 if record.outcome is Outcome.FETCHED
                 else None
             )
+            page.hreflang = [HreflangRow(lang=h.lang, href=h.href) for h in record.hreflang]
             src_host = urlparse(record.url).netloc
             page.links = [
                 LinkRow(
@@ -255,6 +271,64 @@ class Store:
             )
             return [QueueItem(r.url, r.depth, r.found_on) for r in rows]
 
+    def sitemap_urls(self) -> frozenset[str]:
+        """Every URL listed in any sitemap, as written there."""
+        with Session(self.engine) as session:
+            return frozenset(session.scalars(select(SitemapUrlRow.loc)))
+
+    def replace_issues(self, issues: Sequence[Issue]) -> int:
+        """Drop every stored issue and write ``issues``. Returns how many were written."""
+        with Session(self.engine) as session:
+            session.execute(delete(IssueRow))
+            ids = dict(session.execute(select(PageRow.url, PageRow.id)).all())
+            rows = [
+                IssueRow(
+                    page_id=ids[i.url],
+                    rule_id=i.rule_id,
+                    severity=i.severity.value,
+                    message=i.message,
+                )
+                for i in issues
+                if i.url in ids
+            ]
+            session.add_all(rows)
+            session.commit()
+        dropped = len(issues) - len(rows)
+        if dropped:
+            log.warning("%d issue(s) refer to URLs that are not in this crawl; dropped", dropped)
+        return len(rows)
+
+    def set_indexability(self, verdicts: dict[str, Indexability]) -> None:
+        """Store the audit's indexability verdict per URL."""
+        with Session(self.engine) as session:
+            for page in session.scalars(select(PageRow).where(PageRow.state == "done")):
+                verdict = verdicts.get(page.url)
+                if verdict is None:
+                    continue
+                page.indexable = verdict.indexable
+                page.indexability_reason = verdict.reason
+            session.commit()
+
+    def iter_issues(self, rule_id: str | None = None) -> list[Issue]:
+        """Stored issues, optionally for one rule, ordered by severity then URL."""
+        stmt = select(IssueRow, PageRow.url).join(PageRow, IssueRow.page_id == PageRow.id)
+        if rule_id is not None:
+            stmt = stmt.where(IssueRow.rule_id == rule_id)
+        with Session(self.engine) as session:
+            issues = [
+                Issue(url, row.rule_id, Severity(row.severity), row.message)
+                for row, url in session.execute(stmt)
+            ]
+        return sorted(issues, key=lambda i: (i.severity.rank, i.rule_id, i.url))
+
+    def issue_counts(self) -> dict[str, int]:
+        """Number of stored issues per rule id."""
+        with Session(self.engine) as session:
+            rows = session.execute(
+                select(IssueRow.rule_id, func.count()).group_by(IssueRow.rule_id)
+            ).all()
+        return dict(rows)
+
     def seen_urls(self) -> frozenset[str]:
         """Every URL in the pages table, fetched or not."""
         with Session(self.engine) as session:
@@ -275,7 +349,10 @@ class Store:
             .where(PageRow.state == "done")
             .order_by(PageRow.url)
             .options(
-                selectinload(PageRow.html), selectinload(PageRow.hops), selectinload(PageRow.links)
+                selectinload(PageRow.html),
+                selectinload(PageRow.hops),
+                selectinload(PageRow.links),
+                selectinload(PageRow.hreflang),
             )
         )
         with Session(self.engine) as session:
@@ -340,4 +417,11 @@ def _to_record(row: PageRow) -> PageRecord:
         h2s=tuple(json.loads(html.h2s_json)) if html else (),
         meta_robots=html.meta_robots if html else "",
         lang=html.lang if html else "",
+        title_count=html.title_count if html else 0,
+        meta_description_count=html.meta_description_count if html else 0,
+        og_url=html.og_url if html else "",
+        canonical_header=html.canonical_header if html else "",
+        hreflang=tuple(HreflangRef(h.lang, h.href) for h in row.hreflang),
+        rel_prev=html.rel_prev if html else "",
+        rel_next=html.rel_next if html else "",
     )

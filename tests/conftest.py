@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
+from typing import Any
 
 import pytest
 from pytest_httpserver import HTTPServer
+from werkzeug.wrappers import Request, Response
 
 FIXTURE_SITE = Path(__file__).parent / "fixtures" / "site"
 
@@ -35,6 +38,47 @@ def _url_path(file: Path) -> str:
     return f"/{stem}"
 
 
+def _routes() -> dict[str, Any]:  # Any: free-form JSON, see routes.json's _comment
+    return dict(json.loads((FIXTURE_SITE / "routes.json").read_text()))
+
+
+def _html_paths() -> set[str]:
+    return {_url_path(f) for f in FIXTURE_SITE.rglob("*.html")}
+
+
+def _linked_paths() -> set[str]:
+    """Root-relative hrefs found in any fixture HTML page, without query or fragment."""
+    found: set[str] = set()
+    for file in FIXTURE_SITE.rglob("*.html"):
+        for href in re.findall(r"href=\"(/[^\"#?]*)", file.read_text(encoding="utf-8")):
+            found.add(href.rstrip("/") or "/")
+    return found
+
+
+def site_pages() -> frozenset[str]:
+    """Every URL path a full crawl of the fixture site records, as the crawler stores it.
+
+    Directory pages are stored without the trailing slash (``/blog``), the
+    root is ``/``. A redirect, special status, truncated response or dead link
+    counts only when a fixture page links to it; intermediate redirect hops
+    are not pages.
+    """
+    routes = _routes()
+    pages = {p.rstrip("/") or "/" for p in _html_paths()}
+    special: set[str] = set()
+    for key in ("redirects", "statuses"):
+        special |= set(routes.get(key, {}))
+    for key in ("truncated", "dead_links"):
+        special |= set(routes.get(key, []))
+    return frozenset(pages | (special & _linked_paths()))
+
+
+@pytest.fixture
+def pages() -> frozenset[str]:
+    """See :func:`site_pages`."""
+    return site_pages()
+
+
 @pytest.fixture(scope="session")
 def httpserver_listen_address() -> tuple[str, int]:
     """Bind to IPv4 loopback explicitly.
@@ -55,7 +99,7 @@ def site(httpserver: HTTPServer) -> str:
     """
     base = httpserver.url_for("/").rstrip("/")
     httpserver.no_handler_status_code = 404
-    routes = json.loads((FIXTURE_SITE / "routes.json").read_text())
+    routes = _routes()
     extra_headers: dict[str, dict[str, str]] = routes.get("headers", {})
 
     for file in sorted(FIXTURE_SITE.rglob("*")):
@@ -75,6 +119,12 @@ def site(httpserver: HTTPServer) -> str:
 
     for path, target in routes["redirects"].items():
         _redirect(httpserver, path, f"{base}{target}", status=302)
+    for path, status in routes.get("statuses", {}).items():
+        httpserver.expect_request(path).respond_with_data(
+            b"<html><title>Error</title></html>", status=status, content_type="text/html"
+        )
+    for path in routes.get("truncated", []):
+        httpserver.expect_request(path).respond_with_handler(_truncated)
     return base
 
 
@@ -82,3 +132,11 @@ def _redirect(httpserver: HTTPServer, path: str, location: str, *, status: int) 
     httpserver.expect_request(path).respond_with_data(
         b"", status=status, headers={"Location": location}
     )
+
+
+def _truncated(_request: Request) -> Response:
+    """Announce a long body but send a short one, so the client sees a protocol error."""
+    response = Response(b"<html>cut", status=200, content_type="text/html")
+    response.automatically_set_content_length = False
+    response.headers["Content-Length"] = "4096"
+    return response

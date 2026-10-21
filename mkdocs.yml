@@ -23,6 +23,8 @@ nav:
       - Storage: user-guide/storage.md
       - List mode: user-guide/list-mode.md
       - Exporting: user-guide/export.md
+      - Auditing: user-guide/audit.md
+      - Audit rules: user-guide/rules.md
   - Project:
       - Development process: DEVELOPMENT.md
       - Architecture: ARCHITECTURE.md
@@ -33,6 +35,7 @@ nav:
           - 0002 CLI first: adr/0002-cli-first-web-ui-later.md
           - 0003 httpx and redirects: adr/0003-httpx-asyncio-manual-redirects.md
           - 0004 One crawl per file: adr/0004-one-crawl-per-file-and-resume.md
+          - 0005 Rules as code and docs: adr/0005-rules-as-code-and-docs.md
   - API reference: reference.md
 
 markdown_extensions:

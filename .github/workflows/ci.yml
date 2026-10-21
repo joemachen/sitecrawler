@@ -40,6 +40,9 @@ jobs:
       - name: Tests
         run: uv run pytest --cov --cov-report=xml --cov-report=term
 
+      - name: Audit rules at 100% branch coverage
+        run: uv run pytest --cov=sitecrawler.audit --cov-fail-under=100 --cov-report=term-missing tests/unit/audit tests/integration/test_audit.py
+
       - name: Upload coverage report
         if: matrix.os == 'ubuntu-latest'
         uses: actions/upload-artifact@v7
