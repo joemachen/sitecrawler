@@ -2,7 +2,6 @@
 
 ```bash
 uv run sitecrawler crawl https://example.com --db example.db
-uv run sitecrawler audit example.db
 uv run sitecrawler serve example.db
 ```
 
@@ -11,28 +10,57 @@ uv run sitecrawler serve example.db
 and has no login: it is a viewer for files on your own machine, not a
 service. Stop it with Ctrl+C.
 
-Run `audit` first. Without stored issues the Overview says so, and the
-issue counts are zero until you audit and restart `serve`.
+A file that has not been audited is audited in memory when it opens, so
+the Issues tab and the filters are always filled. Nothing is written back;
+run `sitecrawler audit` to store the result in the file.
 
 | Option | Meaning |
 | --- | --- |
 | `--port 8765` | Listen on another port, still on 127.0.0.1 |
 | `--no-open` | Print the URL instead of opening a browser |
 
-## Tabs
+## The screen
 
-| Tab | Shows |
+One page, three panes:
+
+- **Tabs and grid** in the middle. Each tab is a column set over the crawled
+  pages; the dropdown beside it narrows the grid to one filter, and the
+  search box matches any column. Click a URL to open its detail page.
+  **Export CSV** writes the rows currently shown, filters applied.
+- **Overview tree** on the right: every tab and filter with its count.
+  Clicking a node selects that tab and filter. The summary above it shows
+  pages, indexable, non-indexable and issue totals.
+- **Detail pane** at the bottom, for the selected URL (arrives with the
+  live crawl UI; the full page at `/page?url=` has everything today).
+
+The address bar keeps `#tab/filter`, so a view can be bookmarked.
+
+## Tabs and filters
+
+Filters that correspond to an [audit rule](rules.md) show exactly the URLs
+that rule flagged, so their counts match `sitecrawler audit`. The others
+are computed from the page itself.
+
+| Tab | Filters |
 | --- | --- |
-| Overview | Crawl summary, page counts by status and depth, issue totals by severity, indexable vs. non-indexable |
-| Pages | Every column of every fetched page in a grid; the URL opens the page detail |
-| Issues | One row per [rule](rules.md) that fired, most severe first; click a row for its URLs, click the rule id for why it matters and how to fix it |
-| Redirects | Every redirect hop the crawler followed, in a grid |
-| Page detail | Everything stored about one URL: response, headers, parsed HTML, redirect hops, hreflang, its issues, the pages that link to it and the links on it |
+| Internal | HTML, Other content, Indexable, Non-indexable |
+| External | Link targets on other hosts (not fetched); Only nofollow links |
+| Response Codes | 2xx, 3xx, 4xx, 5xx, Blocked by robots.txt, No response, redirect chain / loop / to error / off-site / temporary |
+| URL | Non-ASCII, Uppercase, Underscores, Parameters, Over 115 characters |
+| Page Titles | Missing, Duplicate, Over 60 characters, Too short, Multiple, Same as H1 |
+| Meta Description | Missing, Duplicate, Over 155 characters, Too short, Multiple |
+| H1 | Missing, Multiple, Duplicate, Over 70 characters |
+| H2 | Missing |
+| Canonicals | Contains canonical, Self-referencing, Canonicalised, Missing, To non-200, Off-site, Chain, Conflicting, og:url mismatch, Canonicalised but linked |
+| Pagination | Contains pagination, To non-200, Canonical to first page, Broken sequence |
+| Directives | Index, Noindex, Follow, Nofollow, None, Conflicting, Noindex but linked, Blocked but linked |
+| Hreflang | Contains hreflang, Invalid language code, Missing self reference, Missing x-default, Missing return link, To non-200, To non-canonical |
+| Links | No inlinks, Links to redirects, Has nofollow outlinks |
+| Sitemaps | In sitemap, Not in sitemap, Non-indexable in sitemap, Noindex in sitemap |
+| Issues | One row per rule that fired, most severe first; click a row for its URLs, click the rule id for why it matters and how to fix it |
+
+On Response Codes a redirected page counts under 3xx by the status of its
+first hop; the `status_code` column still shows where the chain ended.
 
 Grids are sortable (click a header) and filterable (type in the header
-boxes, or in the search box to match any column). **Download CSV** writes
-the rows that are currently shown, filters applied, to your downloads
-folder.
-
-The UI reads the file once at start; to see a new crawl or a fresh audit,
-restart `serve`. Everything it shows is also in the [exports](export.md).
+boxes). Everything the UI shows is also in the [exports](export.md).

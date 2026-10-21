@@ -1,0 +1,15 @@
+<h2>Inlinks <span class="muted">({{ detail.inlinks | length }})</span></h2>
+<table class="plain inlinks">
+  <thead><tr><th>From</th><th>Anchor</th><th>rel</th></tr></thead>
+  <tbody>
+  {% for inlink in detail.inlinks %}
+    <tr data-src="{{ inlink.src }}">
+      <td><a href="/page?url={{ inlink.src | urlencode }}" data-url="{{ inlink.src }}">{{ inlink.src }}</a></td>
+      <td>{{ inlink.link.text }}</td>
+      <td>{{ inlink.link.rel }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="3" class="muted">No internal links point here.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>

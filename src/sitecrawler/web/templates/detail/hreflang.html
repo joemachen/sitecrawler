@@ -1,0 +1,10 @@
+{% set page = detail.page %}
+<h2>Hreflang <span class="muted">({{ page.hreflang | length }})</span></h2>
+<table class="plain">
+  <thead><tr><th>Lang</th><th>Href</th></tr></thead>
+  <tbody>
+  {% for ref in page.hreflang %}<tr><td>{{ ref.lang }}</td><td>{{ ref.href }}</td></tr>
+  {% else %}<tr><td colspan="2" class="muted">None</td></tr>
+  {% endfor %}
+  </tbody>
+</table>

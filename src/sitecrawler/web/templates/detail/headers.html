@@ -1,0 +1,10 @@
+{% from "detail/_macros.html" import field %}
+{% set page = detail.page %}
+<h2>Headers</h2>
+<table class="plain fields">
+  {% for name, value in page.headers.items() | sort %}
+    {{ field(name, value) }}
+  {% else %}
+    <tr><td class="muted">none stored</td></tr>
+  {% endfor %}
+</table>

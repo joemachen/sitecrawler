@@ -11,17 +11,15 @@
   <script src="/static/app.js" defer></script>
 </head>
 <body>
-  <header>
+{% block body %}
+  <header class="bar">
     <a class="brand" href="/">sitecrawler</a>
-    <nav>
-      {% for href, label in tabs %}
-      <a href="{{ href }}"{% if active == label %} class="active" aria-current="page"{% endif %}>{{ label }}</a>
-      {% endfor %}
-    </nav>
-    <span class="crawl" title="{{ snapshot.path }}">{{ snapshot.info.start_url }}</span>
+    <a class="back" href="/">Back to the crawl</a>
+    <span class="crawl" title="{{ state.db or '' }}">{{ state.start_url }}</span>
   </header>
   <main>
     {% block content %}{% endblock %}
   </main>
+{% endblock %}
 </body>
 </html>
