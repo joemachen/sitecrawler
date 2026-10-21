@@ -21,9 +21,11 @@ stripped by default so `/faq?faq=shipping` and `/faq` are one page.
 | --- | --- | --- |
 | `-o, --output` | `pages.csv` | Output file |
 | `--max-pages` | 5000 | Stop after this many pages |
-| `--delay` | 0.5 | Minimum seconds between requests, shared across workers |
+| `--delay` | 0.5 | Minimum seconds between requests to the same host, shared across workers |
 | `--workers` | 4 | Concurrent fetchers |
 | `--timeout` | 20 | Per-request timeout in seconds |
+| `--max-redirects` | 10 | Give up on a redirect chain longer than this and report `redirect_loop` |
+| `--no-http2` | off | Use HTTP/1.1 only. By default HTTP/2 is negotiated when an HTTPS server offers it |
 | `--no-sitemap` | off | Discover only by following links |
 | `--keep-query` | off | Treat different query strings as different pages (tracking parameters are still dropped) |
 | `--ignore-robots` | off | Crawl pages robots.txt disallows. Use only on sites you own. |
@@ -40,7 +42,7 @@ uv run sitecrawler crawl https://example.com -o pages.csv 2> crawl.log
 | Column | Meaning |
 | --- | --- |
 | `url` | Normalised URL that was requested |
-| `status` | HTTP status code, or `blocked` (robots.txt) / `error` (network failure, redirect loop) |
+| `status` | HTTP status code, or `blocked` (robots.txt) / `error` (network failure) / `redirect_loop` (redirects never resolved: a cycle, or more than `--max-redirects` hops) |
 | `title` | `<title>` text |
 | `meta_description` | `<meta name="description">` content |
 | `h1` | First `<h1>` on the page |
@@ -51,4 +53,12 @@ uv run sitecrawler crawl https://example.com -o pages.csv 2> crawl.log
 | `internal_links` | Count of distinct same-site hrefs on the page |
 | `word_count` | Visible words, with scripts and styles removed |
 | `fetch_ms` | Request time in milliseconds, including redirects |
-| `error` | Error detail, if any |
+| `error` | Error detail, if any. For `redirect_loop` this is the chain, e.g. `redirect loop: /a -> /b -> /a` |
+
+## Redirects
+
+Redirects are followed one hop at a time, and every hop is kept (status code,
+from, to). The CSV shows only the end of the chain; the full chain is kept on
+each record for the SQLite store and the redirect audits in later phases. A
+chain that returns to a URL it already visited stops immediately, so a loop
+costs two requests rather than a timeout.

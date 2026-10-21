@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import threading
 from collections import deque
 from urllib.parse import urlparse
 
@@ -11,10 +10,11 @@ from sitecrawler.models import QueueItem
 
 
 class Frontier:
-    """Thread-safe FIFO of URLs to crawl, de-duplicated by normalised form.
+    """FIFO of URLs to crawl, de-duplicated by normalised form.
 
     Only URLs on the same site as ``site_host`` that look like HTML pages are
-    accepted; everything else is silently dropped by :meth:`add`.
+    accepted; everything else is silently dropped by :meth:`add`. The crawler
+    drives it from a single event loop, so no locking is needed.
     """
 
     def __init__(self, site_host: str, *, scheme: str = "https", keep_query: bool = False) -> None:
@@ -24,7 +24,6 @@ class Frontier:
         self._keep_query = keep_query
         self._seen: set[str] = set()
         self._queue: deque[QueueItem] = deque()
-        self._lock = threading.Lock()
 
     def add(self, url: str, depth: int, found_on: str) -> bool:
         """Queue ``url`` if it is in scope and new. Returns True if it was queued."""
@@ -35,17 +34,15 @@ class Frontier:
             return False
         if not looks_like_page(normalised):
             return False
-        with self._lock:
-            if normalised in self._seen:
-                return False
-            self._seen.add(normalised)
-            self._queue.append(QueueItem(normalised, depth, found_on))
-            return True
+        if normalised in self._seen:
+            return False
+        self._seen.add(normalised)
+        self._queue.append(QueueItem(normalised, depth, found_on))
+        return True
 
     def pop(self) -> QueueItem | None:
         """Take the next item, or ``None`` when the queue is empty."""
-        with self._lock:
-            return self._queue.popleft() if self._queue else None
+        return self._queue.popleft() if self._queue else None
 
     def __len__(self) -> int:
         """Number of URLs still queued (not counting in-flight ones)."""

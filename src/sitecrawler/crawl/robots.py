@@ -3,9 +3,13 @@
 from __future__ import annotations
 
 import urllib.robotparser
+from typing import TYPE_CHECKING
 from urllib.parse import urljoin
 
-import requests
+from sitecrawler.models import Outcome
+
+if TYPE_CHECKING:
+    from sitecrawler.crawl.fetcher import Fetcher
 
 
 class RobotsPolicy:
@@ -22,14 +26,11 @@ class RobotsPolicy:
         self._parser.parse([])
         self.loaded = False
 
-    def load(self, session: requests.Session, site_url: str, timeout: float) -> None:
+    async def load(self, fetcher: Fetcher, site_url: str) -> None:
         """Fetch and parse ``/robots.txt`` for the site that ``site_url`` belongs to."""
-        try:
-            response = session.get(urljoin(site_url, "/robots.txt"), timeout=timeout)
-        except requests.RequestException:
-            return
-        if response.ok:
-            self._parser.parse(response.text.splitlines())
+        result = await fetcher.fetch(urljoin(site_url, "/robots.txt"))
+        if result.outcome is Outcome.FETCHED and result.status_code == 200:
+            self._parser.parse(result.content.decode("utf-8", errors="replace").splitlines())
             self.loaded = True
 
     def allowed(self, url: str) -> bool:

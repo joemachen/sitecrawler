@@ -46,16 +46,39 @@ def test_statuses(crawled: dict[str, PageRecord]) -> None:
     assert crawled["/missing"].status_code == 404
     assert crawled["/blocked/secret"].outcome is Outcome.BLOCKED
     assert crawled["/blocked/secret"].status_code is None
-    assert crawled["/loop-a"].outcome is Outcome.ERROR
-    assert "redirect" in crawled["/loop-a"].error.lower()
+    assert crawled["/loop-a"].outcome is Outcome.REDIRECT_LOOP
+    assert crawled["/loop-a"].status_code is None
+    assert crawled["/loop-a"].error.startswith("redirect loop:")
 
 
 def test_redirect_chain_resolves_to_final_url(crawled: dict[str, PageRecord], site: str) -> None:
     hop = crawled["/redirect-start"]
     assert hop.status_code == 200
+    assert hop.final_url == f"{site}/about"
     # the page at the end declares its own canonical, which wins
     assert hop.canonical == "https://www.fixture.test/about"
     assert hop.title == "About the Fixture Site"
+
+
+def test_redirect_chain_records_two_hops(crawled: dict[str, PageRecord], site: str) -> None:
+    hops = crawled["/redirect-start"].redirect_hops
+    assert [h.hop_no for h in hops] == [1, 2]
+    assert [h.to_url for h in hops] == [f"{site}/redirect-middle", f"{site}/about"]
+    assert all(h.status_code == 302 for h in hops)
+    assert crawled["/about"].redirect_hops == ()
+
+
+def test_loop_is_detected_quickly(crawled: dict[str, PageRecord]) -> None:
+    loop = crawled["/loop-a"]
+    assert len(loop.redirect_hops) == 2
+    assert loop.fetch_ms < 2000
+
+
+def test_response_headers_are_kept(crawled: dict[str, PageRecord]) -> None:
+    home = crawled["/"]
+    assert home.headers["content-type"].startswith("text/html")
+    assert home.size_bytes > 0
+    assert crawled["/blocked/secret"].headers == {}
 
 
 def test_parsed_fields(crawled: dict[str, PageRecord]) -> None:
@@ -102,3 +125,16 @@ def test_ignore_robots_fetches_blocked_page(site: str) -> None:
 def test_invalid_start_url() -> None:
     with pytest.raises(ValueError, match="Invalid start URL"):
         Crawler(CrawlConfig(start_url="not a url"))
+
+
+def test_parser_failure_becomes_error_record(site: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    def boom(html: str, base_url: str) -> object:
+        raise RuntimeError("parser exploded")
+
+    monkeypatch.setattr("sitecrawler.crawl.crawler.parse_html", boom)
+    records = Crawler(CrawlConfig(start_url=site, delay_seconds=0, workers=1)).run()
+    by_path = {r.url.removeprefix(site): r for r in records}
+    assert by_path["/"].outcome is Outcome.ERROR
+    assert "parser exploded" in by_path["/"].error
+    assert by_path["/about"].outcome is Outcome.ERROR  # the crawl carried on (sitemap URL)
+    assert len(records) == 4  # start URL plus the three other sitemap URLs

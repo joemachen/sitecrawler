@@ -63,6 +63,10 @@ def crawl(
     ignore_robots: Annotated[
         bool, typer.Option("--ignore-robots", help="Do not honour robots.txt.")
     ] = False,
+    max_redirects: Annotated[
+        int, typer.Option(help="Report redirect_loop after this many hops.")
+    ] = 10,
+    no_http2: Annotated[bool, typer.Option("--no-http2", help="Use HTTP/1.1 only.")] = False,
 ) -> None:
     """Spider a site from URL and write every page found to a CSV."""
     config = CrawlConfig(
@@ -74,6 +78,8 @@ def crawl(
         use_sitemap=not no_sitemap,
         keep_query=keep_query,
         respect_robots=not ignore_robots,
+        max_redirects=max_redirects,
+        http2=not no_http2,
     )
     try:
         crawler = Crawler(config)
