@@ -83,7 +83,11 @@ class Crawler:
 
     # ------------------------------------------------------------------ one page
     async def _process(self, item: QueueItem) -> _Processed:
-        """Fetch and parse one URL. Returns the record and the raw links found."""
+        """Fetch and parse one URL. Returns the record and the raw links found.
+
+        Never raises: a page that breaks the parser becomes an ``ERROR`` record
+        so one weird page cannot end the crawl.
+        """
         record = PageRecord(
             url=item.url, outcome=Outcome.FETCHED, depth=item.depth, found_on=item.found_on
         )
@@ -91,7 +95,15 @@ class Crawler:
             record.outcome = Outcome.BLOCKED
             record.error = "disallowed by robots.txt"
             return record, []
+        try:
+            return await self._fetch_and_parse(item, record)
+        except Exception as exc:  # deliberately total, see docstring
+            log.exception("unexpected failure processing %s", item.url)
+            record.outcome = Outcome.ERROR
+            record.error = f"internal error: {exc}"[:200]
+            return record, []
 
+    async def _fetch_and_parse(self, item: QueueItem, record: PageRecord) -> _Processed:
         result = await self.fetcher.fetch(item.url)
         record.outcome = result.outcome
         record.status_code = result.status_code

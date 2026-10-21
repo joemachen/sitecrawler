@@ -164,3 +164,27 @@ async def test_error_mid_chain_keeps_hops_so_far(
 async def test_can_be_built_without_http2() -> None:
     async with Fetcher("ua", 0, 5.0, http2=False) as fetcher:
         assert fetcher.throttle is not None
+
+
+async def test_loop_detection_ignores_host_case_and_fragment(
+    respx_mock: respx.MockRouter, fetcher: Fetcher
+) -> None:
+    respx_mock.get("https://x.test/a").mock(return_value=_redirect("https://X.test/a#top"))
+
+    result = await fetcher.fetch("https://x.test/a")
+
+    assert result.outcome is Outcome.REDIRECT_LOOP
+    assert result.error.startswith("redirect loop:")
+    assert len(result.hops) == 1
+
+
+async def test_repeated_headers_are_joined(respx_mock: respx.MockRouter, fetcher: Fetcher) -> None:
+    respx_mock.get("https://x.test/r").mock(
+        return_value=httpx.Response(
+            200, headers=[("X-Robots-Tag", "noindex"), ("X-Robots-Tag", "nofollow")]
+        )
+    )
+
+    result = await fetcher.fetch("https://x.test/r")
+
+    assert result.headers["x-robots-tag"] == "noindex, nofollow"

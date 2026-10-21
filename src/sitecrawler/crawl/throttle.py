@@ -24,8 +24,9 @@ class HostThrottle:
         """Return once a request to ``host`` may be sent."""
         if self._delay <= 0:
             return
-        lock = self._locks.setdefault(host, asyncio.Lock())
-        async with lock:
+        if host not in self._locks:
+            self._locks[host] = asyncio.Lock()
+        async with self._locks[host]:
             wait = self._next_allowed.get(host, 0.0) - time.monotonic()
             if wait > 0:
                 await asyncio.sleep(wait)

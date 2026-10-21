@@ -125,3 +125,16 @@ def test_ignore_robots_fetches_blocked_page(site: str) -> None:
 def test_invalid_start_url() -> None:
     with pytest.raises(ValueError, match="Invalid start URL"):
         Crawler(CrawlConfig(start_url="not a url"))
+
+
+def test_parser_failure_becomes_error_record(site: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    def boom(html: str, base_url: str) -> object:
+        raise RuntimeError("parser exploded")
+
+    monkeypatch.setattr("sitecrawler.crawl.crawler.parse_html", boom)
+    records = Crawler(CrawlConfig(start_url=site, delay_seconds=0, workers=1)).run()
+    by_path = {r.url.removeprefix(site): r for r in records}
+    assert by_path["/"].outcome is Outcome.ERROR
+    assert "parser exploded" in by_path["/"].error
+    assert by_path["/about"].outcome is Outcome.ERROR  # the crawl carried on (sitemap URL)
+    assert len(records) == 4  # start URL plus the three other sitemap URLs

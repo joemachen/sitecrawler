@@ -19,6 +19,21 @@ def _host(url: str) -> str:
     return urlparse(url).netloc.lower()
 
 
+def _loop_key(url: str) -> str:
+    """Identity used for loop detection: case-insensitive host, no fragment."""
+    parts = urlparse(url)
+    return parts._replace(netloc=parts.netloc.lower(), fragment="").geturl()
+
+
+def _headers(response: httpx.Response) -> dict[str, str]:
+    """Lower-cased header map; repeated headers are joined with ``", "``."""
+    merged: dict[str, str] = {}
+    for key, value in response.headers.multi_items():
+        name = key.lower()
+        merged[name] = f"{merged[name]}, {value}" if name in merged else value
+    return merged
+
+
 class Fetcher:
     """Fetches URLs through one shared async client, never faster than ``delay`` per host.
 
@@ -76,7 +91,7 @@ class Fetcher:
         """
         started = time.monotonic()
         hops: list[RedirectHop] = []
-        visited = {url}
+        visited = {_loop_key(url)}
         current = url
         try:
             while True:
@@ -87,20 +102,15 @@ class Fetcher:
                     break
                 target = urljoin(current, location)
                 hops.append(RedirectHop(len(hops) + 1, current, target, response.status_code))
-                if target in visited:
+                reason = ""
+                if _loop_key(target) in visited:
                     chain = " -> ".join([url, *(hop.to_url for hop in hops)])
-                    return self._failed(
-                        url, Outcome.REDIRECT_LOOP, f"redirect loop: {chain}", hops, started
-                    )
-                if len(hops) > self._max_redirects:
-                    return self._failed(
-                        url,
-                        Outcome.REDIRECT_LOOP,
-                        f"more than {self._max_redirects} redirects",
-                        hops,
-                        started,
-                    )
-                visited.add(target)
+                    reason = f"redirect loop: {chain}"
+                elif len(hops) > self._max_redirects:
+                    reason = f"more than {self._max_redirects} redirects"
+                if reason:
+                    return self._failed(url, Outcome.REDIRECT_LOOP, reason, hops, started)
+                visited.add(_loop_key(target))
                 current = target
         except (httpx.HTTPError, httpx.InvalidURL) as exc:
             return self._failed(url, Outcome.ERROR, str(exc)[:200], hops, started)
@@ -114,7 +124,7 @@ class Fetcher:
             content_type=content_type,
             text=response.text if "html" in content_type else "",
             content=response.content,
-            headers={key.lower(): value for key, value in response.headers.items()},
+            headers=_headers(response),
             size_bytes=len(response.content),
             elapsed_ms=_elapsed(started),
             hops=tuple(hops),
