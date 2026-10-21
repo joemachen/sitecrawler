@@ -1,3 +1,6 @@
+from pathlib import Path
+
+from sitecrawler.audit import CrawlView
 from sitecrawler.models import Outcome, PageRecord
 from tests.unit.audit.helpers import SITE, blocked, links, page, view
 
@@ -64,6 +67,15 @@ def test_external_links_are_not_inlinks() -> None:
     )
     v = view([home, external])
     assert v.inlinks_to("https://other.test/") == []
+
+
+def test_from_store_reads_keep_query(tmp_path: Path) -> None:
+    from sitecrawler.models import CrawlConfig
+    from sitecrawler.store import open_store
+
+    with open_store(tmp_path / "k.db") as store:
+        store.begin(CrawlConfig(start_url="https://site.test/", keep_query=True), resume=False)
+        assert CrawlView.from_store(store).keep_query is True
 
 
 def test_group_and_sitemap() -> None:

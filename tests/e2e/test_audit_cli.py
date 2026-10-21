@@ -53,6 +53,10 @@ def test_issues_before_audit_and_unknown_rule(db: Path, tmp_path: Path) -> None:
     assert "unknown rule" in " ".join(unknown.output.split())
 
     assert runner.invoke(app, ["audit", str(tmp_path / "none.db")]).exit_code == 2
+    not_db = tmp_path / "notes.txt"
+    not_db.write_text("hello", encoding="utf-8")
+    assert runner.invoke(app, ["audit", str(not_db)]).exit_code == 2
+    assert not_db.read_text(encoding="utf-8") == "hello"  # left untouched
     missing_crawl = tmp_path / "empty.db"
     from sitecrawler.store import open_store
 

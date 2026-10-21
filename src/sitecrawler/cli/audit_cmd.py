@@ -9,20 +9,15 @@ import typer
 from rich.table import Table
 
 from sitecrawler.audit import CrawlView, load_rules, rule_by_id, run_audit
-from sitecrawler.cli._run import err, fail
+from sitecrawler.cli._run import err, fail, require_crawl_db
 from sitecrawler.store import open_store
-
-
-def _open(db: Path) -> None:
-    if not db.is_file():
-        fail(f"{db} is not a file")
 
 
 def audit(
     db: Annotated[Path, typer.Argument(help="Crawl database written by crawl --db or list --db.")],
 ) -> None:
     """Run every audit rule over a stored crawl, store the issues and print the fix list."""
-    _open(db)
+    require_crawl_db(db)
     with open_store(db) as store:
         try:
             crawl = CrawlView.from_store(store)
@@ -56,7 +51,7 @@ def issues(
     ] = None,
 ) -> None:
     """List the URLs an audit flagged, one per line: severity, rule, URL, detail."""
-    _open(db)
+    require_crawl_db(db)
     if rule is not None and rule_by_id(rule) is None:
         known = ", ".join(r.id for r in load_rules())
         fail(f"unknown rule {rule!r}; known rules: {known}")

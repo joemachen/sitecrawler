@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import Iterator, Sequence
 from dataclasses import asdict
 from datetime import UTC, datetime
@@ -42,6 +43,8 @@ from sitecrawler.store.schema import (
     RedirectHopRow,
     SitemapUrlRow,
 )
+
+log = logging.getLogger(__name__)
 
 
 def _now() -> datetime:
@@ -290,13 +293,18 @@ class Store:
             ]
             session.add_all(rows)
             session.commit()
-            return len(rows)
+        dropped = len(issues) - len(rows)
+        if dropped:
+            log.warning("%d issue(s) refer to URLs that are not in this crawl; dropped", dropped)
+        return len(rows)
 
     def set_indexability(self, verdicts: dict[str, Indexability]) -> None:
         """Store the audit's indexability verdict per URL."""
         with Session(self.engine) as session:
-            for page in session.scalars(select(PageRow).where(PageRow.url.in_(verdicts))):
-                verdict = verdicts[page.url]
+            for page in session.scalars(select(PageRow).where(PageRow.state == "done")):
+                verdict = verdicts.get(page.url)
+                if verdict is None:
+                    continue
                 page.indexable = verdict.indexable
                 page.indexability_reason = verdict.reason
             session.commit()

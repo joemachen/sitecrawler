@@ -14,7 +14,7 @@ def test_client_error_only_4xx_with_link_context() -> None:
 def test_server_error_message_without_inlinks() -> None:
     hits = flagged(ServerError(), [page("/boom", 500), page("/gone", 404), page("/ok")])
     assert set(hits) == {"/boom"}
-    assert hits["/boom"].message == "500, linked from nowhere (sitemap or start URL)"
+    assert hits["/boom"].message == "500, no internal links; found via start"
 
 
 def test_fetch_error() -> None:

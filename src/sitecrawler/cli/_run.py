@@ -21,6 +21,15 @@ def fail(message: str) -> None:
     raise typer.Exit(code=2)
 
 
+def require_crawl_db(path: Path) -> None:
+    """Exit 2 unless ``path`` is an existing SQLite file (does not open it)."""
+    if not path.is_file():
+        fail(f"{path} is not a file")
+    header = path.read_bytes()[:16] if path.stat().st_size else b""
+    if not header.startswith(b"SQLite format 3"):
+        fail(f"{path} is not a SQLite database")
+
+
 def run_crawl(config: CrawlConfig, *, db: Path | None, resume: bool, output: Path | None) -> None:
     """Run ``config`` to completion, storing and/or exporting as asked.
 

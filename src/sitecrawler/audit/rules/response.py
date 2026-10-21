@@ -14,7 +14,7 @@ CATEGORY = "Response codes"
 def _linked_from(page: PageRecord, crawl: CrawlView) -> str:
     sources = crawl.inlinks_to(page.url)
     if not sources:
-        return "linked from nowhere (sitemap or start URL)"
+        return f"no internal links; found via {page.found_on}"
     first = sources[0].src
     more = f" and {len(sources) - 1} more" if len(sources) > 1 else ""
     return f"linked from {first}{more}"

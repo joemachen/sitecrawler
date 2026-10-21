@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
@@ -58,8 +59,8 @@ class CrawlView:
     @classmethod
     def from_store(cls, store: Store) -> CrawlView:
         """Load every fetched page and sitemap URL from ``store``."""
-        config = store.crawl().config_json
-        keep_query = '"keep_query": true' in config
+        config = json.loads(store.crawl().config_json or "{}")
+        keep_query = bool(config.get("keep_query", False))
         return cls(list(store.iter_pages()), store.sitemap_urls(), keep_query)
 
     # ------------------------------------------------------------ lookups

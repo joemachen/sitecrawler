@@ -8,7 +8,7 @@ from typing import Annotated
 
 import typer
 
-from sitecrawler.cli._run import err, fail
+from sitecrawler.cli._run import err, fail, require_crawl_db
 from sitecrawler.export import write_csv, write_json, write_xlsx
 from sitecrawler.store import open_store
 from sitecrawler.store.dump import dump_tables
@@ -37,10 +37,7 @@ def export(
     ] = None,
 ) -> None:
     """Export a stored crawl: csv (the pages table), xlsx (one sheet per table) or json."""
-    if not db.is_file():
-        fail(f"{db} is not a file")
-    if db.stat().st_size == 0 or not db.read_bytes()[:16].startswith(b"SQLite format 3"):
-        fail(f"{db} is not a SQLite database")
+    require_crawl_db(db)
     output = output or db.with_suffix(f".{fmt.value}")
     with open_store(db) as store:
         try:
