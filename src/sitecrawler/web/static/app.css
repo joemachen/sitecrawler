@@ -107,7 +107,18 @@ header .db { margin-left: auto; max-width: 24rem; font-family: ui-monospace, mon
 .gridwrap { min-height: 0; position: relative; overflow: hidden; }
 #grid { height: 100%; }
 .issues-panel { height: 100%; overflow: auto; padding: 0.5rem 1rem; }
-.detail-pane { border-top: 1px solid var(--line); overflow: auto; padding: 0.5rem 1rem; background: var(--panel); }
+.detail-pane { border-top: 1px solid var(--line); display: grid; grid-template-rows: auto minmax(0, 1fr); background: var(--panel); min-height: 0; }
+.detail-head { display: flex; align-items: center; gap: 0.75rem; padding: 0.3rem 0.75rem; border-bottom: 1px solid var(--line); }
+.subtabs { display: flex; gap: 2px; }
+.subtabs button { padding: 0.2rem 0.6rem; border: 1px solid transparent; border-radius: 4px; background: transparent; cursor: pointer; font: inherit; }
+.subtabs button:hover { background: #e8eaed; }
+.subtabs button[aria-selected="true"] { background: var(--accent); color: #fff; }
+.detail-url { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 auto; }
+.detail-open { color: var(--accent); white-space: nowrap; }
+.detail-body { overflow: auto; padding: 0.5rem 1rem; }
+.detail-body h2 { margin-top: 0; }
+.detail-body table.plain td, .detail-body table.plain th { word-break: break-word; }
+.tabulator-row { cursor: pointer; }
 .sidebar { border-left: 1px solid var(--line); overflow: auto; padding: 0.5rem 0.75rem; background: var(--panel); }
 .sidebar h2 { margin: 0.25rem 0 0.5rem; }
 

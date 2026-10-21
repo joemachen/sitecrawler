@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 
 from sitecrawler.audit import load_rules
 from sitecrawler.web import create_app
+from sitecrawler.web.app import DETAIL_SUBS
 from tests.integration.test_audit import TRIGGERS
 
 
@@ -63,7 +64,7 @@ def test_every_rule_has_an_explanation_page(client: TestClient) -> None:
 
 
 def test_unknown_rule_and_page_render_the_404_page(client: TestClient) -> None:
-    for path in ("/rules/nope", "/issues/nope", "/page?url=https://elsewhere.test/", "/page"):
+    for path in ("/rules/nope", "/page?url=https://elsewhere.test/", "/page"):
         response = client.get(path)
         assert response.status_code == 404, path
         assert "<h1>Not found</h1>" in response.text
@@ -98,3 +99,24 @@ def test_page_detail_accepts_any_url_form(client: TestClient, site: str) -> None
     without = client.get("/page", params={"url": f"{site}/blog"})
     assert with_slash.status_code == without.status_code == 200
     assert f"{site}/blog" in with_slash.text
+
+
+@pytest.mark.parametrize("sub", [s for s, _ in DETAIL_SUBS])
+def test_detail_fragments_render_for_a_crawled_url(client: TestClient, site: str, sub: str) -> None:
+    response = client.get(f"/detail/{sub}", params={"url": f"{site}/missing"})
+    assert response.status_code == 200
+    assert "<html" not in response.text  # a fragment, not a page
+    if sub == "issues":
+        assert 'data-rule="response.4xx"' in response.text
+    if sub == "inlinks":
+        assert f'data-src="{site}/"' in response.text
+
+
+def test_detail_fragment_404s_are_small_fragments(client: TestClient, site: str) -> None:
+    missing = client.get("/detail/issues", params={"url": "https://elsewhere.test/"})
+    assert missing.status_code == 404
+    assert "<html" not in missing.text
+    assert "not in this crawl" in missing.text
+    assert client.get("/detail/nope", params={"url": f"{site}/"}).status_code == 404
+    assert client.get("/issues/nope").status_code == 404
+    assert "<html" not in client.get("/issues/nope").text

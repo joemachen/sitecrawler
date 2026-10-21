@@ -55,8 +55,19 @@
              hx-get="/issues" hx-trigger="load, audit-changed from:body" hx-swap="innerHTML"></div>
       </div>
 
-      <section class="detail-pane" id="detail" aria-label="URL details">
-        <p class="muted">Click a URL in the grid to see its details.</p>
+      <section class="detail-pane" id="detail" aria-label="URL details" data-detail>
+        <div class="detail-head">
+          <nav class="subtabs" data-subtabs>
+            {% for sub, label in detail_subs %}
+            <button type="button" data-sub="{{ sub }}" aria-selected="{{ 'true' if loop.first else 'false' }}">{{ label }}</button>
+            {% endfor %}
+          </nav>
+          <span class="detail-url" data-detail-url></span>
+          <a class="detail-open" data-detail-open href="/" hidden>Open full page</a>
+        </div>
+        <div class="detail-body" data-detail-body>
+          <p class="muted">Click a URL in the grid to see its details.</p>
+        </div>
       </section>
     </section>
 

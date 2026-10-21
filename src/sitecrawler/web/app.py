@@ -56,10 +56,34 @@ def crawl_json(rows: RowStore) -> dict[str, object]:
     }
 
 
+DETAIL_SUBS: tuple[tuple[str, str], ...] = (
+    ("details", "URL Details"),
+    ("html", "HTML"),
+    ("inlinks", "Inlinks"),
+    ("outlinks", "Outlinks"),
+    ("redirects", "Redirects"),
+    ("headers", "HTTP Headers"),
+    ("hreflang", "Hreflang"),
+    ("issues", "Issues"),
+)
+"""The detail pane's sub-tabs: (fragment name, label)."""
+
+
 @router.get("/", response_class=HTMLResponse)
 def index(request: Request) -> HTMLResponse:
     """The app shell: tab strip, grid, detail pane and sidebar, filled by JavaScript."""
-    return _render(request, "index.html", tabs=TABS, specs=to_json())
+    return _render(request, "index.html", tabs=TABS, specs=to_json(), detail_subs=DETAIL_SUBS)
+
+
+@router.get("/detail/{sub}", response_class=HTMLResponse)
+def detail_fragment(request: Request, sub: str, url: str = "") -> HTMLResponse:
+    """One sub-tab of the detail pane for ``url``: the same partials ``/page`` is built from."""
+    if sub not in dict(DETAIL_SUBS):
+        raise HTTPException(status_code=404, detail=f"unknown detail section {sub!r}")
+    detail = _rows(request).page_detail(url) if url else None
+    if detail is None:
+        raise HTTPException(status_code=404, detail=f"{url} is not in this crawl")
+    return _render(request, f"detail/{sub}.html", detail=detail)
 
 
 @router.get("/issues", response_class=HTMLResponse)
@@ -191,6 +215,9 @@ def api_crawl_action(request: Request, action: str) -> JSONResponse:
 async def _not_found(request: Request, exc: StarletteHTTPException) -> HTMLResponse | JSONResponse:
     if request.url.path.startswith("/api/"):
         return JSONResponse({"detail": str(exc.detail)}, status_code=exc.status_code)
+    if request.url.path.startswith(("/detail/", "/issues/")):
+        text = str(exc.detail).replace("<", "&lt;")
+        return HTMLResponse(f'<p class="muted">{text}</p>', status_code=exc.status_code)
     if exc.status_code != 404:
         return HTMLResponse(str(exc.detail), status_code=exc.status_code)
     return _render(request, "404.html", status_code=404, detail=exc.detail)
