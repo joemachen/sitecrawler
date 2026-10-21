@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from sitecrawler.audit.rule import HtmlPageRule, Rule
+from sitecrawler.audit.rules._common import describe_group
 from sitecrawler.audit.view import CrawlView
 from sitecrawler.models import Issue, PageRecord, Severity
 
@@ -12,12 +13,6 @@ CATEGORY = "Titles"
 MAX_LENGTH = 60
 """Roughly what fits in a desktop result before Google truncates (about 580 px)."""
 MIN_LENGTH = 30
-
-
-def _others(page: PageRecord, group: list[PageRecord]) -> str:
-    others = [p.url for p in group if p.url != page.url]
-    more = f" and {len(others) - 1} more" if len(others) > 1 else ""
-    return f"same as {others[0]}{more}"
 
 
 class Missing(HtmlPageRule):
@@ -62,7 +57,7 @@ class Duplicate(Rule):
         for group in crawl.group_html_pages(lambda p: p.title.casefold()).values():
             if len(group) > 1:
                 for page in group:
-                    yield self.issue(page, _others(page, group))
+                    yield self.issue(page, describe_group(page, group))
 
 
 class TooLong(HtmlPageRule):

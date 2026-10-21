@@ -39,6 +39,7 @@ class CrawlView:
     sitemap_urls: frozenset[str] = frozenset()
     keep_query: bool = False
     _by_url: dict[str, PageRecord] = field(init=False, repr=False)
+    _normalized: dict[str, str | None] = field(init=False, repr=False, default_factory=dict)
 
     def __post_init__(self) -> None:
         """Index the pages."""
@@ -65,8 +66,12 @@ class CrawlView:
 
     # ------------------------------------------------------------ lookups
     def normalize(self, url: str) -> str | None:
-        """The crawl's normalised form of ``url`` (scheme kept)."""
-        return normalize(url, keep_query=self.keep_query)
+        """The crawl's normalised form of ``url`` (scheme kept). Memoised per view."""
+        try:
+            return self._normalized[url]
+        except KeyError:
+            result = self._normalized[url] = normalize(url, keep_query=self.keep_query)
+            return result
 
     def page_for(self, url: str) -> PageRecord | None:
         """The fetched page at ``url`` (any form), or ``None`` if it was not crawled."""

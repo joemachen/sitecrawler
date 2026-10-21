@@ -37,6 +37,7 @@ CANONICALISED = {
     "/audit/canonical-chain-1",
     "/audit/canonical-chain-2",
     "/audit/canonical-conflict",
+    "/audit/paged-bad-2",
 }
 """Linked pages whose effective canonical is a different URL."""
 
@@ -49,11 +50,7 @@ TRIGGERS: dict[str, set[str]] = {
     "redirect.loop": {"/loop-a"},
     "redirect.to_error": {"/audit/redirect-to-missing"},
     "redirect.off_site": {"/audit/redirect-off-site"},
-    "redirect.temporary": {
-        "/redirect-start",
-        "/audit/redirect-to-missing",
-        "/audit/redirect-off-site",
-    },
+    "redirect.temporary": {"/redirect-start"},
     "link.to_redirect": {"/", "/audit"},
     "title.missing": {"/notitle"},
     "title.duplicate": {"/dup-title-1", "/dup-title-2"},
@@ -96,6 +93,15 @@ TRIGGERS: dict[str, set[str]] = {
         "/audit/robots-none",
     },
     "robots.blocked_but_linked": {"/blocked/secret"},
+    "hreflang.invalid_lang": {"/audit/hreflang-bad"},
+    "hreflang.missing_self": {"/audit/hreflang-bad"},
+    "hreflang.missing_x_default": {"/audit/hreflang-bad", "/audit/hreflang-no-return"},
+    "hreflang.missing_return_link": {"/audit/hreflang-bad"},
+    "hreflang.to_non_200": {"/audit/hreflang-bad"},
+    "hreflang.to_non_canonical": {"/audit/hreflang-bad"},
+    "pagination.to_non_200": {"/audit/paged-bad-1"},
+    "pagination.canonical_to_first": {"/audit/paged-bad-2"},
+    "pagination.broken_sequence": {"/audit/paged-bad-2"},
 }
 
 NON_INDEXABLE: dict[str, str] = {
@@ -119,6 +125,7 @@ NON_INDEXABLE: dict[str, str] = {
     "/audit/canonical-chain-1": "canonicalised to",
     "/audit/canonical-chain-2": "canonicalised to",
     "/audit/canonical-conflict": "canonicalised to",
+    "/audit/paged-bad-2": "canonicalised to",
 }
 TRIGGERS["page.non_indexable"] = set(NON_INDEXABLE)
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections import defaultdict
 from collections.abc import Iterator, Sequence
 from dataclasses import asdict
 from datetime import UTC, datetime
@@ -343,21 +344,47 @@ class Store:
             return session.scalar(stmt) or 0
 
     def iter_pages(self) -> Iterator[PageRecord]:
-        """Fetched pages as :class:`~sitecrawler.models.PageRecord`, sorted by URL."""
+        """Fetched pages as :class:`~sitecrawler.models.PageRecord`, sorted by URL.
+
+        Child rows (hops, links, hreflang) are read with plain selects and
+        grouped in Python: a 10k-page crawl has hundreds of thousands of links,
+        and one ORM object per link made loading slower than auditing.
+        """
         stmt = (
             select(PageRow)
             .where(PageRow.state == "done")
             .order_by(PageRow.url)
-            .options(
-                selectinload(PageRow.html),
-                selectinload(PageRow.hops),
-                selectinload(PageRow.links),
-                selectinload(PageRow.hreflang),
-            )
+            .options(selectinload(PageRow.html))
         )
         with Session(self.engine) as session:
-            for row in session.scalars(stmt):
-                yield _to_record(row)
+            rows = session.scalars(stmt).all()
+            hops: dict[int, list[RedirectHop]] = defaultdict(list)
+            for page_id, hop_no, from_url, to_url, status in session.execute(
+                select(
+                    RedirectHopRow.page_id,
+                    RedirectHopRow.hop_no,
+                    RedirectHopRow.from_url,
+                    RedirectHopRow.to_url,
+                    RedirectHopRow.status_code,
+                ).order_by(RedirectHopRow.page_id, RedirectHopRow.hop_no)
+            ):
+                hops[page_id].append(RedirectHop(hop_no, from_url, to_url, status))
+            links: dict[int, list[LinkRef]] = defaultdict(list)
+            for page_id, dst, text, rel in session.execute(
+                select(LinkRow.page_id, LinkRow.dst_url, LinkRow.anchor_text, LinkRow.rel).order_by(
+                    LinkRow.page_id, LinkRow.id
+                )
+            ):
+                links[page_id].append(LinkRef(dst, text, rel))
+            hreflang: dict[int, list[HreflangRef]] = defaultdict(list)
+            for page_id, lang, href in session.execute(
+                select(HreflangRow.page_id, HreflangRow.lang, HreflangRow.href).order_by(
+                    HreflangRow.page_id, HreflangRow.id
+                )
+            ):
+                hreflang[page_id].append(HreflangRef(lang, href))
+            for row in rows:
+                yield _to_record(row, hops[row.id], links[row.id], hreflang[row.id])
 
     # ------------------------------------------------------------- helpers
     def _crawl_id(self) -> int:
@@ -388,7 +415,12 @@ class Store:
         )
 
 
-def _to_record(row: PageRow) -> PageRecord:
+def _to_record(
+    row: PageRow,
+    hops: Sequence[RedirectHop],
+    links: Sequence[LinkRef],
+    hreflang: Sequence[HreflangRef],
+) -> PageRecord:
     html = row.html
     headers: dict[str, str] = json.loads(row.headers_json)
     return PageRecord(
@@ -409,10 +441,8 @@ def _to_record(row: PageRow) -> PageRecord:
         final_url=row.final_url,
         size_bytes=row.size_bytes,
         headers=headers,
-        redirect_hops=tuple(
-            RedirectHop(h.hop_no, h.from_url, h.to_url, h.status_code) for h in row.hops
-        ),
-        links=tuple(LinkRef(link.dst_url, link.anchor_text, link.rel) for link in row.links),
+        redirect_hops=tuple(hops),
+        links=tuple(links),
         h1s=tuple(json.loads(html.h1s_json)) if html else (),
         h2s=tuple(json.loads(html.h2s_json)) if html else (),
         meta_robots=html.meta_robots if html else "",
@@ -421,7 +451,7 @@ def _to_record(row: PageRow) -> PageRecord:
         meta_description_count=html.meta_description_count if html else 0,
         og_url=html.og_url if html else "",
         canonical_header=html.canonical_header if html else "",
-        hreflang=tuple(HreflangRef(h.lang, h.href) for h in row.hreflang),
+        hreflang=tuple(hreflang),
         rel_prev=html.rel_prev if html else "",
         rel_next=html.rel_next if html else "",
     )

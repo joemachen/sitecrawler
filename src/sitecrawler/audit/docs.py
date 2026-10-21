@@ -16,7 +16,18 @@ Do not edit by hand.
 Severity: **critical** blocks indexing or breaks pages site-wide, **high** costs
 rankings on affected pages, **medium** is worth fixing in the next sprint,
 **low** is hygiene, **info** is a fact to know rather than a problem.
+
+One tag can appear under several rules when they ask for different actions:
+an off-site canonical is listed by `canonical.off_site` (fix the tag),
+`canonical.canonicalised_but_linked` (fix the links) and
+`canonical.not_self_referencing` (the informational roll-up). Count problems
+by the highest-severity rule, not by the number of rows.
 """
+
+
+def _text(value: str) -> str:
+    """Rule prose for Markdown: tag-like text such as ``<title>`` must not render as HTML."""
+    return value.strip().replace("<", "&lt;").replace(">", "&gt;")
 
 
 def render_rules_page(rules: Iterable[Rule]) -> str:
@@ -31,8 +42,8 @@ def render_rules_page(rules: Iterable[Rule]) -> str:
         for rule in sorted(by_category[category], key=lambda r: r.id):
             parts.append(
                 f"\n### `{rule.id}`\n\n"
-                f"**{rule.summary}** (severity: {rule.severity.value})\n\n"
-                f"{rule.why.strip()}\n\n"
-                f"**Fix:** {rule.fix.strip()}\n"
+                f"**{_text(rule.summary)}** (severity: {rule.severity.value})\n\n"
+                f"{_text(rule.why)}\n\n"
+                f"**Fix:** {_text(rule.fix)}\n"
             )
     return "".join(parts)

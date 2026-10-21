@@ -26,6 +26,19 @@ def test_chain_needs_two_hops() -> None:
     assert hits["/a"].message == f"2 hops: {SITE}/a -> {SITE}/b -> {SITE}/c"
 
 
+def test_same_page_hops_are_not_chains_or_temporary() -> None:
+    slash_then_move = page(
+        "/dir",
+        final_url=f"{SITE}/new",
+        redirect_hops=hops(("/dir", "/dir/", 302), ("/dir/", "/new", 301)),
+    )
+    slash_only = page(
+        "/blog", final_url=f"{SITE}/blog/", redirect_hops=hops(("/blog", "/blog/", 302))
+    )
+    assert flagged(Chain(), [slash_then_move, slash_only]) == {}
+    assert flagged(Temporary(), [slash_then_move, slash_only]) == {}
+
+
 def test_loop() -> None:
     loop = page("/l", None, outcome=Outcome.REDIRECT_LOOP, error="redirect loop: l -> m -> l")
     hits = flagged(Loop(), [loop, page("/ok")])
@@ -60,7 +73,15 @@ def test_temporary_lists_the_codes() -> None:
         "/t", final_url=f"{SITE}/u", redirect_hops=hops(("/t", "/t2", 302), ("/t2", "/u", 307))
     )
     permanent = page("/p", final_url=f"{SITE}/q", redirect_hops=hops(("/p", "/q", 301)))
-    hits = flagged(Temporary(), [mixed, permanent])
+    to_404 = page("/bad", 404, final_url=f"{SITE}/gone", redirect_hops=hops(("/bad", "/gone", 302)))
+    loop = page("/l", None, outcome=Outcome.REDIRECT_LOOP, redirect_hops=hops(("/l", "/m", 302)))
+    away = page(
+        "/away",
+        302,
+        final_url="https://other.test/x",
+        redirect_hops=(RedirectHop(1, f"{SITE}/away", "https://other.test/x", 302),),
+    )
+    hits = flagged(Temporary(), [mixed, permanent, to_404, loop, away])
     assert set(hits) == {"/t"}
     assert hits["/t"].message.startswith("302, 307 in ")
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from sitecrawler.audit.rule import HtmlPageRule, Rule
-from sitecrawler.audit.rules.titles import _others
+from sitecrawler.audit.rules._common import describe_group
 from sitecrawler.audit.view import CrawlView
 from sitecrawler.models import Issue, PageRecord, Severity
 
@@ -52,7 +52,7 @@ class Duplicate(Rule):
         for group in crawl.group_html_pages(lambda p: p.meta_description.casefold()).values():
             if len(group) > 1:
                 for page in group:
-                    yield self.issue(page, _others(page, group))
+                    yield self.issue(page, describe_group(page, group))
 
 
 class TooLong(HtmlPageRule):
