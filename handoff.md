@@ -1,7 +1,8 @@
 # Handoff: sitecrawler
 
 Read this first in a new session. It is the state of the project as of
-2026-10-21 (late evening) and everything that is not obvious from the code.
+2026-10-21 (night, after the Phase 3 build) and everything that is not
+obvious from the code.
 
 ## What this is
 
@@ -17,10 +18,25 @@ one-line reason, not menus of options.
 
 ## Where things stand
 
-Phases 0, 1 and 2 are complete and on `main`, released as v0.3.0. CI is green
-on Ubuntu, Windows and the docs build. Phase 2 landed as four squash-merged
-PRs (#10 framework, #11 content rules, #12 canonical/robots rules, #13
-hreflang/pagination rules) plus a release PR.
+Phases 0, 1 and 2 are complete and on `main`, released as v0.3.0. Phase 2
+landed as four squash-merged PRs (#10 framework, #11 content rules, #12
+canonical/robots rules, #13 hreflang/pagination rules) plus a release PR.
+
+**Phase 3 (local web UI) is built and sits in three stacked, unmerged PRs**,
+opened 2026-10-21 (evening session 2):
+
+| PR | Branch | Base | Contents |
+| --- | --- | --- | --- |
+| #15 | `feat/web-serve` | `main` | deps, `web/` package, `serve` command, Overview + Pages tabs, ADR-0006, user guide |
+| #16 | `feat/web-issues` | `feat/web-serve` | Issues tab + HTMX URL panel, `/rules/<id>`, Redirects, Page detail, 404 page |
+| #17 | `feat/web-e2e` | `feat/web-issues` | Playwright e2e per tab, CI Chromium step, roadmap/architecture close-out |
+
+Merge order: #15, then #16, then #17, each squash-merged once CI is green.
+After each squash merge, GitHub retargets the next PR to `main` on its own
+but the branch still needs rebasing:
+`git rebase --onto origin/main <old-base-tip> <branch>` then
+`git push --force-with-lease`. Then `chore(release): v0.4.0` (bump
+`pyproject.toml`, move the Unreleased block in `CHANGELOG.md`, tag).
 
 What exists now:
 
@@ -39,7 +55,16 @@ What exists now:
 - `CrawlView` (`audit/view.py`) is the index rules read: lookups by
   normalised URL, inlinks, groups, sitemap membership. Rules never fetch.
 - CI enforces 100% branch coverage on `audit/` as a separate step.
-- 252 offline tests, ~99% coverage. ADRs 0001-0005.
+- `sitecrawler serve crawl.db [--port 8765] [--no-open]` (on the PR
+  branches): FastAPI + Jinja2 + HTMX + Tabulator on 127.0.0.1. `web/data.py`
+  loads one `CrawlSnapshot` (pages/issues/redirects dumps from
+  `store/dump.py`, a `CrawlView`, `load_rules()`) and closes the file;
+  `web/app.py` has the routes; templates and the vendored `htmx.min.js`
+  (2.0.11), `tabulator.min.js`/`.css` (6.7.0) sit beside them. Grids are
+  client-side (sort, header filters, any-column search, CSV download of the
+  filtered rows). Rule explanations are rendered in-app at `/rules/<id>`.
+- 334 offline tests (5 of them headless Chromium, marker `browser`), ~99%
+  coverage. ADRs 0001-0006.
 
 Open:
 
@@ -52,10 +77,13 @@ Open:
   serve HTTPS (see the note under Phase 2 in the roadmap).
 - Dependabot's older uv can produce lockfile-downgrading PRs (#4 was closed
   for that); read the lock diff before merging.
-- Next piece of work: **Phase 3, the local web UI** (FastAPI + Jinja2 + HTMX
-  + Tabulator over a stored crawl, ADR-0002). The Issues tab reads the
-  `issues` table and the rules' `summary`/`why`/`fix`; `store/dump.py` and
-  `Store.iter_issues()` are the read side to build on.
+- Next piece of work: merge #15, #16, #17 in order and release v0.4.0 (see
+  above), then **Phase 4, JavaScript rendering** (`docs/ROADMAP.md`).
+  Playwright is already a dev dependency and Chromium is installed in CI,
+  which Phase 4 reuses.
+- Dependabot will now also see fastapi/uvicorn/jinja2/playwright; the
+  vendored htmx/Tabulator files are upgraded by hand (replace the three files
+  under `src/sitecrawler/web/static/`).
 
 ## Decisions already made (do not re-open)
 
@@ -71,6 +99,7 @@ Open:
 | Commits | Conventional Commits, squash-merge PRs, `CHANGELOG.md` entry per change |
 | List mode | URLs may span hosts; `--follow` stays within the listed hosts |
 | Resume | `pages.state` is the frontier; `max_pages` counts across runs; `crawls.status` is `stopped` when capped |
+| Web UI | One in-memory snapshot per `serve`, file closed; grids filter/export client-side; htmx and Tabulator vendored; rule pages rendered in-app (ADR-0006) |
 
 Full rationale in `docs/adr/`.
 
@@ -82,10 +111,13 @@ uv run sitecrawler crawl https://example.com --db example.db
 uv run sitecrawler audit example.db
 uv run sitecrawler issues example.db --rule title.missing
 uv run sitecrawler export example.db --format xlsx
+uv run sitecrawler serve example.db          # web UI on http://127.0.0.1:8765
+uv run playwright install chromium           # once per machine, for tests/e2e/test_web_ui.py
 uv run ruff format . && uv run ruff check .
 uv run mypy
 uv run pytest --cov                      # whole suite, offline, ~80 s
 uv run pytest tests/unit                 # fast loop
+uv run pytest -m "not browser"           # without Chromium installed
 uv run pytest --cov=sitecrawler.audit --cov-fail-under=100 tests/unit/audit tests/integration/test_audit.py
 uv run python scripts/gen_rule_docs.py   # after adding or editing a rule
 uv run pre-commit run --all-files
@@ -136,16 +168,33 @@ test, then regenerate `rules.md`.
   hides the pass/fail summary line.
 - Dependabot's uv is older than ours: its grouped lockfile PRs can downgrade
   packages. Read the lock diff before merging.
+- **Playwright's sync API keeps an asyncio loop running on the main thread**
+  for as long as it is open. With the `pytest-playwright` plugin's
+  session-scoped fixtures that loop outlived the browser tests and every
+  `asyncio.run` in the rest of the suite failed (100 errors). The plugin is
+  not installed; `tests/e2e/test_web_ui.py` opens `sync_playwright()` in a
+  module-scoped fixture, and `crawled_db` runs its crawl in a worker thread.
+- Starlette 1.9 warns that its test client wants `httpx2`; httpx 0.28 still
+  works and the warning is filtered in `pyproject.toml`.
+- Jinja's `tojson` leaves double quotes alone (it escapes `<`, `>`, `&`,
+  `'`), so a `data-columns='{{ columns | tojson }}'` attribute is fine and a
+  test should look for `"url"`, not `&#34;url&#34;`.
+- Python scripts that rewrite files on this machine write CRLF; the repo is
+  LF. Convert before committing or the diff is every line.
 
 ## Where to look next
 
-- Phase 3 scope and acceptance: `docs/ROADMAP.md` under "Phase 3".
-- Read side for the UI: `Store.iter_pages()`, `Store.iter_issues()`,
-  `Store.issue_counts()`, `store/dump.py`; rule metadata via
-  `sitecrawler.audit.load_rules()`.
-- The fixture site is the contract for every feature; the Playwright e2e
-  test in Phase 3 should assert the numbers `tests/integration/test_audit.py`
-  already knows.
+- Phase 4 scope and acceptance: `docs/ROADMAP.md` under "Phase 4". It needs
+  a fixture page that injects its title, canonical and three links via JS,
+  a `--render` flag on `crawl`, and a rendered-vs-raw diff. `Crawler.arun()`
+  is the entry point for callers that already have an event loop.
+- The web UI's read side: `web/data.py` (`CrawlSnapshot`, `load_snapshot`,
+  `to_rows`), `store/dump.py::dump_tables(store, names)`. A new tab is a
+  route in `web/app.py`, a template, and a `TABS` entry; a grid needs only
+  the `section.grid` markup from `pages.html` (see `static/app.js`).
+- The fixture site is the contract for every feature; `tests/e2e/test_web_ui.py`
+  and `tests/integration/test_web_tabs.py` assert the numbers
+  `tests/integration/test_audit.py` already knows.
 
 ## Claude memory
 
