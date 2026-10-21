@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from sitecrawler.audit.rule import HtmlPageRule
+from sitecrawler.audit.rules._common import describe_target
 from sitecrawler.audit.rules.canonicals import effective_canonical
 from sitecrawler.audit.view import CrawlView
 from sitecrawler.models import Issue, PageRecord, Severity
@@ -34,9 +35,9 @@ class ToNon200(HtmlPageRule):
             target = crawl.page_for(href)
             if target is None:
                 continue
-            redirected = target.final_url and not crawl.same_page(target.final_url, target.url)
-            if target.status_code != 200 or redirected:
-                bad.append(f"{rel} {href} ({target.status})")
+            problem = describe_target(crawl, target)
+            if problem:
+                bad.append(f"{rel} {href} {problem}")
         if bad:
             yield self.issue(page, ", ".join(bad))
 

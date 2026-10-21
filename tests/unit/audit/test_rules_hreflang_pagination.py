@@ -50,7 +50,7 @@ def test_return_links_and_targets() -> None:
 
     dead = flagged(hreflang.ToNon200(), pages)
     assert set(dead) == {"/en"}
-    assert dead["/en"].message == f"{SITE}/gone (404)"
+    assert dead["/en"].message == f"{SITE}/gone returns 404"
 
     non_canon = flagged(hreflang.ToNonCanonical(), pages)
     assert set(non_canon) == {"/en"}
@@ -78,7 +78,8 @@ def test_pagination_rules() -> None:
 
     dead = flagged(pagination.ToNon200(), pages)
     assert set(dead) == {"/b1", "/tm"}
-    assert dead["/b1"].message == f"next {SITE}/gone (404)"
+    assert dead["/b1"].message == f"next {SITE}/gone returns 404"
+    assert dead["/tm"].message == f"prev {SITE}/moved redirects to {SITE}/new"
     assert set(flagged(pagination.CanonicalToFirstPage(), pages)) == {"/b2"}
     broken = flagged(pagination.BrokenSequence(), pages)
     assert set(broken) == {"/b2"}

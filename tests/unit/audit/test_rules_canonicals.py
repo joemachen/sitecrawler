@@ -25,6 +25,7 @@ def test_to_non_200_judges_crawled_targets_only() -> None:
     hits = flagged(canonicals.ToNon200(), pages)
     assert set(hits) == {"/to-404", "/to-redirect"}
     assert hits["/to-404"].message == f"{SITE}/gone returns 404"
+    assert hits["/to-redirect"].message == f"{SITE}/moved redirects to {SITE}/new"
 
 
 def test_off_site_and_not_self_and_linked() -> None:
