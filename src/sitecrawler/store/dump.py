@@ -7,6 +7,7 @@ link) live here, inside the store.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
@@ -50,7 +51,7 @@ class TableDump:
     rows: list[tuple[Cell, ...]]
 
 
-_PAGE_COLUMNS = (
+PAGE_COLUMNS: tuple[str, ...] = (
     "url",
     "status",
     "outcome",
@@ -76,6 +77,7 @@ _PAGE_COLUMNS = (
     "indexable",
     "indexability_reason",
 )
+"""Column names of the ``pages`` dump, in order."""
 
 
 def _iso(value: datetime | None) -> str | None:
@@ -112,66 +114,102 @@ def _page_row(page: PageRow) -> tuple[Cell, ...]:
     )
 
 
-def dump_tables(store: Store) -> list[TableDump]:
-    """Read every export table from ``store`` into memory, in :data:`EXPORT_TABLES` order."""
+def _pages(session: Session) -> TableDump:
+    pages = session.scalars(
+        select(PageRow)
+        .where(PageRow.state == "done")
+        .order_by(PageRow.url)
+        .options(selectinload(PageRow.html))
+    ).all()
+    return TableDump("pages", PAGE_COLUMNS, [_page_row(p) for p in pages])
+
+
+def _issues(session: Session) -> TableDump:
+    issues = session.execute(
+        select(PageRow.url, IssueRow)
+        .join(IssueRow, IssueRow.page_id == PageRow.id)
+        .order_by(IssueRow.rule_id, PageRow.url)
+    ).all()
+    return TableDump(
+        "issues",
+        ("url", "rule_id", "severity", "message"),
+        [(url, i.rule_id, i.severity, i.message) for url, i in issues],
+    )
+
+
+def _links(session: Session) -> TableDump:
+    links = session.execute(
+        select(PageRow.url, LinkRow)
+        .join(LinkRow, LinkRow.page_id == PageRow.id)
+        .order_by(PageRow.url, LinkRow.id)
+    ).all()
+    return TableDump(
+        "links",
+        ("src_url", "dst_url", "anchor_text", "rel", "nofollow", "is_internal"),
+        [
+            (url, link.dst_url, link.anchor_text, link.rel, link.nofollow, link.is_internal)
+            for url, link in links
+        ],
+    )
+
+
+def _redirects(session: Session) -> TableDump:
+    hops = session.execute(
+        select(PageRow.url, RedirectHopRow)
+        .join(RedirectHopRow, RedirectHopRow.page_id == PageRow.id)
+        .order_by(PageRow.url, RedirectHopRow.hop_no)
+    ).all()
+    return TableDump(
+        "redirects",
+        ("url", "hop_no", "from_url", "to_url", "status_code"),
+        [(url, h.hop_no, h.from_url, h.to_url, h.status_code) for url, h in hops],
+    )
+
+
+def _hreflang(session: Session) -> TableDump:
+    hreflang = session.execute(
+        select(PageRow.url, HreflangRow)
+        .join(HreflangRow, HreflangRow.page_id == PageRow.id)
+        .order_by(PageRow.url, HreflangRow.id)
+    ).all()
+    return TableDump(
+        "hreflang", ("url", "lang", "href"), [(url, h.lang, h.href) for url, h in hreflang]
+    )
+
+
+def _sitemap_urls(session: Session) -> TableDump:
+    sitemap_urls = session.scalars(
+        select(SitemapUrlRow).order_by(SitemapUrlRow.sitemap_url, SitemapUrlRow.loc)
+    ).all()
+    return TableDump(
+        "sitemap_urls", ("sitemap_url", "loc"), [(s.sitemap_url, s.loc) for s in sitemap_urls]
+    )
+
+
+_LOADERS: dict[str, Callable[[Session], TableDump]] = {
+    "pages": _pages,
+    "issues": _issues,
+    "links": _links,
+    "redirects": _redirects,
+    "hreflang": _hreflang,
+    "sitemap_urls": _sitemap_urls,
+}
+
+
+def dump_tables(store: Store, names: Iterable[str] = EXPORT_TABLES) -> list[TableDump]:
+    """Read export tables from ``store`` into memory, in :data:`EXPORT_TABLES` order.
+
+    Args:
+        store: An open store.
+        names: Which tables to read; default all. Readers that only need a
+            few (the web UI) skip the links table, by far the largest.
+
+    Raises:
+        ValueError: for a name that is not in :data:`EXPORT_TABLES`.
+    """
+    wanted = set(names)
+    if unknown := wanted - set(EXPORT_TABLES):
+        msg = f"unknown export tables: {sorted(unknown)}"
+        raise ValueError(msg)
     with Session(store.engine) as session:
-        pages = session.scalars(
-            select(PageRow)
-            .where(PageRow.state == "done")
-            .order_by(PageRow.url)
-            .options(selectinload(PageRow.html))
-        ).all()
-        links = session.execute(
-            select(PageRow.url, LinkRow)
-            .join(LinkRow, LinkRow.page_id == PageRow.id)
-            .order_by(PageRow.url, LinkRow.id)
-        ).all()
-        hops = session.execute(
-            select(PageRow.url, RedirectHopRow)
-            .join(RedirectHopRow, RedirectHopRow.page_id == PageRow.id)
-            .order_by(PageRow.url, RedirectHopRow.hop_no)
-        ).all()
-        sitemap_urls = session.scalars(
-            select(SitemapUrlRow).order_by(SitemapUrlRow.sitemap_url, SitemapUrlRow.loc)
-        ).all()
-        issues = session.execute(
-            select(PageRow.url, IssueRow)
-            .join(IssueRow, IssueRow.page_id == PageRow.id)
-            .order_by(IssueRow.rule_id, PageRow.url)
-        ).all()
-        hreflang = session.execute(
-            select(PageRow.url, HreflangRow)
-            .join(HreflangRow, HreflangRow.page_id == PageRow.id)
-            .order_by(PageRow.url, HreflangRow.id)
-        ).all()
-        return [
-            TableDump("pages", _PAGE_COLUMNS, [_page_row(p) for p in pages]),
-            TableDump(
-                "issues",
-                ("url", "rule_id", "severity", "message"),
-                [(url, i.rule_id, i.severity, i.message) for url, i in issues],
-            ),
-            TableDump(
-                "links",
-                ("src_url", "dst_url", "anchor_text", "rel", "nofollow", "is_internal"),
-                [
-                    (url, link.dst_url, link.anchor_text, link.rel, link.nofollow, link.is_internal)
-                    for url, link in links
-                ],
-            ),
-            TableDump(
-                "redirects",
-                ("url", "hop_no", "from_url", "to_url", "status_code"),
-                [(url, h.hop_no, h.from_url, h.to_url, h.status_code) for url, h in hops],
-            ),
-            TableDump(
-                "hreflang",
-                ("url", "lang", "href"),
-                [(url, h.lang, h.href) for url, h in hreflang],
-            ),
-            TableDump(
-                "sitemap_urls",
-                ("sitemap_url", "loc"),
-                [(s.sitemap_url, s.loc) for s in sitemap_urls],
-            ),
-        ]
+        return [_LOADERS[name](session) for name in EXPORT_TABLES if name in wanted]

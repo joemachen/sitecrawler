@@ -11,6 +11,11 @@ import pytest
 from pytest_httpserver import HTTPServer
 from werkzeug.wrappers import Request, Response
 
+from sitecrawler.audit import CrawlView, run_audit
+from sitecrawler.crawl import Crawler
+from sitecrawler.models import CrawlConfig
+from sitecrawler.store import open_store
+
 FIXTURE_SITE = Path(__file__).parent / "fixtures" / "site"
 
 _CONTENT_TYPES = {
@@ -127,6 +132,25 @@ def site(httpserver: HTTPServer) -> str:
     for path in routes.get("truncated", []):
         httpserver.expect_request(path).respond_with_handler(_truncated)
     return base
+
+
+@pytest.fixture
+def crawled_db(site: str, tmp_path: Path) -> Path:
+    """A complete crawl of the fixture site in a closed SQLite file, not yet audited."""
+    path = tmp_path / "crawl.db"
+    with open_store(path) as store:
+        Crawler(CrawlConfig(start_url=site, delay_seconds=0, workers=1), sink=store).run()
+    return path
+
+
+@pytest.fixture
+def audited_db(crawled_db: Path) -> Path:
+    """:func:`crawled_db` with the issues table and indexability verdicts stored."""
+    with open_store(crawled_db) as store:
+        result = run_audit(CrawlView.from_store(store))
+        store.replace_issues(result.issues)
+        store.set_indexability(result.verdicts)
+    return crawled_db
 
 
 def _redirect(httpserver: HTTPServer, path: str, location: str, *, status: int) -> None:

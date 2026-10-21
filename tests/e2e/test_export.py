@@ -6,7 +6,6 @@ import csv
 import json
 from pathlib import Path
 
-import pytest
 from openpyxl import load_workbook
 from typer.testing import CliRunner
 
@@ -17,20 +16,10 @@ from tests.conftest import site_pages
 runner = CliRunner()
 
 
-@pytest.fixture
-def db(site: str, tmp_path: Path) -> Path:
-    path = tmp_path / "crawl.db"
-    result = runner.invoke(
-        app, ["crawl", site, "--db", str(path), "--delay", "0", "--workers", "1"]
-    )
+def test_export_xlsx_has_a_sheet_per_table(crawled_db: Path) -> None:
+    result = runner.invoke(app, ["export", str(crawled_db), "--format", "xlsx"])
     assert result.exit_code == 0, result.output
-    return path
-
-
-def test_export_xlsx_has_a_sheet_per_table(db: Path) -> None:
-    result = runner.invoke(app, ["export", str(db), "--format", "xlsx"])
-    assert result.exit_code == 0, result.output
-    out = db.with_suffix(".xlsx")
+    out = crawled_db.with_suffix(".xlsx")
     workbook = load_workbook(out, read_only=True)
     try:
         assert workbook.sheetnames == [
@@ -53,9 +42,9 @@ def test_export_xlsx_has_a_sheet_per_table(db: Path) -> None:
         workbook.close()
 
 
-def test_export_csv_matches_crawl_output(db: Path, site: str, tmp_path: Path) -> None:
+def test_export_csv_matches_crawl_output(crawled_db: Path, site: str, tmp_path: Path) -> None:
     out = tmp_path / "pages.csv"
-    result = runner.invoke(app, ["export", str(db), "-f", "csv", "-o", str(out)])
+    result = runner.invoke(app, ["export", str(crawled_db), "-f", "csv", "-o", str(out)])
     assert result.exit_code == 0, result.output
     with out.open(newline="", encoding="utf-8") as fh:
         reader = csv.DictReader(fh)
@@ -66,10 +55,10 @@ def test_export_csv_matches_crawl_output(db: Path, site: str, tmp_path: Path) ->
     assert rows["/loop-a"]["status"] == "redirect_loop"
 
 
-def test_export_json(db: Path, site: str) -> None:
-    result = runner.invoke(app, ["export", str(db), "-f", "json"])
+def test_export_json(crawled_db: Path, site: str) -> None:
+    result = runner.invoke(app, ["export", str(crawled_db), "-f", "json"])
     assert result.exit_code == 0, result.output
-    data = json.loads(db.with_suffix(".json").read_text(encoding="utf-8"))
+    data = json.loads(crawled_db.with_suffix(".json").read_text(encoding="utf-8"))
     assert data["crawl"]["status"] == "done"
     assert data["crawl"]["start_url"] == site + "/"
     assert len(data["pages"]) == len(site_pages())
