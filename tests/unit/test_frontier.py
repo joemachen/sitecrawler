@@ -38,3 +38,23 @@ def test_scheme_is_forced_to_site_scheme() -> None:
     item = f.pop()
     assert item is not None
     assert item.url == "http://localhost:8000/x"
+
+
+def test_add_returns_the_queued_item() -> None:
+    f = Frontier("example.com")
+    item = f.add("https://example.com/x", 2, "https://example.com/")
+    assert item is not None
+    assert item.url == "https://example.com/x"
+    assert item.depth == 2
+
+
+def test_mark_seen_and_restore_for_resume() -> None:
+    from sitecrawler.models import QueueItem
+
+    f = Frontier("example.com")
+    f.mark_seen(["https://example.com/done"])
+    f.restore(QueueItem("https://example.com/pending", 1, "https://example.com/done"))
+    assert f.add("https://example.com/done", 0, "s") is None
+    assert f.add("https://example.com/pending", 0, "s") is None
+    assert len(f) == 1
+    assert f.seen_count == 2

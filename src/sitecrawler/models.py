@@ -67,6 +67,33 @@ class QueueItem:
 
 
 @dataclass(slots=True, frozen=True)
+class ResumeState:
+    """What a store hands back so an interrupted crawl can carry on."""
+
+    seen: frozenset[str] = frozenset()
+    """Every URL already queued or fetched; the frontier must not re-add these."""
+    pending: tuple[QueueItem, ...] = ()
+    """URLs queued but not yet fetched, in queue order."""
+    done: int = 0
+    """Pages already fetched, so ``max_pages`` counts across runs."""
+
+
+@dataclass(slots=True, frozen=True)
+class LinkRef:
+    """One anchor on a page."""
+
+    href: str
+    """Absolute target URL, before any normalisation."""
+    text: str = ""
+    rel: str = ""
+
+    @property
+    def nofollow(self) -> bool:
+        """True when ``rel`` contains ``nofollow``."""
+        return "nofollow" in self.rel.lower().split()
+
+
+@dataclass(slots=True, frozen=True)
 class FetchResult:
     """Raw outcome of one HTTP request. No parsing has happened yet."""
 
@@ -101,10 +128,19 @@ class ParsedPage:
     title: str = ""
     meta_description: str = ""
     h1: str = ""
+    """First H1, for the CSV; ``h1s`` has them all."""
     canonical: str = ""
     word_count: int = 0
     links: list[str] = field(default_factory=list)
     """Absolute hrefs of every anchor, before any filtering."""
+    anchors: list[LinkRef] = field(default_factory=list)
+    """The same anchors with their text and ``rel``."""
+    h1s: list[str] = field(default_factory=list)
+    h2s: list[str] = field(default_factory=list)
+    meta_robots: str = ""
+    """Content of ``<meta name="robots">``, if present."""
+    lang: str = ""
+    """``<html lang>`` attribute, if present."""
 
 
 @dataclass(slots=True)
@@ -130,6 +166,12 @@ class PageRecord:
     size_bytes: int = 0
     headers: dict[str, str] = field(default_factory=dict)
     redirect_hops: tuple[RedirectHop, ...] = ()
+    links: tuple[LinkRef, ...] = ()
+    """Every anchor on the page, unfiltered."""
+    h1s: tuple[str, ...] = ()
+    h2s: tuple[str, ...] = ()
+    meta_robots: str = ""
+    lang: str = ""
 
     @property
     def status(self) -> str:

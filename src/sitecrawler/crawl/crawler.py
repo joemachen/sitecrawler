@@ -10,8 +10,16 @@ from urllib.parse import urljoin, urlparse
 from sitecrawler.crawl.fetcher import Fetcher
 from sitecrawler.crawl.frontier import Frontier
 from sitecrawler.crawl.robots import RobotsPolicy
+from sitecrawler.crawl.sink import CrawlSink
 from sitecrawler.crawl.urls import normalize, same_site
-from sitecrawler.models import CrawlConfig, FetchResult, Outcome, PageRecord, QueueItem
+from sitecrawler.models import (
+    CrawlConfig,
+    FetchResult,
+    Outcome,
+    PageRecord,
+    QueueItem,
+    ResumeState,
+)
 from sitecrawler.parse import parse_html, parse_sitemap
 
 log = logging.getLogger(__name__)
@@ -29,17 +37,28 @@ class Crawler:
 
         records = Crawler(CrawlConfig(start_url="https://example.com")).run()
 
+    With a ``sink`` (normally a :class:`~sitecrawler.store.Store`) every page
+    is handed over as soon as it is fetched, and ``resume=True`` continues an
+    interrupted crawl from what the sink already holds.
+
     ``run`` drives an asyncio event loop internally; call :meth:`arun` instead
     from code that already has one.
     """
 
-    def __init__(self, config: CrawlConfig) -> None:
+    def __init__(
+        self, config: CrawlConfig, *, sink: CrawlSink | None = None, resume: bool = False
+    ) -> None:
         """Validate the start URL and prepare (but do not start) the crawl."""
         start = normalize(config.start_url, keep_query=config.keep_query)
         if start is None:
             msg = f"Invalid start URL: {config.start_url!r}"
             raise ValueError(msg)
+        if resume and sink is None:
+            msg = "resume=True needs a sink to resume from"
+            raise ValueError(msg)
         self.config = config
+        self.sink = sink
+        self.resume = resume
         self.start_url = start
         self.host = urlparse(start).netloc
         self.scheme = urlparse(start).scheme
@@ -56,30 +75,36 @@ class Crawler:
 
     # ------------------------------------------------------------------ setup
     async def _seed(self) -> None:
-        self.frontier.add(self.start_url, 0, "start")
-        if not self.config.use_sitemap:
-            return
-        candidates = [*self.robots.sitemaps(), urljoin(self.start_url, "/sitemap.xml")]
-        visited: set[str] = set()
-        seeded = 0
-        while candidates:
-            sitemap_url = candidates.pop(0)
-            if sitemap_url in visited:
-                continue
-            visited.add(sitemap_url)
-            result = await self.fetcher.fetch(sitemap_url)
-            if result.outcome is not Outcome.FETCHED or result.status_code != 200:
-                continue
-            doc = parse_sitemap(result.content)
-            if doc is None:
-                continue
-            if doc.kind == "index":
-                candidates.extend(doc.locs)
-            else:
+        seeds: list[QueueItem] = []
+        sitemap_urls: list[tuple[str, str]] = []
+        start_item = self.frontier.add(self.start_url, 0, "start")
+        if start_item is not None:
+            seeds.append(start_item)
+        if self.config.use_sitemap:
+            candidates = [*self.robots.sitemaps(), urljoin(self.start_url, "/sitemap.xml")]
+            visited: set[str] = set()
+            while candidates:
+                sitemap_url = candidates.pop(0)
+                if sitemap_url in visited:
+                    continue
+                visited.add(sitemap_url)
+                result = await self.fetcher.fetch(sitemap_url)
+                if result.outcome is not Outcome.FETCHED or result.status_code != 200:
+                    continue
+                doc = parse_sitemap(result.content)
+                if doc is None:
+                    continue
+                if doc.kind == "index":
+                    candidates.extend(doc.locs)
+                    continue
                 for loc in doc.locs:
-                    if self.frontier.add(loc, 0, f"sitemap:{sitemap_url}"):
-                        seeded += 1
-        log.info("seeded %d URLs from %d sitemap file(s)", seeded, len(visited))
+                    sitemap_urls.append((sitemap_url, loc))
+                    item = self.frontier.add(loc, 0, f"sitemap:{sitemap_url}")
+                    if item is not None:
+                        seeds.append(item)
+            log.info("seeded %d URLs from %d sitemap file(s)", len(seeds) - 1, len(visited))
+        if self.sink is not None:
+            self.sink.seeded(seeds, sitemap_urls)
 
     # ------------------------------------------------------------------ one page
     async def _process(self, item: QueueItem) -> _Processed:
@@ -131,7 +156,12 @@ class Crawler:
         record.title = page.title
         record.meta_description = page.meta_description
         record.h1 = page.h1
+        record.h1s = tuple(page.h1s)
+        record.h2s = tuple(page.h2s)
+        record.meta_robots = page.meta_robots
+        record.lang = page.lang
         record.word_count = page.word_count
+        record.links = tuple(page.anchors)
         if page.canonical:
             record.canonical = page.canonical
 
@@ -154,17 +184,28 @@ class Crawler:
         """Crawl until the frontier is empty or ``max_pages`` is reached.
 
         Returns:
-            All page records, sorted by URL.
+            The page records fetched by this run, sorted by URL. On a resumed
+            crawl that excludes pages from earlier runs; read those from the sink.
         """
         return asyncio.run(self.arun(on_progress))
 
     async def arun(self, on_progress: ProgressCallback | None = None) -> list[PageRecord]:
         """Async form of :meth:`run`, for callers that already have an event loop."""
+        state = ResumeState()
+        if self.sink is not None:
+            state = self.sink.begin(self.config, resume=self.resume)
+        done = state.done
         async with self.fetcher:
             if self.config.respect_robots:
                 await self.robots.load(self.fetcher, self.start_url)
-            await self._seed()
-            await self._crawl_loop(on_progress)
+            if self.resume:
+                self.frontier.mark_seen(state.seen)
+                for item in state.pending:
+                    self.frontier.restore(item)
+                log.info("resuming: %d done, %d pending", state.done, len(state.pending))
+            else:
+                await self._seed()
+            done = await self._crawl_loop(on_progress, done)
 
         self.records.sort(key=lambda r: r.url)
         if len(self.frontier):
@@ -173,10 +214,11 @@ class Crawler:
                 self.config.max_pages,
                 len(self.frontier),
             )
+        if self.sink is not None:
+            self.sink.finish(pages_done=done)
         return self.records
 
-    async def _crawl_loop(self, on_progress: ProgressCallback | None) -> None:
-        done = 0
+    async def _crawl_loop(self, on_progress: ProgressCallback | None, done: int) -> int:
         limit = self.config.max_pages
         inflight: dict[asyncio.Task[_Processed], QueueItem] = {}
         try:
@@ -195,8 +237,13 @@ class Crawler:
                 record, links = task.result()
                 self.records.append(record)
                 done += 1
+                discovered: list[QueueItem] = []
                 for link in links:
-                    self.frontier.add(link, record.depth + 1, record.url)
+                    queued = self.frontier.add(link, record.depth + 1, record.url)
+                    if queued is not None:
+                        discovered.append(queued)
+                if self.sink is not None:
+                    self.sink.page_done(record, discovered)
                 if on_progress is not None:
                     on_progress(record, done, len(self.frontier))
         finally:
@@ -204,3 +251,4 @@ class Crawler:
                 task.cancel()
             if inflight:
                 await asyncio.gather(*inflight, return_exceptions=True)
+        return done

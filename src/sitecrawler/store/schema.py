@@ -1,0 +1,139 @@
+"""SQLite schema, declared with SQLAlchemy 2.0.
+
+One file holds one crawl. Row classes end in ``Row`` so they never clash with
+the dataclasses in :mod:`sitecrawler.models`, which remain the records that
+cross package boundaries. JSON columns are plain ``TEXT`` holding ``json.dumps``
+output; enums are stored by their string value.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime
+
+from sqlalchemy import ForeignKey, Index, UniqueConstraint
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+
+
+class Base(DeclarativeBase):
+    """Declarative base for every table."""
+
+
+class CrawlRow(Base):
+    """One row per crawl run; a file holds exactly one."""
+
+    __tablename__ = "crawls"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    start_url: Mapped[str]
+    mode: Mapped[str] = mapped_column(default="crawl")
+    """``crawl`` (spider from a start URL) or ``list`` (fetch given URLs)."""
+    config_json: Mapped[str]
+    version: Mapped[str]
+    """sitecrawler version that wrote the file; doubles as the schema version."""
+    started_at: Mapped[datetime]
+    finished_at: Mapped[datetime | None] = mapped_column(default=None)
+    status: Mapped[str] = mapped_column(default="running")
+    """``running`` until :meth:`~sitecrawler.store.Store.finish`; then ``done``."""
+    pages_done: Mapped[int] = mapped_column(default=0)
+
+
+class PageRow(Base):
+    """One row per URL the crawl queued; ``state`` says whether it was fetched."""
+
+    __tablename__ = "pages"
+    __table_args__ = (
+        UniqueConstraint("crawl_id", "url"),
+        Index("ix_pages_crawl_state", "crawl_id", "state"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    crawl_id: Mapped[int] = mapped_column(ForeignKey("crawls.id"))
+    url: Mapped[str]
+    state: Mapped[str] = mapped_column(default="pending")
+    """``pending`` (queued, not fetched) or ``done``."""
+    depth: Mapped[int]
+    found_on: Mapped[str]
+    outcome: Mapped[str | None] = mapped_column(default=None)
+    status_code: Mapped[int | None] = mapped_column(default=None)
+    final_url: Mapped[str] = mapped_column(default="")
+    content_type: Mapped[str] = mapped_column(default="")
+    size_bytes: Mapped[int] = mapped_column(default=0)
+    fetch_ms: Mapped[int] = mapped_column(default=0)
+    error: Mapped[str] = mapped_column(default="")
+    x_robots_tag: Mapped[str | None] = mapped_column(default=None)
+    last_modified: Mapped[str | None] = mapped_column(default=None)
+    headers_json: Mapped[str] = mapped_column(default="{}")
+    fetched_at: Mapped[datetime | None] = mapped_column(default=None)
+
+    html: Mapped[PageHtmlRow | None] = relationship(
+        back_populates="page", cascade="all, delete-orphan", uselist=False
+    )
+    hops: Mapped[list[RedirectHopRow]] = relationship(
+        back_populates="page", cascade="all, delete-orphan", order_by="RedirectHopRow.hop_no"
+    )
+    links: Mapped[list[LinkRow]] = relationship(
+        back_populates="page", cascade="all, delete-orphan", order_by="LinkRow.id"
+    )
+
+
+class RedirectHopRow(Base):
+    """One hop of a redirect chain that started at ``page``."""
+
+    __tablename__ = "redirect_hops"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    page_id: Mapped[int] = mapped_column(ForeignKey("pages.id"))
+    hop_no: Mapped[int]
+    from_url: Mapped[str]
+    to_url: Mapped[str]
+    status_code: Mapped[int]
+
+    page: Mapped[PageRow] = relationship(back_populates="hops")
+
+
+class PageHtmlRow(Base):
+    """What the HTML parser extracted; one row per fetched page."""
+
+    __tablename__ = "page_html"
+
+    page_id: Mapped[int] = mapped_column(ForeignKey("pages.id"), primary_key=True)
+    title: Mapped[str] = mapped_column(default="")
+    meta_description: Mapped[str] = mapped_column(default="")
+    meta_robots: Mapped[str] = mapped_column(default="")
+    canonical: Mapped[str] = mapped_column(default="")
+    h1: Mapped[str] = mapped_column(default="")
+    h1s_json: Mapped[str] = mapped_column(default="[]")
+    h2s_json: Mapped[str] = mapped_column(default="[]")
+    lang: Mapped[str] = mapped_column(default="")
+    word_count: Mapped[int] = mapped_column(default=0)
+    internal_links: Mapped[int] = mapped_column(default=0)
+
+    page: Mapped[PageRow] = relationship(back_populates="html")
+
+
+class LinkRow(Base):
+    """One anchor found on ``page``."""
+
+    __tablename__ = "links"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    page_id: Mapped[int] = mapped_column(ForeignKey("pages.id"))
+    dst_url: Mapped[str]
+    anchor_text: Mapped[str] = mapped_column(default="")
+    rel: Mapped[str] = mapped_column(default="")
+    nofollow: Mapped[bool] = mapped_column(default=False)
+    is_internal: Mapped[bool] = mapped_column(default=False)
+
+    page: Mapped[PageRow] = relationship(back_populates="links")
+
+
+class SitemapUrlRow(Base):
+    """One URL from one sitemap file."""
+
+    __tablename__ = "sitemap_urls"
+    __table_args__ = (UniqueConstraint("crawl_id", "sitemap_url", "loc"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    crawl_id: Mapped[int] = mapped_column(ForeignKey("crawls.id"))
+    sitemap_url: Mapped[str]
+    loc: Mapped[str]

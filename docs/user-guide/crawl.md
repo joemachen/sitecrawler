@@ -19,7 +19,9 @@ stripped by default so `/faq?faq=shipping` and `/faq` are one page.
 
 | Flag | Default | Purpose |
 | --- | --- | --- |
-| `-o, --output` | `pages.csv` | Output file |
+| `-o, --output` | `pages.csv` | CSV to write. With `--db` the default is no CSV; pass `-o` to get one as well |
+| `--db` | off | SQLite file to store the crawl in. One crawl per file; see [Storage](storage.md) |
+| `--resume` | off | Continue the crawl already in `--db` from where it stopped |
 | `--max-pages` | 5000 | Stop after this many pages |
 | `--delay` | 0.5 | Minimum seconds between requests to the same host, shared across workers |
 | `--workers` | 4 | Concurrent fetchers |
@@ -30,6 +32,19 @@ stripped by default so `/faq?faq=shipping` and `/faq` are one page.
 | `--keep-query` | off | Treat different query strings as different pages (tracking parameters are still dropped) |
 | `--ignore-robots` | off | Crawl pages robots.txt disallows. Use only on sites you own. |
 | `-v, --verbose` | off | Debug logging |
+
+## Storing the crawl
+
+```bash
+uv run sitecrawler crawl https://example.com --db example.db
+uv run sitecrawler crawl https://example.com --db example.db --resume   # after a crash or Ctrl-C
+```
+
+With `--db` every page is written to the SQLite file as soon as it is fetched,
+so nothing is lost if the crawl stops early. A file holds one crawl: running
+`crawl` again on an existing file is refused unless you pass `--resume`, which
+carries on from the queued URLs without re-fetching finished pages (`max-pages`
+counts across both runs). The start URL must match the stored crawl.
 
 Progress goes to stderr, so it can be captured separately:
 
