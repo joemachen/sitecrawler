@@ -24,7 +24,10 @@ issue counts are zero until you audit and restart `serve`.
 | Tab | Shows |
 | --- | --- |
 | Overview | Crawl summary, page counts by status and depth, issue totals by severity, indexable vs. non-indexable |
-| Pages | Every column of every fetched page in a grid |
+| Pages | Every column of every fetched page in a grid; the URL opens the page detail |
+| Issues | One row per [rule](rules.md) that fired, most severe first; click a row for its URLs, click the rule id for why it matters and how to fix it |
+| Redirects | Every redirect hop the crawler followed, in a grid |
+| Page detail | Everything stored about one URL: response, headers, parsed HTML, redirect hops, hreflang, its issues, the pages that link to it and the links on it |
 
 Grids are sortable (click a header) and filterable (type in the header
 boxes, or in the search box to match any column). **Download CSV** writes

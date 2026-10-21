@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}{{ detail.page.url }} · sitecrawler{% endblock %}
+{% set page = detail.page %}
+{% macro field(label, value) -%}
+  <tr><th>{{ label }}</th><td>{% if value is none or value == "" %}<span class="muted">–</span>{% else %}{{ value }}{% endif %}</td></tr>
+{%- endmacro %}
+{% block content %}
+<h1 class="url"><a href="{{ page.url }}" rel="noopener" target="_blank">{{ page.url }}</a></h1>
+<p class="meta">
+  <span class="status">{{ page.status }}</span>
+  {% if detail.indexable is true %}<span class="sev sev-info">indexable</span>
+  {% elif detail.indexable is false %}<span class="sev sev-high">non-indexable</span> {{ detail.indexability_reason }}
+  {% else %}<span class="muted">not audited</span>{% endif %}
+</p>
+
+<div class="columns">
+  <section>
+    <h2>Response</h2>
+    <table class="plain fields">
+      {{ field("Outcome", page.outcome.value) }}
+      {{ field("Status code", page.status_code) }}
+      {{ field("Final URL", page.final_url) }}
+      {{ field("Content type", page.content_type) }}
+      {{ field("Size (bytes)", page.size_bytes) }}
+      {{ field("Fetch time (ms)", page.fetch_ms) }}
+      {{ field("Error", page.error) }}
+      {{ field("Depth", page.depth) }}
+      {{ field("Found on", page.found_on) }}
+    </table>
+    {% if page.redirect_hops %}
+    <h2>Redirect hops</h2>
+    <table class="plain">
+      <thead><tr><th>#</th><th>From</th><th>To</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for hop in page.redirect_hops %}
+        <tr><td>{{ hop.hop_no }}</td><td>{{ hop.from_url }}</td><td>{{ hop.to_url }}</td><td>{{ hop.status_code }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+    <h2>Headers</h2>
+    <table class="plain fields">
+      {% for name, value in page.headers.items() | sort %}
+        {{ field(name, value) }}
+      {% else %}
+        <tr><td class="muted">none stored</td></tr>
+      {% endfor %}
+    </table>
+  </section>
+
+  <section>
+    <h2>HTML</h2>
+    <table class="plain fields">
+      {{ field("Title", page.title) }}
+      {{ field("Title tags", page.title_count) }}
+      {{ field("Meta description", page.meta_description) }}
+      {{ field("Meta description tags", page.meta_description_count) }}
+      {{ field("H1", page.h1s | join(" | ")) }}
+      {{ field("H2", page.h2s | join(" | ")) }}
+      {{ field("Canonical", page.canonical) }}
+      {{ field("Canonical (Link header)", page.canonical_header) }}
+      {{ field("Meta robots", page.meta_robots) }}
+      {{ field("og:url", page.og_url) }}
+      {{ field("Language", page.lang) }}
+      {{ field("Word count", page.word_count) }}
+      {{ field("Internal links", page.internal_links) }}
+      {{ field("rel=prev", page.rel_prev) }}
+      {{ field("rel=next", page.rel_next) }}
+    </table>
+    {% if page.hreflang %}
+    <h2>Hreflang</h2>
+    <table class="plain">
+      <thead><tr><th>Lang</th><th>Href</th></tr></thead>
+      <tbody>
+      {% for ref in page.hreflang %}<tr><td>{{ ref.lang }}</td><td>{{ ref.href }}</td></tr>{% endfor %}
+      </tbody>
+    </table>
+    {% endif %}
+  </section>
+
+  <section>
+    <h2>Issues <span class="muted">({{ detail.issues | length }})</span></h2>
+    <table class="plain issues">
+      <thead><tr><th>Severity</th><th>Rule</th><th>Detail</th></tr></thead>
+      <tbody>
+      {% for issue in detail.issues %}
+        <tr data-rule="{{ issue.rule_id }}">
+          <td><span class="sev sev-{{ issue.severity }}">{{ issue.severity }}</span></td>
+          <td><a href="/rules/{{ issue.rule_id }}" title="{{ issue.summary }}"><code>{{ issue.rule_id }}</code></a></td>
+          <td>{{ issue.message }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="3" class="muted">None</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+
+    <h2>Inlinks <span class="muted">({{ detail.inlinks | length }})</span></h2>
+    <table class="plain inlinks">
+      <thead><tr><th>From</th><th>Anchor</th><th>rel</th></tr></thead>
+      <tbody>
+      {% for inlink in detail.inlinks %}
+        <tr data-src="{{ inlink.src }}">
+          <td><a href="/page?url={{ inlink.src | urlencode }}">{{ inlink.src }}</a></td>
+          <td>{{ inlink.link.text }}</td>
+          <td>{{ inlink.link.rel }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="3" class="muted">No internal links point here.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+
+    <h2>Outlinks <span class="muted">({{ page.links | length }})</span></h2>
+    <table class="plain outlinks">
+      <thead><tr><th>To</th><th>Anchor</th><th>rel</th></tr></thead>
+      <tbody>
+      {% for link in page.links %}
+        <tr>
+          <td>{% if snapshot.view.page_for(link.href) %}<a href="/page?url={{ link.href | urlencode }}">{{ link.href }}</a>{% else %}{{ link.href }}{% endif %}</td>
+          <td>{{ link.text }}</td>
+          <td>{{ link.rel }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="3" class="muted">None</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</div>
+{% endblock %}

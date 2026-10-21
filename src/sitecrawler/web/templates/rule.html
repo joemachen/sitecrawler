@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}{{ rule.id }} · sitecrawler{% endblock %}
+{% block content %}
+<article class="rule">
+  <p class="meta">{{ rule.category }}</p>
+  <h1><code>{{ rule.id }}</code> <span class="sev sev-{{ rule.severity.value }}">{{ rule.severity.value }}</span></h1>
+  <p class="summary"><strong>{{ rule.summary }}</strong></p>
+  <h2>Why it matters</h2>
+  <p>{{ rule.why }}</p>
+  <h2>How to fix it</h2>
+  <p>{{ rule.fix }}</p>
+  <p class="meta" data-count="{{ count }}">
+    {% if count %}{{ count }} URL{{ "s" if count != 1 }} in this crawl.
+    <a href="/issues" hx-boost="false">See them on the Issues tab</a>.
+    {% else %}No URLs in this crawl.{% endif %}
+  </p>
+</article>
+{% endblock %}

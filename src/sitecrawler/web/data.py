@@ -13,7 +13,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from sitecrawler.audit import CrawlView, Rule, load_rules
-from sitecrawler.models import CrawlInfo, Severity
+from sitecrawler.audit.view import Inlink
+from sitecrawler.models import CrawlInfo, PageRecord, Severity
 from sitecrawler.store import open_store
 from sitecrawler.store.dump import Cell, TableDump, dump_tables
 
@@ -38,6 +39,27 @@ class Overview:
     def issues(self) -> int:
         """Total stored issues."""
         return sum(self.issues_by_severity.values())
+
+
+@dataclass(slots=True, frozen=True)
+class RuleRow:
+    """One row of the Issues tab: a rule that fired and how many URLs it flagged."""
+
+    rule: Rule
+    count: int
+
+
+@dataclass(slots=True, frozen=True)
+class PageDetail:
+    """Everything the crawl and audit know about one URL."""
+
+    page: PageRecord
+    indexable: bool | None
+    """``None`` until an audit has run."""
+    indexability_reason: str
+    issues: list[Row]
+    """``rule_id``, ``severity``, ``summary``, ``message`` per finding on this URL."""
+    inlinks: list[Inlink]
 
 
 @dataclass(slots=True, frozen=True)
@@ -96,6 +118,60 @@ class CrawlSnapshot:
             indexable=yes,
             non_indexable=no,
         )
+
+    def rule_rows(self) -> list[RuleRow]:
+        """Rules that fired, most severe first, then most URLs, then by id.
+
+        Same order as the ``audit`` command's table. A stored rule id this
+        version does not know is skipped.
+        """
+        rows = [
+            RuleRow(self.rules[rule_id], count)
+            for rule_id, count in self.issue_counts.items()
+            if count and rule_id in self.rules
+        ]
+        return sorted(rows, key=lambda r: (r.rule.severity.rank, -r.count, r.rule.id))
+
+    def issues_for(self, rule_id: str) -> list[Row]:
+        """The stored issues of one rule, as rows, in URL order."""
+        return [row for row in to_rows(self.issues) if row["rule_id"] == rule_id]
+
+    def page_detail(self, url: str) -> PageDetail | None:
+        """Everything about the page at ``url`` (any form), or ``None`` if it was not crawled."""
+        page = self.view.page_for(url)
+        if page is None:
+            return None
+        col = self.pages.columns.index
+        indexable: bool | None = None
+        reason = ""
+        for row in self.pages.rows:
+            if row[col("url")] == page.url:
+                verdict = row[col("indexable")]
+                indexable = verdict if isinstance(verdict, bool) else None
+                reason = str(row[col("indexability_reason")] or "")
+                break
+        issues = [
+            {
+                "rule_id": row["rule_id"],
+                "severity": row["severity"],
+                "summary": self._summary(row["rule_id"]),
+                "message": row["message"],
+            }
+            for row in to_rows(self.issues)
+            if row["url"] == page.url
+        ]
+        issues.sort(key=lambda r: (Severity(str(r["severity"])).rank, str(r["rule_id"])))
+        return PageDetail(
+            page=page,
+            indexable=indexable,
+            indexability_reason=reason,
+            issues=issues,
+            inlinks=self.view.inlinks_to(page.url),
+        )
+
+    def _summary(self, rule_id: Cell) -> str:
+        rule = self.rules.get(str(rule_id))
+        return rule.summary if rule else ""
 
 
 def to_rows(table: TableDump) -> list[Row]:

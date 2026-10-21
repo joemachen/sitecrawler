@@ -12,10 +12,29 @@
     });
   }
 
+  function escapeHtml(text) {
+    return String(text)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function pageLink(cell) {
+    var url = cell.getValue();
+    if (url === null || url === undefined || url === "") {
+      return "";
+    }
+    return '<a href="/page?url=' + encodeURIComponent(url) + '">' + escapeHtml(url) + "</a>";
+  }
+
   function column(name) {
     var spec = { title: name, field: name, headerFilter: "input", headerFilterLiveFilter: true };
     if (name === "url" || name === "final_url" || name === "found_on" || name === "canonical") {
       spec.width = 320;
+    }
+    if (name === "url") {
+      spec.formatter = pageLink;
     }
     return spec;
   }
