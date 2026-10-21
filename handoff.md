@@ -75,8 +75,8 @@ Open:
 - Next piece of work: **Phase 4, JavaScript rendering** (`docs/ROADMAP.md`).
   Playwright is already a dev dependency and Chromium is installed in CI,
   which Phase 4 reuses. Merged branches `feat/web-serve`, `feat/web-issues`,
-  `feat/web-e2e` and `chore/release-v0.4.0` still exist on origin; delete at
-  leisure.
+  `feat/web-e2e`, `chore/release-v0.4.0`, `docs/handoff-v0.4.0` and
+  `docs/handoff-timing` still exist on origin; delete at leisure.
 - Dependabot will now also see fastapi/uvicorn/jinja2/playwright; the
   vendored htmx/Tabulator files are upgraded by hand (replace the three files
   under `src/sitecrawler/web/static/`).
@@ -111,7 +111,7 @@ uv run sitecrawler serve example.db          # web UI on http://127.0.0.1:8765
 uv run playwright install chromium           # once per machine, for tests/e2e/test_web_ui.py
 uv run ruff format . && uv run ruff check .
 uv run mypy
-uv run pytest --cov                      # whole suite, offline, ~80 s
+uv run pytest --cov                      # whole suite, offline, ~160 s (browser tests included)
 uv run pytest tests/unit                 # fast loop
 uv run pytest -m "not browser"           # without Chromium installed
 uv run pytest --cov=sitecrawler.audit --cov-fail-under=100 tests/unit/audit tests/integration/test_audit.py
