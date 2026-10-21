@@ -21,6 +21,7 @@ nav:
   - User guide:
       - Crawling a site: user-guide/crawl.md
       - Storage: user-guide/storage.md
+      - List mode: user-guide/list-mode.md
   - Project:
       - Development process: DEVELOPMENT.md
       - Architecture: ARCHITECTURE.md

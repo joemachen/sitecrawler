@@ -44,3 +44,20 @@ async def test_unreachable_robots_allows_everything(respx_mock: respx.MockRouter
 
     assert not policy.loaded
     assert policy.allowed("https://x.test/anything")
+
+
+async def test_cache_loads_each_host_once(respx_mock: respx.MockRouter) -> None:
+    from sitecrawler.crawl.robots import RobotsCache
+
+    a = respx_mock.get("https://a.test/robots.txt").mock(
+        return_value=httpx.Response(200, content=b"User-agent: *\nDisallow: /no\n")
+    )
+    b = respx_mock.get("https://b.test/robots.txt").mock(return_value=httpx.Response(404))
+    cache = RobotsCache("ua")
+    async with Fetcher("ua", 0, 5.0) as fetcher:
+        assert not await cache.allowed(fetcher, "https://a.test/no/x")
+        assert await cache.allowed(fetcher, "https://a.test/yes")
+        assert await cache.allowed(fetcher, "https://b.test/no/x")
+        assert await cache.allowed(fetcher, "https://B.test/other")
+    assert a.call_count == 1
+    assert b.call_count == 1

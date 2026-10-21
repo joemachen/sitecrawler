@@ -9,7 +9,7 @@ from urllib.parse import urljoin, urlparse
 
 from sitecrawler.crawl.fetcher import Fetcher
 from sitecrawler.crawl.frontier import Frontier
-from sitecrawler.crawl.robots import RobotsPolicy
+from sitecrawler.crawl.robots import RobotsCache
 from sitecrawler.crawl.sink import CrawlSink
 from sitecrawler.crawl.urls import normalize, same_site
 from sitecrawler.models import (
@@ -31,11 +31,16 @@ _Processed = tuple[PageRecord, list[str]]
 
 
 class Crawler:
-    """Breadth-first crawler for a single site.
+    """Breadth-first crawler for one site, or a fetcher for a given list of URLs.
 
     Usage::
 
         records = Crawler(CrawlConfig(start_url="https://example.com")).run()
+        records = Crawler(CrawlConfig(seed_urls=("https://a.test/x", "https://b.test/y"))).run()
+
+    With ``seed_urls`` the crawler is in *list mode*: it fetches exactly those
+    URLs (any number of hosts), follows links only if ``follow_links`` is on
+    and then only within the seeds' hosts, and never reads sitemaps.
 
     With a ``sink`` (normally a :class:`~sitecrawler.store.Store`) every page
     is handed over as soon as it is fetched, and ``resume=True`` continues an
@@ -48,21 +53,16 @@ class Crawler:
     def __init__(
         self, config: CrawlConfig, *, sink: CrawlSink | None = None, resume: bool = False
     ) -> None:
-        """Validate the start URL and prepare (but do not start) the crawl."""
-        start = normalize(config.start_url, keep_query=config.keep_query)
-        if start is None:
-            msg = f"Invalid start URL: {config.start_url!r}"
-            raise ValueError(msg)
+        """Validate the start URL or seed list and prepare (but do not start) the crawl."""
         if resume and sink is None:
             msg = "resume=True needs a sink to resume from"
             raise ValueError(msg)
         self.config = config
         self.sink = sink
         self.resume = resume
-        self.start_url = start
-        self.host = urlparse(start).netloc
-        self.scheme = urlparse(start).scheme
-        self.frontier = Frontier(self.host, scheme=self.scheme, keep_query=config.keep_query)
+        self.list_mode = bool(config.seed_urls)
+        self.robots = RobotsCache(config.user_agent)
+        self.records: list[PageRecord] = []
         self.fetcher = Fetcher(
             config.user_agent,
             config.delay_seconds,
@@ -70,45 +70,91 @@ class Crawler:
             max_redirects=config.max_redirects,
             http2=config.http2,
         )
-        self.robots = RobotsPolicy(config.user_agent)
-        self.records: list[PageRecord] = []
+
+        if self.list_mode:
+            self.seeds = self._validate_seeds(config)
+            self.start_url = ""
+            self.scheme: str | None = None
+            hosts = {urlparse(url).netloc for url in self.seeds}
+            self.frontier = Frontier(hosts, scheme=None, keep_query=config.keep_query)
+        else:
+            start = normalize(config.start_url, keep_query=config.keep_query)
+            if start is None:
+                msg = f"Invalid start URL: {config.start_url!r}"
+                raise ValueError(msg)
+            self.seeds = ()
+            self.start_url = start
+            self.scheme = urlparse(start).scheme
+            self.frontier = Frontier(
+                urlparse(start).netloc, scheme=self.scheme, keep_query=config.keep_query
+            )
+
+    @staticmethod
+    def _validate_seeds(config: CrawlConfig) -> tuple[str, ...]:
+        seeds: list[str] = []
+        bad: list[str] = []
+        for line_no, raw in enumerate(config.seed_urls, start=1):
+            url = normalize(raw, keep_query=config.keep_query)
+            if url is None:
+                bad.append(f"line {line_no}: {raw!r}")
+            elif url not in seeds:
+                seeds.append(url)
+        if bad:
+            msg = "Invalid URL(s) in list: " + "; ".join(bad)
+            raise ValueError(msg)
+        return tuple(seeds)
 
     # ------------------------------------------------------------------ setup
     async def _seed(self) -> None:
         seeds: list[QueueItem] = []
         sitemap_urls: list[tuple[str, str]] = []
-        start_item = self.frontier.add(self.start_url, 0, "start")
-        if start_item is not None:
-            seeds.append(start_item)
+        if self.list_mode:
+            for url in self.seeds:
+                item = self.frontier.add_seed(url, "list")
+                if item is not None:
+                    seeds.append(item)
+            log.info("list mode: %d URLs to fetch", len(seeds))
         else:
-            log.warning("start URL %s does not look like a page; nothing to crawl", self.start_url)
-        from_sitemaps = 0
-        if self.config.use_sitemap:
-            candidates = [*self.robots.sitemaps(), urljoin(self.start_url, "/sitemap.xml")]
-            visited: set[str] = set()
-            while candidates:
-                sitemap_url = candidates.pop(0)
-                if sitemap_url in visited:
-                    continue
-                visited.add(sitemap_url)
-                result = await self.fetcher.fetch(sitemap_url)
-                if result.outcome is not Outcome.FETCHED or result.status_code != 200:
-                    continue
-                doc = parse_sitemap(result.content)
-                if doc is None:
-                    continue
-                if doc.kind == "index":
-                    candidates.extend(doc.locs)
-                    continue
-                for loc in doc.locs:
-                    sitemap_urls.append((sitemap_url, loc))
-                    item = self.frontier.add(loc, 0, f"sitemap:{sitemap_url}")
-                    if item is not None:
-                        seeds.append(item)
-                        from_sitemaps += 1
-            log.info("seeded %d URLs from %d sitemap file(s)", from_sitemaps, len(visited))
+            start_item = self.frontier.add(self.start_url, 0, "start")
+            if start_item is not None:
+                seeds.append(start_item)
+            else:
+                log.warning(
+                    "start URL %s does not look like a page; nothing to crawl", self.start_url
+                )
+            if self.config.use_sitemap:
+                await self._seed_from_sitemaps(seeds, sitemap_urls)
         if self.sink is not None:
             self.sink.seeded(seeds, sitemap_urls)
+
+    async def _seed_from_sitemaps(
+        self, seeds: list[QueueItem], sitemap_urls: list[tuple[str, str]]
+    ) -> None:
+        policy = await self.robots.policy(self.fetcher, self.start_url)
+        candidates = [*policy.sitemaps(), urljoin(self.start_url, "/sitemap.xml")]
+        visited: set[str] = set()
+        from_sitemaps = 0
+        while candidates:
+            sitemap_url = candidates.pop(0)
+            if sitemap_url in visited:
+                continue
+            visited.add(sitemap_url)
+            result = await self.fetcher.fetch(sitemap_url)
+            if result.outcome is not Outcome.FETCHED or result.status_code != 200:
+                continue
+            doc = parse_sitemap(result.content)
+            if doc is None:
+                continue
+            if doc.kind == "index":
+                candidates.extend(doc.locs)
+                continue
+            for loc in doc.locs:
+                sitemap_urls.append((sitemap_url, loc))
+                item = self.frontier.add(loc, 0, f"sitemap:{sitemap_url}")
+                if item is not None:
+                    seeds.append(item)
+                    from_sitemaps += 1
+        log.info("seeded %d URLs from %d sitemap file(s)", from_sitemaps, len(visited))
 
     # ------------------------------------------------------------------ one page
     async def _process(self, item: QueueItem) -> _Processed:
@@ -120,11 +166,11 @@ class Crawler:
         record = PageRecord(
             url=item.url, outcome=Outcome.FETCHED, depth=item.depth, found_on=item.found_on
         )
-        if self.config.respect_robots and not self.robots.allowed(item.url):
-            record.outcome = Outcome.BLOCKED
-            record.error = "disallowed by robots.txt"
-            return record, []
         try:
+            if self.config.respect_robots and not await self.robots.allowed(self.fetcher, item.url):
+                record.outcome = Outcome.BLOCKED
+                record.error = "disallowed by robots.txt"
+                return record, []
             return await self._fetch_and_parse(item, record)
         except Exception as exc:  # deliberately total, see docstring
             log.exception("unexpected failure processing %s", item.url)
@@ -146,8 +192,9 @@ class Crawler:
         if result.outcome is not Outcome.FETCHED:
             return record, []
 
+        page_host = urlparse(item.url).netloc
         final = self._normalize(result.final_url)
-        if final and not same_site(urlparse(final).netloc, self.host):
+        if final and not same_site(urlparse(final).netloc, page_host):
             record.error = f"redirected off-site to {result.final_url}"
             return record, []
         if final and final != item.url:
@@ -172,9 +219,9 @@ class Crawler:
         internal = {self._normalize(link) for link in page.links}
         internal.discard(None)
         record.internal_links = sum(
-            1 for link in internal if link and same_site(urlparse(link).netloc, self.host)
+            1 for link in internal if link and same_site(urlparse(link).netloc, page_host)
         )
-        return record, page.links
+        return record, page.links if self.config.follow_links else []
 
     def _normalize(self, url: str) -> str | None:
         return normalize(url, keep_query=self.config.keep_query, scheme=self.scheme)
@@ -200,8 +247,6 @@ class Crawler:
             if self.sink is not None:
                 state = self.sink.begin(self.config, resume=self.resume)
             done = state.done
-            if self.config.respect_robots:
-                await self.robots.load(self.fetcher, self.start_url)
             if self.resume:
                 self.frontier.mark_seen(state.seen)
                 for item in state.pending:

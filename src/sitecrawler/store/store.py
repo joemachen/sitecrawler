@@ -95,7 +95,7 @@ class Store:
         self.engine.dispose()
 
     # ------------------------------------------------------------- CrawlSink
-    def begin(self, config: CrawlConfig, *, resume: bool, mode: str = "crawl") -> ResumeState:
+    def begin(self, config: CrawlConfig, *, resume: bool) -> ResumeState:
         """Create the crawl row, or load the pending work of the existing one.
 
         Raises:
@@ -104,6 +104,7 @@ class Store:
                 URL differs from the stored crawl's.
         """
         start = normalize(config.start_url, keep_query=config.keep_query) or config.start_url
+        mode = "list" if config.seed_urls else "crawl"
         with Session(self.engine) as session:
             existing = session.scalars(select(CrawlRow)).first()
             if existing is None:

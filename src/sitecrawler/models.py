@@ -44,6 +44,10 @@ class CrawlConfig:
     """Give up on a redirect chain longer than this and report ``redirect_loop``."""
     http2: bool = True
     """Negotiate HTTP/2 when the server offers it (HTTPS only)."""
+    seed_urls: tuple[str, ...] = ()
+    """List mode: fetch exactly these URLs instead of spidering from ``start_url``."""
+    follow_links: bool = True
+    """Queue the links found on each page. Off by default in list mode (see CLI)."""
 
 
 @dataclass(slots=True, frozen=True)

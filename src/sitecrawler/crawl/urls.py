@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
 SKIP_EXTENSIONS: frozenset[str] = frozenset(
@@ -78,6 +79,23 @@ def normalize(url: str, *, keep_query: bool = False, scheme: str | None = None) 
         query = urlencode(sorted(params))
 
     return urlunparse((scheme or parts.scheme, host, path, "", query, ""))
+
+
+def parse_url_list(lines: Iterable[str]) -> list[str]:
+    """Read a URL list: one per line, blank lines and ``#`` comments ignored, duplicates dropped.
+
+    URLs are returned as written (not normalised) and in order of first appearance.
+    """
+    seen: set[str] = set()
+    urls: list[str] = []
+    for raw in lines:
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line not in seen:
+            seen.add(line)
+            urls.append(line)
+    return urls
 
 
 def looks_like_page(url: str) -> bool:
