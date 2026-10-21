@@ -1,7 +1,7 @@
 # Handoff: sitecrawler
 
 Read this first in a new session. It is the state of the project as of
-2026-10-21 (night, after the Phase 3 build) and everything that is not
+2026-10-21 (night, after the v0.4.0 release) and everything that is not
 obvious from the code.
 
 ## What this is
@@ -22,21 +22,16 @@ Phases 0, 1 and 2 are complete and on `main`, released as v0.3.0. Phase 2
 landed as four squash-merged PRs (#10 framework, #11 content rules, #12
 canonical/robots rules, #13 hreflang/pagination rules) plus a release PR.
 
-**Phase 3 (local web UI) is built and sits in three stacked, unmerged PRs**,
-opened 2026-10-21 (evening session 2):
-
-| PR | Branch | Base | Contents |
-| --- | --- | --- | --- |
-| #15 | `feat/web-serve` | `main` | deps, `web/` package, `serve` command, Overview + Pages tabs, ADR-0006, user guide |
-| #16 | `feat/web-issues` | `feat/web-serve` | Issues tab + HTMX URL panel, `/rules/<id>`, Redirects, Page detail, 404 page |
-| #17 | `feat/web-e2e` | `feat/web-issues` | Playwright e2e per tab, CI Chromium step, roadmap/architecture close-out |
-
-Merge order: #15, then #16, then #17, each squash-merged once CI is green.
-After each squash merge, GitHub retargets the next PR to `main` on its own
-but the branch still needs rebasing:
-`git rebase --onto origin/main <old-base-tip> <branch>` then
-`git push --force-with-lease`. Then `chore(release): v0.4.0` (bump
-`pyproject.toml`, move the Unreleased block in `CHANGELOG.md`, tag).
+**Phase 3 (local web UI) is complete and released as v0.4.0** (tag on
+`main`, 2026-10-21). It landed as three stacked PRs, squash-merged in order:
+#15 (`web/` package, `serve`, Overview + Pages, ADR-0006), #16 (Issues +
+HTMX URL panel, `/rules/<id>`, Redirects, Page detail, 404), #17 (Playwright
+e2e per tab, CI Chromium step, roadmap close-out), then #18 the release.
+Stacking worked: after each squash merge,
+`git rebase --onto origin/main <old-base-tip> <branch>`,
+`git push --force-with-lease`, `gh pr edit N --base main`. A rebase that
+changes no content (`git diff --stat <old-tip> <branch>` empty) does not
+need a fresh CI run; the earlier green run tested the same tree.
 
 What exists now:
 
@@ -55,8 +50,8 @@ What exists now:
 - `CrawlView` (`audit/view.py`) is the index rules read: lookups by
   normalised URL, inlinks, groups, sitemap membership. Rules never fetch.
 - CI enforces 100% branch coverage on `audit/` as a separate step.
-- `sitecrawler serve crawl.db [--port 8765] [--no-open]` (on the PR
-  branches): FastAPI + Jinja2 + HTMX + Tabulator on 127.0.0.1. `web/data.py`
+- `sitecrawler serve crawl.db [--port 8765] [--no-open]`: FastAPI + Jinja2
+  + HTMX + Tabulator on 127.0.0.1. `web/data.py`
   loads one `CrawlSnapshot` (pages/issues/redirects dumps from
   `store/dump.py`, a `CrawlView`, `load_rules()`) and closes the file;
   `web/app.py` has the routes; templates and the vendored `htmx.min.js`
@@ -77,10 +72,11 @@ Open:
   serve HTTPS (see the note under Phase 2 in the roadmap).
 - Dependabot's older uv can produce lockfile-downgrading PRs (#4 was closed
   for that); read the lock diff before merging.
-- Next piece of work: merge #15, #16, #17 in order and release v0.4.0 (see
-  above), then **Phase 4, JavaScript rendering** (`docs/ROADMAP.md`).
+- Next piece of work: **Phase 4, JavaScript rendering** (`docs/ROADMAP.md`).
   Playwright is already a dev dependency and Chromium is installed in CI,
-  which Phase 4 reuses.
+  which Phase 4 reuses. Merged branches `feat/web-serve`, `feat/web-issues`,
+  `feat/web-e2e` and `chore/release-v0.4.0` still exist on origin; delete at
+  leisure.
 - Dependabot will now also see fastapi/uvicorn/jinja2/playwright; the
   vendored htmx/Tabulator files are upgraded by hand (replace the three files
   under `src/sitecrawler/web/static/`).
