@@ -171,11 +171,17 @@ def test_iter_pages_rebuilds_records_sorted(store: Store) -> None:
 
 def test_finish_marks_done(store: Store) -> None:
     store.begin(CONFIG, resume=False)
-    store.finish(pages_done=7)
+    store.finish(pages_done=7, complete=True)
     crawl = store.crawl()
     assert crawl.status == "done"
     assert crawl.pages_done == 7
     assert crawl.finished_at is not None
+
+
+def test_finish_incomplete_is_stopped(store: Store) -> None:
+    store.begin(CONFIG, resume=False)
+    store.finish(pages_done=2, complete=False)
+    assert store.crawl().status == "stopped"
 
 
 def test_writing_before_begin_fails(store: Store) -> None:

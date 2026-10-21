@@ -19,6 +19,7 @@ from sitecrawler import __version__
 from sitecrawler.crawl.urls import normalize, same_site
 from sitecrawler.models import (
     CrawlConfig,
+    CrawlInfo,
     LinkRef,
     Outcome,
     PageRecord,
@@ -217,25 +218,33 @@ class Store:
             crawl.pages_done += 1
             session.commit()
 
-    def finish(self, *, pages_done: int) -> None:
-        """Mark the crawl done."""
+    def finish(self, *, pages_done: int, complete: bool) -> None:
+        """Mark the crawl ``done``, or ``stopped`` when it ended at ``max_pages``."""
         with Session(self.engine) as session:
             crawl = session.get_one(CrawlRow, self._crawl_id())
-            crawl.status = "done"
+            crawl.status = "done" if complete else "stopped"
             crawl.finished_at = _now()
             crawl.pages_done = pages_done
             session.commit()
 
     # ------------------------------------------------------------- reading
-    def crawl(self) -> CrawlRow:
-        """The crawl row (detached; its columns are loaded)."""
-        with Session(self.engine, expire_on_commit=False) as session:
+    def crawl(self) -> CrawlInfo:
+        """Summary of the stored crawl."""
+        with Session(self.engine) as session:
             row = session.scalars(select(CrawlRow)).first()
             if row is None:
                 msg = f"{self.path} holds no crawl"
                 raise ValueError(msg)
-            session.expunge(row)
-            return row
+            return CrawlInfo(
+                start_url=row.start_url,
+                mode=row.mode,
+                version=row.version,
+                status=row.status,
+                pages_done=row.pages_done,
+                started_at=row.started_at,
+                finished_at=row.finished_at,
+                config_json=row.config_json,
+            )
 
     def pending_items(self) -> list[QueueItem]:
         """URLs queued but not fetched, in queue order."""

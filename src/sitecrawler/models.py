@@ -7,6 +7,7 @@ module must not import from any of them.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from enum import StrEnum
 
 
@@ -76,6 +77,21 @@ class ResumeState:
     """URLs queued but not yet fetched, in queue order."""
     done: int = 0
     """Pages already fetched, so ``max_pages`` counts across runs."""
+
+
+@dataclass(slots=True, frozen=True)
+class CrawlInfo:
+    """Summary of a stored crawl, as read back from a store."""
+
+    start_url: str
+    mode: str
+    version: str
+    status: str
+    """``running``, ``done`` (frontier exhausted) or ``stopped`` (hit ``max_pages``)."""
+    pages_done: int
+    started_at: datetime
+    finished_at: datetime | None = None
+    config_json: str = ""
 
 
 @dataclass(slots=True, frozen=True)

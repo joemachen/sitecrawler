@@ -92,8 +92,6 @@ def crawl(
     )
     if resume and db is None:
         _fail("--resume needs --db to say which crawl to continue")
-    if db is not None and db.exists() and not resume:
-        _fail(f"{db} already exists; pass --resume to continue it or choose a new file")
     if db is not None and resume and not db.exists():
         _fail(f"{db} does not exist, so there is nothing to resume")
 

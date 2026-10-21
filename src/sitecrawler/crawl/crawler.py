@@ -80,6 +80,9 @@ class Crawler:
         start_item = self.frontier.add(self.start_url, 0, "start")
         if start_item is not None:
             seeds.append(start_item)
+        else:
+            log.warning("start URL %s does not look like a page; nothing to crawl", self.start_url)
+        from_sitemaps = 0
         if self.config.use_sitemap:
             candidates = [*self.robots.sitemaps(), urljoin(self.start_url, "/sitemap.xml")]
             visited: set[str] = set()
@@ -102,7 +105,8 @@ class Crawler:
                     item = self.frontier.add(loc, 0, f"sitemap:{sitemap_url}")
                     if item is not None:
                         seeds.append(item)
-            log.info("seeded %d URLs from %d sitemap file(s)", len(seeds) - 1, len(visited))
+                        from_sitemaps += 1
+            log.info("seeded %d URLs from %d sitemap file(s)", from_sitemaps, len(visited))
         if self.sink is not None:
             self.sink.seeded(seeds, sitemap_urls)
 
@@ -191,11 +195,11 @@ class Crawler:
 
     async def arun(self, on_progress: ProgressCallback | None = None) -> list[PageRecord]:
         """Async form of :meth:`run`, for callers that already have an event loop."""
-        state = ResumeState()
-        if self.sink is not None:
-            state = self.sink.begin(self.config, resume=self.resume)
-        done = state.done
         async with self.fetcher:
+            state = ResumeState()
+            if self.sink is not None:
+                state = self.sink.begin(self.config, resume=self.resume)
+            done = state.done
             if self.config.respect_robots:
                 await self.robots.load(self.fetcher, self.start_url)
             if self.resume:
@@ -215,7 +219,7 @@ class Crawler:
                 len(self.frontier),
             )
         if self.sink is not None:
-            self.sink.finish(pages_done=done)
+            self.sink.finish(pages_done=done, complete=len(self.frontier) == 0)
         return self.records
 
     async def _crawl_loop(self, on_progress: ProgressCallback | None, done: int) -> int:

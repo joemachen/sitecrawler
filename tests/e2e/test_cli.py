@@ -47,7 +47,7 @@ def test_crawl_with_db_then_resume(site: str, tmp_path: Path) -> None:
 
     again = runner.invoke(app, ["crawl", site, "--db", str(db), "--delay", "0"])
     assert again.exit_code == 2
-    assert "already exists" in again.output
+    assert "already contains a crawl" in again.output
 
     out = tmp_path / "pages.csv"
     resumed = runner.invoke(

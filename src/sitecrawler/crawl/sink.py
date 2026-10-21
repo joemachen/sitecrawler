@@ -33,6 +33,6 @@ class CrawlSink(Protocol):
         """Record one fetched page and the new URLs it put on the queue, atomically."""
         ...
 
-    def finish(self, *, pages_done: int) -> None:
-        """Mark the crawl complete."""
+    def finish(self, *, pages_done: int, complete: bool) -> None:
+        """Mark the crawl finished; ``complete`` is False when ``max_pages`` cut it short."""
         ...

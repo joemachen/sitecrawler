@@ -105,6 +105,7 @@ def test_resume_after_max_pages(site: str, tmp_path: Path, httpserver: HTTPServe
     with open_store(path) as store:
         first = Crawler(_config(site, max_pages=4), sink=store).run()
         assert store.count_pages("pending") > 0
+        assert store.crawl().status == "stopped"
     httpserver.clear_log()
     with open_store(path) as store:
         second = Crawler(_config(site, max_pages=100), sink=store, resume=True).run()
