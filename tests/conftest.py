@@ -85,6 +85,32 @@ def _linked_paths() -> set[str]:
     return found
 
 
+def follow_inlink_sources() -> dict[str, set[str]]:
+    """Which fixture pages link to each path without nofollow, from the HTML files themselves.
+
+    Keys and values are URL paths as the crawler stores them. Self-links,
+    ``rel=nofollow`` links and every link on a page whose robots meta says
+    ``nofollow`` are left out, as the audit's link graph leaves them out.
+    """
+    from sitecrawler.parse import parse_html
+
+    sources: dict[str, set[str]] = {}
+    for file in FIXTURE_SITE.rglob("*.html"):
+        served = _url_path(file)
+        src = served.rstrip("/") or "/"
+        parsed = parse_html(file.read_text(encoding="utf-8"), f"https://fixture.test{served}")
+        if "nofollow" in parsed.meta_robots.lower():
+            continue
+        for anchor in parsed.anchors:
+            if anchor.nofollow or not anchor.href.startswith("https://fixture.test/"):
+                continue
+            path = anchor.href.removeprefix("https://fixture.test").split("#")[0].split("?")[0]
+            path = path.rstrip("/") or "/"
+            if path != src:
+                sources.setdefault(path, set()).add(src)
+    return sources
+
+
 def site_pages() -> frozenset[str]:
     """Every URL path a full crawl of the fixture site records, as the crawler stores it.
 

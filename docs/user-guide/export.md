@@ -17,8 +17,10 @@ uv run sitecrawler export crawl.db --format json -o out.json
 
 The `pages` sheet (and JSON list) is wider than the CSV: it adds `outcome`,
 `final_url`, `size_bytes`, `meta_robots`, `lang`, `x_robots_tag`,
-`last_modified` and `fetched_at`. `links` has one row per anchor with its
-source page, text, `rel`, `nofollow` and whether it is internal. `redirects`
+`last_modified`, `fetched_at` and, once `audit` has run, `inlinks`,
+`link_depth` and `link_score` (see [Internal linking](links.md)). `links`
+has one row per anchor with its source page, text, `rel`, `nofollow`,
+whether it is internal and its `position` on the page. `redirects`
 has one row per hop with the page that started the chain. `sitemaps` has one
 row per sitemap file the crawl tried (`url`, `found_in`, `kind`,
 `status_code`, `url_count`, `error`) and `sitemap_urls` one row per entry

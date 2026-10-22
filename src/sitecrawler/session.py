@@ -278,7 +278,7 @@ class CrawlSession:
             keep_query=config.keep_query,
         )
         result = (
-            AuditResult(issues, verdicts, session._rules)
+            AuditResult(issues, verdicts, session._rules, dict(view.link_graph.metrics))
             if verdicts
             else run_audit(view, session._rules)
         )
@@ -491,6 +491,7 @@ class CrawlSession:
             if result is not None:
                 store.replace_issues(result.issues)
                 store.set_indexability(result.verdicts)
+                store.set_link_metrics(result.links)
         except Exception as exc:  # deliberately total, same reason as above
             log.exception("final audit failed")
             error = error or f"audit failed: {type(exc).__name__}: {exc}"

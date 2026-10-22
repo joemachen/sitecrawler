@@ -20,7 +20,7 @@ from sitecrawler.audit import AuditResult, CrawlView, Rule
 from sitecrawler.audit.engine import RuleCount, robots_directives
 from sitecrawler.audit.view import Inlink
 from sitecrawler.crawl.urls import normalize, same_site
-from sitecrawler.models import Issue, Outcome, PageRecord, Severity, SitemapEntry
+from sitecrawler.models import Issue, LinkMetrics, Outcome, PageRecord, Severity, SitemapEntry
 from sitecrawler.session import CrawlSession, SessionState
 from sitecrawler.web.tabs import Row, TabSpec, matches, with_custom
 
@@ -35,6 +35,11 @@ NO_AUDIT: Row = {
     "indexable": None,
     "indexability_reason": "",
     "inlinks": 0,
+    "unique_inlinks": 0,
+    "follow_inlinks": 0,
+    "link_depth": None,
+    "link_score": None,
+    "unreachable": False,
 }
 """Audit cells of a page the audit has not seen yet."""
 
@@ -222,12 +227,20 @@ class AuditIndex:
         """The audit half of the row for ``url``."""
         issues = self.issues_for_url(url)
         verdict = self.result.verdicts.get(url)
+        metrics = self.view.link_graph.metrics.get(url)
         return {
             "rules": [i.rule_id for i in issues],
             "issues_n": len(issues),
             "indexable": verdict.indexable if verdict else None,
             "indexability_reason": verdict.reason if verdict else "",
             "inlinks": len(self.view.inlinks_to(url)),
+            "unique_inlinks": metrics.inlinks if metrics else 0,
+            "follow_inlinks": metrics.follow_inlinks if metrics else 0,
+            "link_depth": metrics.link_depth if metrics else None,
+            "link_score": metrics.link_score if metrics else None,
+            "unreachable": metrics is not None
+            and metrics.link_depth is None
+            and self.view.start_page is not None,
         }
 
 
@@ -283,9 +296,13 @@ class PageDetail:
     """``rule_id``, ``severity``, ``summary``, ``message`` per finding on this URL."""
     inlinks: list[Inlink]
     outlinks: list[Row]
-    """``href``, ``text``, ``rel`` and ``crawled`` (True when the target is a page row)."""
+    """``href``, ``text``, ``rel``, ``position``, ``crawled`` (True when the target is a page)."""
     sitemaps: list[SitemapEntry] = field(default_factory=list)
     """Every sitemap entry naming this page; empty when no sitemap lists it."""
+    links: LinkMetrics | None = None
+    """Inlink counts, click depth and Link Score; None until an audit has run."""
+    anchors: list[tuple[str, int]] = field(default_factory=list)
+    """Anchor texts of the inlinks with how often each is used, most used first."""
 
 
 class RowStore:
@@ -506,22 +523,27 @@ class RowStore:
                 }
                 for i in (self._index.issues_for_url(page.url) if self._index else [])
             ]
+            inlinks = self._index.view.inlinks_to(page.url) if self._index else []
+            anchors = Counter(i.link.text for i in inlinks)
             return PageDetail(
                 page=page,
                 indexable=indexable if isinstance(indexable, bool) else None,
                 indexability_reason=str(cells["indexability_reason"]),
                 issues=issues,
-                inlinks=self._index.view.inlinks_to(page.url) if self._index else [],
+                inlinks=inlinks,
                 outlinks=[
                     {
                         "href": link.href,
                         "text": link.text,
                         "rel": link.rel,
+                        "position": link.position,
                         "crawled": self.lookup(link.href) is not None,
                     }
                     for link in page.links
                 ],
                 sitemaps=self._index.view.sitemap_listings_for(page.url) if self._index else [],
+                links=self._index.view.link_graph.metrics.get(page.url) if self._index else None,
+                anchors=sorted(anchors.items(), key=lambda kv: (-kv[1], kv[0])),
             )
 
 

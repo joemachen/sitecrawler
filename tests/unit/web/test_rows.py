@@ -127,6 +127,11 @@ def test_audit_index_cells() -> None:
     assert "response.4xx" in cells["rules"]  # type: ignore[operator]
     assert cells["rules"][0] == "response.4xx"  # type: ignore[index]  # most severe first
     assert "sitemap.non_indexable" in cells["rules"]  # type: ignore[operator]
+    assert (cells["unique_inlinks"], cells["follow_inlinks"], cells["link_depth"]) == (2, 2, 1)
+    assert cells["link_score"] == 100
+    assert cells["unreachable"] is False
+    home_cells = index.cells(f"{SITE}/")
+    assert (home_cells["link_score"], home_cells["link_depth"]) == (0, 0)
     assert index.cells("https://nowhere.test/") == {**NO_AUDIT, "inlinks": 0}
 
 

@@ -37,10 +37,11 @@ that pass between stages are typed records from `sitecrawler.models`.
                sitemap diff
 ```
 
-**Status (after Phase 7):** `crawl/` (with the Playwright `Renderer`,
+**Status (after Phase 8):** `crawl/` (with the Playwright `Renderer`,
 ADR-0008), `parse/`, `store/`, `export/` (including the sitemap writer,
-ADR-0010), `audit/` (57 rules), `analysis/` (the sitemap-versus-crawl
-report), `cli/`, `session.py` and `web/` exist. `session.py`
+ADR-0010), `audit/` (63 rules, plus the link graph index in
+`audit/graph.py`, ADR-0011), `analysis/` (the sitemap-versus-crawl report
+and the link report), `cli/`, `session.py` and `web/` exist. `session.py`
 (`CrawlSession`, ADR-0007) runs a crawl on a worker thread with pause and
 stop, audits it as pages arrive and writes the result to the file at the
 end, or opens a finished file read-only into the same shape. `web/` is a
@@ -49,8 +50,9 @@ filters as data, `rows.py` turns page records into grid rows (base cells
 once, audit cells per audit revision) and computes the summary counts,
 `app.py` holds the routes; the one-page shell, templates and vendored
 htmx/Tabulator sit beside them (ADR-0006 for the client-side grids).
-`analysis/` holds only the sitemap report so far; the link graph and
-duplicate clusters arrive in Phases 8 and 9.
+`analysis/` holds the sitemap report and the link report; the link graph
+itself (PageRank, click depth) sits in `audit/graph.py` because the rules
+read it (ADR-0011). Duplicate clusters arrive in Phase 9.
 
 ---
 
@@ -63,7 +65,7 @@ duplicate clusters arrive in Phases 8 and 9.
 | `parse` | Turning bytes into records: HTML, XML sitemaps, JSON-LD/microdata, custom extraction (XPath/CSS/regex). | Do network I/O. Decide whether something is a problem. |
 | `store` | Persisting records to SQLite and querying them back. | Contain business rules. |
 | `audit` | Rules: each takes records (or the store) and yields `Issue`s with severity, explanation and fix. | Fetch anything. |
-| `analysis` | Whole-crawl computations: link graph and PageRank, duplicate clusters, sitemap-vs-crawl diff. | Fetch anything. |
+| `analysis` | Whole-crawl reports: the link report (links to errors and redirects, anchor text per target), duplicate clusters, sitemap-vs-crawl diff. The link graph index (PageRank, click depth) is `audit/graph.py`, since rules read it (ADR-0011). | Fetch anything. Be imported by `audit`. |
 | `export` | Writers: CSV, XLSX, JSON. | Compute anything new. |
 | `integrations` | Enrichers that pull external data (GSC, GA4, PSI, backlink APIs) keyed by URL. | Be required for a crawl to work. |
 | `session` | One crawl from Start to an audited file: runs `crawl` on a worker thread, feeds `store`, re-runs `audit`, serves the result to any thread (ADR-0007). | Render anything. Know about HTTP routes. |
@@ -92,7 +94,7 @@ set of tables in SQLite:
 | Table | Purpose |
 | --- | --- |
 | `crawls` | One row per run: start URL, config snapshot, timestamps, version. |
-| `pages` | One row per requested URL: outcome, status, final URL, content type, size, timing, render mode, content hash, indexability verdict. |
+| `pages` | One row per requested URL: outcome, status, final URL, content type, size, timing, render mode, content hash, indexability verdict, link metrics (`inlinks`, `link_depth`, `link_score`, written by `audit`). |
 | `redirect_hops` | Every hop in a chain: page_id, hop_no, from, to, status. Loops and chain length come from here. |
 | `page_html` | Title, meta description, meta robots, X-Robots-Tag, canonical, all H1s/H2s (JSON), lang, word count. |
 | `links` | Every anchor: src page, dst URL, anchor text, rel, nofollow, position (nav/body/footer), is_internal. |

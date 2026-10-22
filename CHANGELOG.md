@@ -6,6 +6,50 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+Phase 8: internal linking analysis.
+
+### Added
+
+- The audit builds the internal link graph and gives every page three
+  numbers: unique and follow inlinks, click depth (shortest path from the
+  start page over internal links, redirects resolved; `None` when
+  unreachable or in list mode) and a **Link Score** (PageRank over the
+  follow graph, log-scaled 0-100). `audit` stores them as `inlinks`,
+  `link_depth` and `link_score` on `pages`; they are in the exports, on the
+  **Internal** and **Links** tabs and in the detail pane. ADR-0011.
+- Six audit rules in a new `Links` category: `link.to_error` (medium: a
+  page linking to a 4xx/5xx, unfetchable or looping target),
+  `link.few_inlinks` (low: an indexable page with one follow inlink or
+  none), `link.high_depth` (low: more than 3 clicks from the start page),
+  `link.generic_anchor` (low: "click here", "read more" and the like on
+  internal links), `link.nofollow_internal` (low: `rel=nofollow` on an
+  internal link) and `link.too_many_outlinks` (low: more than 300 anchors).
+- `sitecrawler links report crawl.db [--top N]`: the pages with the
+  highest and lowest Link Scores, then every internal link to an error or
+  a redirect with its source page, target and anchor text. `audit` prints
+  the same as one `Links:` summary line.
+- `sitecrawler links anchors crawl.db [URL]`: the anchor texts used for
+  every page (or one), with counts.
+- Every anchor now records its `position` (`header`, `nav`, `body`,
+  `aside`, `footer`: the nearest sectioning ancestor or ARIA role), stored
+  in `links.position`, exported, and shown in the Inlinks and Outlinks
+  detail tables.
+- Web UI: the **Links** tab shows `link_score`, `unique_inlinks`,
+  `follow_inlinks` and `link_depth`, with a filter per link rule plus
+  *Unreachable from the start page*; the Inlinks pane lists the anchor
+  texts pointing at the page and its four link numbers.
+- Fixture: `audit/link-deep-1..3` (a chain four clicks deep),
+  `audit/generic-anchor`, `audit/nofollow-link`, `audit/many-outlinks`,
+  and `Home` links on the hub and product pages so the home page is the
+  best-linked page of the fixture site; `tests/integration/test_links.py`.
+
+### Changed
+
+- `robots_directives` moved to `audit/directives.py` (still importable from
+  `audit.engine`). `AuditResult` carries the per-page link metrics.
+- Crawl files written before this version lack the new `pages` and `links`
+  columns and open with an error; re-crawl (no migrations during 0.x).
+
 ## [0.8.0] - 2026-10-22
 
 Phase 7: XML sitemap audit and generation.

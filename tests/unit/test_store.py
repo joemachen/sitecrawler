@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from sitecrawler.models import (
     CrawlConfig,
+    LinkMetrics,
     LinkRef,
     Outcome,
     PageRecord,
@@ -78,7 +79,10 @@ def test_page_done_writes_every_table(store: Store) -> None:
         h1s=("H", "H2"),
         headers={"x-robots-tag": "noindex", "last-modified": "yesterday"},
         redirect_hops=(RedirectHop(1, "https://x.test/", "https://x.test/home", 301),),
-        links=(LinkRef("https://x.test/a", "A", "nofollow"), LinkRef("https://o.test/", "O")),
+        links=(
+            LinkRef("https://x.test/a", "A", "nofollow", position="nav"),
+            LinkRef("https://o.test/", "O"),
+        ),
     )
     store.page_done(record, [QueueItem("https://x.test/b", 1, "https://x.test/")])
 
@@ -95,13 +99,38 @@ def test_page_done_writes_every_table(store: Store) -> None:
         assert html.title == "Home"
         assert html.h1s_json == '["H", "H2"]'
         links = s.scalars(select(LinkRow).order_by(LinkRow.id)).all()
-        assert [(link.dst_url, link.nofollow, link.is_internal) for link in links] == [
-            ("https://x.test/a", True, True),
-            ("https://o.test/", False, False),
+        assert [(k.dst_url, k.nofollow, k.is_internal, k.position) for k in links] == [
+            ("https://x.test/a", True, True, "nav"),
+            ("https://o.test/", False, False, ""),
         ]
         assert s.scalars(select(SitemapUrlRow.loc)).all() == ["https://x.test/a"]
     assert store.count_pages() == 3
     assert store.count_pages("done") == 1
+
+
+def test_link_metrics_and_positions_round_trip(store: Store) -> None:
+    store.begin(CONFIG, resume=False)
+    home = _page(
+        "https://x.test/",
+        status_code=200,
+        links=(LinkRef("https://x.test/a", "A", position="footer"),),
+    )
+    store.page_done(home, [QueueItem("https://x.test/a", 1, "https://x.test/")])
+    store.page_done(_page("https://x.test/a", status_code=200), [])
+    store.set_link_metrics(
+        {
+            "https://x.test/": LinkMetrics(0, 0, 0, 100),
+            "https://x.test/a": LinkMetrics(1, 1, None, 0),
+            "https://x.test/unknown": LinkMetrics(9, 9, 9, 9),
+        }
+    )
+    with Session(store.engine) as s:
+        rows = {
+            p.url: (p.inlinks, p.link_depth, p.link_score)
+            for p in s.scalars(select(PageRow).where(PageRow.state == "done"))
+        }
+    assert rows == {"https://x.test/": (0, 0, 100), "https://x.test/a": (1, None, 0)}
+    assert next(store.iter_pages()).links[0].position == "footer"
 
 
 def test_blocked_page_has_no_html_row(store: Store) -> None:

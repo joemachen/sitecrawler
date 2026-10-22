@@ -278,6 +278,10 @@ class CrawlInfo:
     config_json: str = ""
 
 
+LinkPosition = Literal["header", "nav", "body", "aside", "footer", ""]
+"""Where on the page an anchor sits; empty when unknown (files written before 0.9)."""
+
+
 @dataclass(slots=True, frozen=True)
 class LinkRef:
     """One anchor on a page."""
@@ -286,11 +290,32 @@ class LinkRef:
     """Absolute target URL, before any normalisation."""
     text: str = ""
     rel: str = ""
+    position: str = ""
+    """``header``, ``nav``, ``body``, ``aside`` or ``footer``: the anchor's nearest
+    sectioning ancestor (ADR-0011); empty in files written before 0.9."""
 
     @property
     def nofollow(self) -> bool:
         """True when ``rel`` contains ``nofollow``."""
         return "nofollow" in self.rel.lower().split()
+
+
+@dataclass(slots=True, frozen=True)
+class LinkMetrics:
+    """What the internal link graph says about one page (ADR-0011).
+
+    Computed by the audit over the whole crawl and stored on ``pages``.
+    """
+
+    inlinks: int = 0
+    """Distinct other crawled pages that link to this URL, any ``rel``."""
+    follow_inlinks: int = 0
+    """Distinct other pages with at least one link here that passes equity."""
+    link_depth: int | None = None
+    """Fewest clicks from the start page over internal links; None when unreachable
+    or when the crawl has no start page (list mode)."""
+    link_score: int = 0
+    """PageRank over the internal follow graph on a log scale, 0 (lowest page) to 100."""
 
 
 @dataclass(slots=True, frozen=True)

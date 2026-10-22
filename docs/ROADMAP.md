@@ -251,8 +251,28 @@ grid of sitemap entries in the web UI (the report is CLI-only), `<image:>` /
 
 Acceptance:
 
-- [ ] Link Score of the fixture home page is highest; the orphan's is lowest.
-- [ ] Every internal link to a 404 or redirect in the fixture site appears in the report with its source and anchor.
+- [x] Link Score of the fixture home page is highest; the orphan's is lowest (`tests/integration/test_links.py::test_home_scores_highest_and_the_orphan_lowest`: 100 and 0).
+- [x] Every internal link to a 404 or redirect in the fixture site appears in the report with its source and anchor (`tests/integration/test_links.py::test_every_link_to_an_error_or_redirect_is_reported_with_source_and_anchor`, which derives the expected links from the fixture HTML).
+
+Design notes: ADR-0011. The graph index is `audit/graph.py`, reached as
+`CrawlView.link_graph`, because the rules read it and `audit` may not
+import `analysis`: nodes are every crawled page, follow edges are links
+between crawled pages minus `rel=nofollow`, page-wide `nofollow` and
+self-links, resolved through redirects to the landing page; PageRank
+(d=0.85, dangling rank spread evenly) is log-scaled 0-100; click depth is a
+BFS from the start page over every internal link. `audit` writes
+`inlinks`, `link_depth` and `link_score` onto `pages`; `links` gained
+`position` (nearest `header`/`nav`/`footer`/`aside` ancestor). Six rules
+in a `Links` category (`link.to_error`, `link.few_inlinks`,
+`link.high_depth`, `link.generic_anchor`, `link.nofollow_internal`,
+`link.too_many_outlinks`); `link.to_redirect` stays with the redirect
+rules. `analysis/links.py` holds the report (`sitecrawler links report`,
+`links anchors`, one `Links:` line under `audit`). The fixture gained
+`Home` links on its hub pages: with the home page linked from `/about`
+alone, PageRank ranked the blog above it. Left for later: canonicals in
+the graph (a canonicalised page keeps its own node), a row-per-link grid
+in the web UI (the detail pane and `links report` cover it), configurable
+thresholds, and PageRank in pure Python (about a second per 10k pages).
 
 ---
 

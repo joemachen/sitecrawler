@@ -1,15 +1,27 @@
 <h2>Inlinks <span class="muted">({{ detail.inlinks | length }})</span></h2>
+{% if detail.links %}
+<table class="plain fields link-metrics">
+  <tr><th>Unique inlinks</th><td>{{ detail.links.inlinks }}</td></tr>
+  <tr><th>Follow inlinks</th><td>{{ detail.links.follow_inlinks }}</td></tr>
+  <tr><th>Link Score</th><td>{{ detail.links.link_score }}</td></tr>
+  <tr><th>Click depth</th><td>{% if detail.links.link_depth is none %}<span class="muted">unreachable</span>{% else %}{{ detail.links.link_depth }}{% endif %}</td></tr>
+</table>
+{% endif %}
+{% if detail.anchors %}
+<p class="anchors">Anchor text: {% for text, count in detail.anchors %}<span class="anchor">{{ text or "(no text)" }} <span class="muted">({{ count }})</span></span>{% if not loop.last %}, {% endif %}{% endfor %}</p>
+{% endif %}
 <table class="plain inlinks">
-  <thead><tr><th>From</th><th>Anchor</th><th>rel</th></tr></thead>
+  <thead><tr><th>From</th><th>Anchor</th><th>rel</th><th>Position</th></tr></thead>
   <tbody>
   {% for inlink in detail.inlinks %}
     <tr data-src="{{ inlink.src }}">
       <td><a href="/page?url={{ inlink.src | urlencode }}" data-url="{{ inlink.src }}">{{ inlink.src }}</a></td>
       <td>{{ inlink.link.text }}</td>
       <td>{{ inlink.link.rel }}</td>
+      <td>{{ inlink.link.position }}</td>
     </tr>
   {% else %}
-    <tr><td colspan="3" class="muted">No internal links point here.</td></tr>
+    <tr><td colspan="4" class="muted">No internal links point here.</td></tr>
   {% endfor %}
   </tbody>
 </table>

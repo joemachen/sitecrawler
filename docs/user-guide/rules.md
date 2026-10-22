@@ -182,6 +182,56 @@ One list of everything search engines will not index, whatever the cause: robots
 
 **Fix:** Scan the reasons; anything you did not intend has its own rule and fix above.
 
+## Links
+
+### `link.few_inlinks`
+
+**Indexable page has one follow inlink or none** (severity: low)
+
+Internal links are how search engines judge which pages matter and how users move around. A page reachable from a single other page (or from none, when only a sitemap or a nofollow link points at it) gets little equity and is one broken link away from being an orphan. Links from the page to itself and nofollow links do not count.
+
+**Fix:** Link to the page from a relevant hub, a category or the navigation; if it does not deserve that, ask whether it should be indexable at all.
+
+### `link.generic_anchor`
+
+**Internal links use generic anchor text such as “click here”** (severity: low)
+
+Anchor text tells search engines and screen-reader users what the linked page is about. “Click here”, “read more” and “this page” describe the act of clicking, not the destination, so the link passes no topical signal and reads badly out of context.
+
+**Fix:** Rewrite the anchor to name the destination: “see the pricing page” rather than “click here to see pricing”. Only internal links are counted.
+
+### `link.high_depth`
+
+**Indexable page is more than 3 clicks from the start page** (severity: low)
+
+The fewer clicks from the home page, the more often a page is crawled and the more equity reaches it. Pages four or more clicks deep are typically old posts and paginated tails that only a sitemap or a deep link keeps alive. This is the shortest path over internal links, not the order the crawler happened to find pages in.
+
+**Fix:** Link to the page from somewhere closer to the home page: a hub, related links on popular pages, or a flatter category structure.
+
+### `link.nofollow_internal`
+
+**Page has internal links with rel=nofollow** (severity: low)
+
+nofollow tells search engines not to pass equity through the link and is meant for links you do not vouch for. On your own site it throws equity away without keeping the target out of the index; the target still gets crawled through other links or the sitemap. It is almost always a leftover from a plugin or an old attempt at sculpting PageRank.
+
+**Fix:** Remove rel=nofollow from internal links. To keep a page out of search, use noindex on the page itself.
+
+### `link.to_error`
+
+**Page links to URLs that return an error** (severity: medium)
+
+A link to a 4xx or 5xx page, a URL that could not be fetched or a redirect that never resolves sends users to a dead end and spends crawl budget and link equity on nothing. The error itself is reported on the target by the response and redirect rules; this rule names the pages that need their links changed.
+
+**Fix:** Point the link at a live page or remove it. `sitecrawler links report` lists every such link with its anchor text.
+
+### `link.too_many_outlinks`
+
+**Page has more than 300 links** (severity: low)
+
+Every link on a page shares the equity the page can pass, so a page with hundreds of links gives each one very little, and a page that is mostly links is hard to use. Mega-menus, tag clouds and unpaginated listings are the usual causes. Internal and external anchors both count.
+
+**Fix:** Trim the navigation to what the page's visitors need, paginate long listings, and move exhaustive link lists to a dedicated index page.
+
 ## Meta descriptions
 
 ### `meta_description.duplicate`

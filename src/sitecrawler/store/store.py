@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from collections import defaultdict
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
@@ -26,6 +26,7 @@ from sitecrawler.models import (
     HreflangRef,
     Indexability,
     Issue,
+    LinkMetrics,
     LinkRef,
     Outcome,
     PageRecord,
@@ -273,6 +274,7 @@ class Store:
                     rel=link.rel,
                     nofollow=link.nofollow,
                     is_internal=same_site(urlparse(link.href).netloc, src_host),
+                    position=link.position,
                 )
                 for link in record.links
             ]
@@ -375,6 +377,18 @@ class Store:
                 page.indexability_reason = verdict.reason
             session.commit()
 
+    def set_link_metrics(self, metrics: Mapping[str, LinkMetrics]) -> None:
+        """Store the audit's inlink count, click depth and Link Score per URL."""
+        with Session(self.engine) as session:
+            for page in session.scalars(select(PageRow).where(PageRow.state == "done")):
+                found = metrics.get(page.url)
+                if found is None:
+                    continue
+                page.inlinks = found.inlinks
+                page.link_depth = found.link_depth
+                page.link_score = found.link_score
+            session.commit()
+
     def indexability(self) -> dict[str, Indexability]:
         """Stored indexability verdicts by URL; empty when no audit has been stored."""
         with Session(self.engine) as session:
@@ -459,12 +473,16 @@ class Store:
             ):
                 hops[page_id].append(RedirectHop(hop_no, from_url, to_url, status))
             links: dict[int, list[LinkRef]] = defaultdict(list)
-            for page_id, dst, text, rel in session.execute(
-                select(LinkRow.page_id, LinkRow.dst_url, LinkRow.anchor_text, LinkRow.rel).order_by(
-                    LinkRow.page_id, LinkRow.id
-                )
+            for page_id, dst, text, rel, position in session.execute(
+                select(
+                    LinkRow.page_id,
+                    LinkRow.dst_url,
+                    LinkRow.anchor_text,
+                    LinkRow.rel,
+                    LinkRow.position,
+                ).order_by(LinkRow.page_id, LinkRow.id)
             ):
-                links[page_id].append(LinkRef(dst, text, rel))
+                links[page_id].append(LinkRef(dst, text, rel, position))
             hreflang: dict[int, list[HreflangRef]] = defaultdict(list)
             for page_id, lang, href in session.execute(
                 select(HreflangRow.page_id, HreflangRow.lang, HreflangRow.href).order_by(

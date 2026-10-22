@@ -88,6 +88,20 @@ def test_anchors_carry_text_and_rel() -> None:
     assert not page.anchors[1].nofollow
 
 
+def test_anchor_position_is_the_nearest_sectioning_ancestor() -> None:
+    html = """
+    <header><nav><a href="/n">N</a></nav><a href="/h">H</a></header>
+    <main><a href="/b">B</a><div role="complementary"><a href="/s">S</a></div></main>
+    <footer><nav><a href="/f">F</a></nav><a href="/g">G</a></footer>
+    <div role="navigation"><a href="/r">R</a></div>
+    <div role="banner"><a href="/x">X</a></div><div role="contentinfo"><a href="/y">Y</a></div>
+    """
+    page = parse_html(html, BASE)
+    assert [a.position for a in page.anchors] == [
+        "nav", "header", "body", "aside", "nav", "footer", "nav", "header", "footer",
+    ]  # fmt: skip
+
+
 def test_br_and_nested_tags_separate_words() -> None:
     page = parse_html("<h1>Hello<br>World</h1><h2>a<b>b</b>c</h2>", BASE)
     assert page.h1 == "Hello World"

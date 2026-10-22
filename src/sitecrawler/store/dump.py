@@ -84,6 +84,9 @@ PAGE_COLUMNS: tuple[str, ...] = (
     "indexability_reason",
     "render_status",
     "render_changes",
+    "inlinks",
+    "link_depth",
+    "link_score",
 )
 """Column names of the ``pages`` dump, in order.
 
@@ -135,6 +138,9 @@ def _page_row(page: PageRow) -> tuple[Cell, ...]:
         page.indexable,
         page.indexability_reason,
         *_render_cells(page),
+        page.inlinks,
+        page.link_depth,
+        page.link_score,
     )
 
 
@@ -205,9 +211,17 @@ def _links(session: Session) -> TableDump:
     ).all()
     return TableDump(
         "links",
-        ("src_url", "dst_url", "anchor_text", "rel", "nofollow", "is_internal"),
+        ("src_url", "dst_url", "anchor_text", "rel", "nofollow", "is_internal", "position"),
         [
-            (url, link.dst_url, link.anchor_text, link.rel, link.nofollow, link.is_internal)
+            (
+                url,
+                link.dst_url,
+                link.anchor_text,
+                link.rel,
+                link.nofollow,
+                link.is_internal,
+                link.position,
+            )
             for url, link in links
         ],
     )
