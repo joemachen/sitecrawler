@@ -1,8 +1,7 @@
 # Handoff: sitecrawler
 
 Read this first in a new session. It is the state of the project as of
-2026-10-21 (v0.5.0 released; Phase 5, JavaScript rendering, implemented on
-PR #28 `feat/render`, not yet merged or released) and everything that is
+2026-10-21 (v0.6.0 released, Phase 6 not started) and everything that is
 not obvious from the code.
 
 ## What this is
@@ -49,16 +48,20 @@ produced a byte-identical tree, so no merge waited for a fresh CI run.
 The roadmap calls the live UI Phase 4 and JS rendering Phase 5 (later
 phases shifted by one).
 
-**Phase 5 (JavaScript rendering) is implemented on one PR, #28
-`feat/render`** (branch from `main` at 47f5a97). It was small enough for a
-single PR rather than a stack. Done means: merge it once CI is green, then
-cut `chore/release-v0.6.0` the way #25 did (bump `pyproject.toml` and
-`src/sitecrawler/__init__.py`, move the Unreleased block in `CHANGELOG.md`
-under `[0.6.0]`, annotated tag on `main`). ADR-0008 records the design:
-every parsable HTML page is rendered (no "looks JS-dependent" heuristic),
-the rendered fields become the page record and rendered-only links feed
-the frontier, the raw values are kept in a `RenderDiff` stored in
-`page_render`, and the two HTML bodies are not stored.
+**Phase 5 (JavaScript rendering) is complete and released as v0.6.0**
+(annotated tag on `main`, 2026-10-21). It was small enough for one PR
+rather than a stack: #28 `feat/render` (squash-merged as 642cd91), then
+#29 `chore/release-v0.6.0`. Before the merge a `/code-review` pass on #28
+found six renderer bugs (an HTTP error page on the browser's request
+becoming the page, a JavaScript redirect off-site parsed as the page, a
+crashed browser turning pages into ERROR records, `--render-timeout 0`
+meaning "wait forever", a Chromium leak when context setup failed, and a
+summary/rule count mismatch for redirect sources); all were fixed on the
+same PR, with a fixture page per new failure mode. ADR-0008 records the
+design: every parsable HTML page is rendered (no "looks JS-dependent"
+heuristic), the rendered fields become the page record and rendered-only
+links feed the frontier, the raw values are kept in a `RenderDiff` stored
+in `page_render`, and the two HTML bodies are not stored.
 
 What exists now:
 
@@ -137,12 +140,16 @@ Open:
   serve HTTPS (see the note under Phase 2 in the roadmap).
 - Dependabot's older uv can produce lockfile-downgrading PRs (#4 was closed
   for that); read the lock diff before merging.
-- Next piece of work: **merge #28, release v0.6.0, then Phase 6
-  (custom extraction and search)** per `docs/ROADMAP.md`. Phase 6 wants
-  to extract from the rendered HTML when `--render` is on: the rendered
-  DOM is not stored (ADR-0008), so extraction has to run inside
-  `Crawler._fetch_and_parse` / `_render` where the text is in hand, or
-  the bodies have to be stored behind a flag first.
+- Next piece of work: **Phase 6, custom extraction and custom search**
+  (`docs/ROADMAP.md`): `--extract name=css:|xpath:|regex:` (repeatable,
+  also from a TOML file), `--search PATTERN`, an `extractions` table shown
+  as Pages columns and in exports, fixture product pages with a price, a
+  SKU and a GA tag. First design call, worth an ADR: extraction wants the
+  rendered HTML when `--render` is on, but the rendered DOM is not stored
+  (ADR-0008), so extractors either run inside `Crawler._fetch_and_parse` /
+  `_render` where the text is in hand, or the bodies are stored behind a
+  flag first. This is also where lxml + cssselect replace BeautifulSoup
+  (decided, see the table below).
 - Phase 5 left for later: blocking third-party hosts (analytics) in the
   renderer (only resource types are blocked now); a `--render` flag on
   `list`; storing raw and rendered HTML bodies; the `rendered` fixture in
@@ -152,11 +159,12 @@ Open:
   resuming a stopped crawl from the UI (the CLI's `--resume` works on the
   file). Summary counts are recomputed per `(seq, audit_rev)` over every
   filter of every tab; fine at 10k pages, not profiled beyond.
-- Merged Phase 4 branches `feat/web-shell`, `feat/web-live`,
-  `feat/web-detail`, `chore/release-v0.5.0` and the older
-  `docs/handoff-timing` may still exist on origin (Claude Code's sandbox
+- Merged branches `feat/render`, `chore/release-v0.6.0` and
+  `docs/handoff-v0.6.0` may still exist on origin (Claude Code's sandbox
   refuses `git push --delete`); delete them by hand if `git branch -r`
-  still lists them. The other pre-v0.5.0 branches are gone.
+  still lists them. The local checkout also carries every merged Phase 3
+  and 4 branch plus a `.claude/worktrees/` entry for the Phase 5 session;
+  `git worktree prune` and `git branch -d` clean those up.
 - Dependabot will now also see fastapi/uvicorn/jinja2/playwright; the
   vendored htmx/Tabulator files are upgraded by hand (replace the three files
   under `src/sitecrawler/web/static/`).
