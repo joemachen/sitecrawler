@@ -71,6 +71,9 @@ class PageRow(Base):
     html: Mapped[PageHtmlRow | None] = relationship(
         back_populates="page", cascade="all, delete-orphan", uselist=False
     )
+    render: Mapped[PageRenderRow | None] = relationship(
+        back_populates="page", cascade="all, delete-orphan", uselist=False
+    )
     hops: Mapped[list[RedirectHopRow]] = relationship(
         back_populates="page", cascade="all, delete-orphan", order_by="RedirectHopRow.hop_no"
     )
@@ -121,6 +124,36 @@ class PageHtmlRow(Base):
     rel_next: Mapped[str] = mapped_column(default="")
 
     page: Mapped[PageRow] = relationship(back_populates="html")
+
+
+class PageRenderRow(Base):
+    """The rendered-vs-raw comparison of one page; present only when rendering was tried."""
+
+    __tablename__ = "page_render"
+
+    page_id: Mapped[int] = mapped_column(ForeignKey("pages.id"), primary_key=True)
+    ok: Mapped[bool] = mapped_column(default=False)
+    """False when the browser did not deliver a DOM; ``error`` says why."""
+    render_ms: Mapped[int] = mapped_column(default=0)
+    error: Mapped[str] = mapped_column(default="")
+    raw_title: Mapped[str] = mapped_column(default="")
+    rendered_title: Mapped[str] = mapped_column(default="")
+    raw_meta_description: Mapped[str] = mapped_column(default="")
+    rendered_meta_description: Mapped[str] = mapped_column(default="")
+    raw_meta_robots: Mapped[str] = mapped_column(default="")
+    rendered_meta_robots: Mapped[str] = mapped_column(default="")
+    raw_canonical: Mapped[str] = mapped_column(default="")
+    rendered_canonical: Mapped[str] = mapped_column(default="")
+    raw_h1: Mapped[str] = mapped_column(default="")
+    rendered_h1: Mapped[str] = mapped_column(default="")
+    raw_word_count: Mapped[int] = mapped_column(default=0)
+    rendered_word_count: Mapped[int] = mapped_column(default=0)
+    raw_link_count: Mapped[int] = mapped_column(default=0)
+    rendered_link_count: Mapped[int] = mapped_column(default=0)
+    links_added_json: Mapped[str] = mapped_column(default="[]")
+    links_removed_json: Mapped[str] = mapped_column(default="[]")
+
+    page: Mapped[PageRow] = relationship(back_populates="render")
 
 
 class HreflangRow(Base):

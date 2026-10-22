@@ -37,8 +37,9 @@ that pass between stages are typed records from `sitecrawler.models`.
                sitemap diff
 ```
 
-**Status (after Phase 4):** `crawl/`, `parse/`, `store/`, `export/`,
-`audit/` (51 rules), `cli/`, `session.py` and `web/` exist. `session.py`
+**Status (after Phase 5):** `crawl/` (with the Playwright `Renderer`,
+ADR-0008), `parse/`, `store/`, `export/`, `audit/` (53 rules), `cli/`,
+`session.py` and `web/` exist. `session.py`
 (`CrawlSession`, ADR-0007) runs a crawl on a worker thread with pause and
 stop, audits it as pages arrive and writes the result to the file at the
 end, or opens a finished file read-only into the same shape. `web/` is a
@@ -121,10 +122,12 @@ old crawl file is cheap and never re-fetches.
   pause and stop requests from any thread; the loop checks it between
   fetches and wakes every 250 ms while waiting, so a request is honoured
   promptly without the control needing a handle on the loop.
-- JS rendering (Phase 5) is a separate `Renderer` with its own, lower
-  concurrency (browser tabs are expensive). Pages are rendered only when
-  `--render` is on; the raw HTML fetch still happens first so both versions can
-  be compared.
+- JS rendering is a separate `Renderer` (`crawl/renderer.py`, Playwright's
+  async API, one Chromium) with its own, lower concurrency (`render_workers`
+  tabs; browser tabs are expensive). Pages are rendered only when `--render`
+  is on; the raw HTML fetch still happens first so both versions can be
+  compared, and the renderer shares the fetcher's per-host throttle
+  (ADR-0008).
 - robots.txt is honoured by default. `--ignore-robots` exists for auditing your
   own site and is logged loudly.
 

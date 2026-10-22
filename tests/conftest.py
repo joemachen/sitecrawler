@@ -121,7 +121,12 @@ def httpserver_listen_address() -> tuple[str, int]:
 
 @pytest.fixture
 def site(httpserver: HTTPServer) -> str:
-    """Serve the fixture site and return its base URL (no trailing slash).
+    """Serve the fixture site and return its base URL (no trailing slash)."""
+    return serve_site(httpserver)
+
+
+def serve_site(httpserver: HTTPServer) -> str:
+    """Register every fixture page and route on ``httpserver``; returns its base URL.
 
     Sitemap and robots files contain root-relative URLs, which are rewritten to
     absolute ones for this server's port so that the crawler sees a realistic site.

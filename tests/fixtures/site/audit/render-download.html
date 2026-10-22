@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>A page the browser downloads instead of rendering</title>
+  <meta name="description" content="Fixture for render.failed: served with a Content-Disposition attachment header, so headless Chromium starts a download and never builds a DOM.">
+  <link rel="canonical" href="/audit/render-download">
+</head>
+<body>
+  <h1>Served as a download</h1>
+  <h2>Why this fails to render</h2>
+  <p>The HTTP fetch sees ordinary HTML (see routes.json for the header), but a browser treats the response as a file to save, so the render fails at once without waiting for a timeout.</p>
+</body>
+</html>

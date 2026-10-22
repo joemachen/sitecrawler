@@ -15,7 +15,7 @@ against `tests/fixtures/site/`, the user guide has a page for it, and
 | 2 | Audit checks and issues engine | v0.3.0 | Done (2026-10-21) |
 | 3 | Local web UI | v0.4.0 | Done (2026-10-21) |
 | 4 | Live crawl UI | v0.5.0 | Done (2026-10-21) |
-| 5 | JavaScript rendering | v0.6.0 | |
+| 5 | JavaScript rendering | v0.6.0 | Done (2026-10-21) |
 | 6 | Custom extraction and search | v0.7.0 | |
 | 7 | XML sitemap audit and generation | v0.8.0 | |
 | 8 | Internal linking analysis | v0.9.0 | |
@@ -163,15 +163,18 @@ filter backed by a rule is the rule, so the UI never disagrees with
 **Goal:** see what Google sees on JS-heavy and app-injected pages.
 
 - `--render` flag uses Playwright headless Chromium. Raw fetch still happens first.
-- Stores both raw and rendered HTML; parses both.
-- Diff report: links, titles, canonicals, metas that exist only after rendering (or only before).
-- Configurable wait strategy (`networkidle`, selector, timeout) and resource blocking (images, fonts, analytics) for speed.
-- Render concurrency separate from fetch concurrency (default 2 tabs).
+- Parses both the raw HTML and the rendered DOM; the rendered fields become the page's, the raw values are kept in the diff. The two HTML bodies themselves are not stored (ADR-0008); revisit if Phase 6 wants the rendered DOM back.
+- Diff report: links, titles, canonicals, metas that exist only after rendering (or only before). Rules `render.differs` and `render.failed`, a JavaScript tab and a Rendering detail section.
+- Configurable wait strategy (`--render-wait load|domcontentloaded|networkidle`, `--render-selector`, `--render-timeout`) and resource blocking (images, fonts, media; blocking by host, for analytics, is not done).
+- Render concurrency separate from fetch concurrency (`--render-workers`, default 2 tabs).
 
 Acceptance:
 
-- [ ] Fixture page that injects its title, canonical and three links via JS is reported correctly only with `--render`.
-- [ ] Rendered-vs-raw diff lists exactly those injected items.
+- [x] Fixture page that injects its title, canonical and three links via JS is reported correctly only with `--render` (`tests/fixtures/site/js-injected.html`, `tests/integration/test_render.py`).
+- [x] Rendered-vs-raw diff lists exactly those injected items (`test_render.py::test_diff_lists_exactly_the_injected_items`).
+
+Design notes: ADR-0008. Playwright is the optional extra `sitecrawler[render]`;
+`--render` without it fails before the first request with the install hint.
 
 ---
 

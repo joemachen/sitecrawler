@@ -27,6 +27,9 @@ dependencies = [
   "jinja2>=3.1",
 ]
 
+[project.optional-dependencies]
+render = ["playwright>=1.49"]
+
 [project.scripts]
 sitecrawler = "sitecrawler.cli.main:app"
 

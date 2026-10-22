@@ -21,6 +21,7 @@ Exports (`sitecrawler export`) read from these tables; see [Exporting](export.md
 | `pages` | URL ever queued | `state` (`pending` / `done`), `depth`, `found_on`, `outcome`, `status_code`, `final_url`, `content_type`, `size_bytes`, `fetch_ms`, `error`, `x_robots_tag`, `last_modified`, `headers_json`, `fetched_at` |
 | `redirect_hops` | redirect followed | `page_id`, `hop_no`, `from_url`, `to_url`, `status_code` |
 | `page_html` | fetched page | `title`, `meta_description`, `meta_robots`, `canonical`, `h1`, `h1s_json`, `h2s_json`, `lang`, `word_count`, `internal_links` |
+| `page_render` | page the crawl tried to render (`--render`) | `ok`, `render_ms`, `error`, raw and rendered `title`, `meta_description`, `meta_robots`, `canonical`, `h1`, `word_count`, `link_count`, `links_added_json`, `links_removed_json` |
 | `links` | anchor on a page | `page_id`, `dst_url`, `anchor_text`, `rel`, `nofollow`, `is_internal` |
 | `sitemap_urls` | URL in a sitemap | `sitemap_url`, `loc` |
 

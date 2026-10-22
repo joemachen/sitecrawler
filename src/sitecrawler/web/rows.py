@@ -158,6 +158,14 @@ def base_row(
         "in_sitemap": normalize(record.url, keep_query=keep_query) in sitemap,
         "fetch_ms": record.fetch_ms,
         "error": record.error,
+        "render_status": record.render_status,
+        "render_changes": record.render.describe() if record.render else "",
+        "render_changed": record.render.changed if record.render else False,
+        "render_same": record.render is not None and not record.render.changed,
+        "render_ms": record.render_ms,
+        "render_error": record.render_error,
+        "raw_title": record.render.raw_title if record.render else "",
+        "raw_canonical": record.render.raw_canonical if record.render else "",
     }
 
 

@@ -5,11 +5,13 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections.abc import Callable
+from contextlib import AsyncExitStack
 from urllib.parse import urljoin, urlparse
 
 from sitecrawler.crawl.control import POLL_SECONDS, CrawlControl
 from sitecrawler.crawl.fetcher import Fetcher
 from sitecrawler.crawl.frontier import Frontier
+from sitecrawler.crawl.renderer import Renderer, require_playwright
 from sitecrawler.crawl.robots import RobotsCache
 from sitecrawler.crawl.sink import CrawlSink
 from sitecrawler.crawl.urls import normalize, same_site
@@ -18,10 +20,11 @@ from sitecrawler.models import (
     FetchResult,
     Outcome,
     PageRecord,
+    ParsedPage,
     QueueItem,
     ResumeState,
 )
-from sitecrawler.parse import link_header_rels, parse_html, parse_sitemap
+from sitecrawler.parse import diff_rendered, link_header_rels, parse_html, parse_sitemap
 
 log = logging.getLogger(__name__)
 
@@ -53,6 +56,11 @@ class Crawler:
     A ``control`` lets another thread pause, resume or stop the crawl while it
     runs (see :class:`~sitecrawler.crawl.control.CrawlControl`). A stopped
     crawl tells its sink it is incomplete, so the file can be resumed later.
+
+    With ``config.render`` on, every parsable HTML page is also loaded in
+    headless Chromium after its raw fetch; the record then carries the
+    rendered fields and a :class:`~sitecrawler.models.RenderDiff` against
+    the raw ones. Playwright must be installed, or construction fails.
     """
 
     def __init__(
@@ -63,7 +71,12 @@ class Crawler:
         resume: bool = False,
         control: CrawlControl | None = None,
     ) -> None:
-        """Validate the start URL or seed list and prepare (but do not start) the crawl."""
+        """Validate the start URL or seed list and prepare (but do not start) the crawl.
+
+        Raises:
+            ValueError: a bad start URL or seed, ``resume`` without a sink, or
+                rendering requested without Playwright installed.
+        """
         if resume and sink is None:
             msg = "resume=True needs a sink to resume from"
             raise ValueError(msg)
@@ -103,6 +116,18 @@ class Crawler:
             http2=config.http2,
             hop_allowed=lambda target: self.frontier.in_scope(urlparse(target).netloc),
         )
+        self.renderer: Renderer | None = None
+        if config.render:
+            require_playwright()
+            self.renderer = Renderer(
+                config.user_agent,
+                workers=config.render_workers,
+                wait=config.render_wait,
+                selector=config.render_selector,
+                timeout_seconds=config.render_timeout_seconds,
+                block=config.render_block,
+                throttle=self.fetcher.throttle,
+            )
 
     @staticmethod
     def _validate_seeds(config: CrawlConfig) -> tuple[str, ...]:
@@ -212,13 +237,19 @@ class Crawler:
         if final and not self.frontier.in_scope(urlparse(final).netloc):
             record.error = f"redirected off-site to {result.final_url}"
             return record, []
-        if final and final != item.url:
+        redirected = final is not None and final != item.url
+        if final and redirected:
             record.canonical = final  # overwritten below if the page declares one
 
         if not self._is_parsable(result):
             return record, []
 
         page = parse_html(result.text, result.final_url)
+        # A redirect source is never audited as HTML (its content belongs to the
+        # target, which is rendered on its own), so rendering it would spend a
+        # browser load for nothing.
+        if self.renderer is not None and not redirected:
+            page = await self._render(record, result, page)
         record.title = page.title
         record.meta_description = page.meta_description
         record.h1 = page.h1
@@ -247,6 +278,26 @@ class Crawler:
         )
         return record, page.links if self.config.follow_links else []
 
+    async def _render(self, record: PageRecord, result: FetchResult, raw: ParsedPage) -> ParsedPage:
+        """Render the page and return what to parse it from: the DOM, or ``raw`` on failure."""
+        if self.renderer is None:  # pragma: no cover - callers check first
+            return raw
+        rendered = await self.renderer.render(result.final_url)
+        record.render_ms = rendered.elapsed_ms
+        if not rendered.ok:
+            record.render_error = rendered.error
+            log.warning("could not render %s: %s", record.url, rendered.error)
+            return raw
+        landed = rendered.final_url or result.final_url
+        if not self.frontier.in_scope(urlparse(landed).netloc):
+            # The DOM is another site's page; the HTTP redirect check above never saw it.
+            record.render_error = f"JavaScript redirected off-site to {landed}"
+            log.warning("could not render %s: %s", record.url, record.render_error)
+            return raw
+        page = parse_html(rendered.html, landed)
+        record.render = diff_rendered(raw, page)
+        return page
+
     def _normalize(self, url: str) -> str | None:
         return normalize(url, keep_query=self.config.keep_query, scheme=self.scheme)
 
@@ -266,7 +317,10 @@ class Crawler:
 
     async def arun(self, on_progress: ProgressCallback | None = None) -> list[PageRecord]:
         """Async form of :meth:`run`, for callers that already have an event loop."""
-        async with self.fetcher:
+        async with AsyncExitStack() as stack:
+            await stack.enter_async_context(self.fetcher)
+            if self.renderer is not None:
+                await stack.enter_async_context(self.renderer)
             state = ResumeState()
             if self.sink is not None:
                 state = self.sink.begin(self.config, resume=self.resume)

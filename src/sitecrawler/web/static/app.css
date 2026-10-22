@@ -227,3 +227,6 @@ article.rule .summary { font-size: 1.05rem; }
   header .db, [data-progress-text] { display: none; }
   .workspace { grid-template-columns: minmax(0, 1fr) 240px; }
 }
+.render-diff tr.changed td { background: #fff4d6; }
+.render-diff tr.changed th { color: #8a5a00; }
+.render-links li { word-break: break-all; }

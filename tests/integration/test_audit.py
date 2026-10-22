@@ -68,7 +68,8 @@ TRIGGERS: dict[str, set[str]] = {
     "h1.duplicate": {"/audit/h1-dup-1", "/audit/h1-dup-2"},
     "h1.too_long": {"/audit/h1-long"},
     "h2.missing": OLD_HTML,
-    "canonical.missing": (OLD_HTML - {"/", "/about"}) | {"/audit/canonical-missing"},
+    "canonical.missing": (OLD_HTML - {"/", "/about"})
+    | {"/audit/canonical-missing", "/js-injected"},
     "canonical.to_non_200": {"/audit/canonical-to-404"},
     "canonical.off_site": {"/about", "/audit/canonical-off-site"},
     "canonical.chain": {"/audit/canonical-chain-1"},
@@ -102,6 +103,10 @@ TRIGGERS: dict[str, set[str]] = {
     "pagination.to_non_200": {"/audit/paged-bad-1"},
     "pagination.canonical_to_first": {"/audit/paged-bad-2"},
     "pagination.broken_sequence": {"/audit/paged-bad-2"},
+    # Rendering rules need --render; tests/integration/test_render.py crawls the site with it
+    # and expects /js-injected under render.differs and /audit/render-download under render.failed.
+    "render.differs": set(),
+    "render.failed": set(),
 }
 
 NON_INDEXABLE: dict[str, str] = {

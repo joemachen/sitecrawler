@@ -326,6 +326,7 @@
       use_sitemap: data.get("use_sitemap") === "on",
       respect_robots: data.get("respect_robots") === "on",
       keep_query: data.get("keep_query") === "on",
+      render: data.get("render") === "on",
     };
     return post("/api/crawl/start", body).then(function (c) {
       seq = 0; rev = 0; pages = []; external = []; summary = null;

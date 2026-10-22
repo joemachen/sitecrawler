@@ -2,5 +2,6 @@
 
 from sitecrawler.crawl.control import CrawlControl
 from sitecrawler.crawl.crawler import Crawler
+from sitecrawler.crawl.renderer import Renderer, RenderUnavailableError
 
-__all__ = ["CrawlControl", "Crawler"]
+__all__ = ["CrawlControl", "Crawler", "RenderUnavailableError", "Renderer"]

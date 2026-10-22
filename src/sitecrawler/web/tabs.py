@@ -349,6 +349,29 @@ TABS: tuple[TabSpec, ...] = (
             _R("noindex_in_sitemap", "Noindex in sitemap", "robots.noindex_in_sitemap"),
         ),
     ),
+    TabSpec(
+        "javascript",
+        "JavaScript",
+        (
+            "url",
+            "render_status",
+            "render_changes",
+            "title",
+            "raw_title",
+            "canonical",
+            "raw_canonical",
+            "outlinks",
+            "render_ms",
+            "render_error",
+        ),
+        (
+            ALL,
+            _F("rendered", "Rendered", "render_status", "eq", "rendered"),
+            _F("same", "Same as raw HTML", "render_same", "truthy"),
+            _R("differs", "Changed by JavaScript", "render.differs"),
+            _R("failed", "Render failed", "render.failed"),
+        ),
+    ),
     TabSpec("issues", "Issues", ("rule_id", "severity", "count"), (ALL,), source="issues"),
 )
 """The tab strip, in display order."""

@@ -76,6 +76,26 @@ def crawl(
         int, typer.Option(help="Report redirect_loop after this many hops.")
     ] = 10,
     no_http2: Annotated[bool, typer.Option("--no-http2", help="Use HTTP/1.1 only.")] = False,
+    render: Annotated[
+        bool,
+        typer.Option(
+            "--render",
+            help="Also load each HTML page in headless Chromium and parse the rendered DOM.",
+        ),
+    ] = False,
+    render_workers: Annotated[
+        int, typer.Option(help="Browser tabs open at once (with --render).")
+    ] = 2,
+    render_wait: Annotated[
+        str,
+        typer.Option(help="When a page counts as loaded: load, domcontentloaded or networkidle."),
+    ] = "networkidle",
+    render_selector: Annotated[
+        str, typer.Option(help="CSS selector to wait for after the page loads (with --render).")
+    ] = "",
+    render_timeout: Annotated[
+        float, typer.Option(help="Seconds before a render is given up (with --render).")
+    ] = 30.0,
 ) -> None:
     """Spider a site from URL and write every page found to a CSV."""
     config = CrawlConfig(
@@ -89,6 +109,11 @@ def crawl(
         respect_robots=not ignore_robots,
         max_redirects=max_redirects,
         http2=not no_http2,
+        render=render,
+        render_workers=render_workers,
+        render_wait=render_wait,
+        render_selector=render_selector,
+        render_timeout_seconds=render_timeout,
     )
     run_crawl(config, db=db, resume=resume, output=output)
 

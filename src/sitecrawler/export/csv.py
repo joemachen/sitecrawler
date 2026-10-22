@@ -22,8 +22,10 @@ CSV_FIELDS: tuple[str, ...] = (
     "word_count",
     "fetch_ms",
     "error",
+    "render_changes",
 )
-"""Column order of the pages CSV. Changing this is a breaking change for users."""
+"""Column order of the pages CSV. Changing this is a breaking change for users;
+new columns go at the end."""
 
 
 def _row(record: PageRecord) -> dict[str, str | int]:
@@ -41,6 +43,7 @@ def _row(record: PageRecord) -> dict[str, str | int]:
         "word_count": record.word_count,
         "fetch_ms": record.fetch_ms,
         "error": record.error,
+        "render_changes": record.render.describe() if record.render else record.render_error,
     }
 
 
