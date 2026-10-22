@@ -98,7 +98,8 @@ class FewInlinks(HtmlPageRule):
         "users move around. A page reachable from a single other page (or from "
         "none, when only a sitemap or a nofollow link points at it) gets little "
         "equity and is one broken link away from being an orphan. Links from the "
-        "page to itself and nofollow links do not count."
+        "page to itself and nofollow links do not count. Silent in list mode, where "
+        "the inlinks describe the list rather than the site."
     )
     fix = (
         "Link to the page from a relevant hub, a category or the navigation; "
@@ -107,7 +108,9 @@ class FewInlinks(HtmlPageRule):
 
     def check_html(self, page: PageRecord, crawl: CrawlView) -> Iterable[Issue]:
         """Flag indexable pages (other than the start page) with at most one follow inlink."""
-        if page.found_on == "start" or not indexability(page, crawl).indexable:
+        if crawl.start_page is None or page.found_on == "start":
+            return
+        if not indexability(page, crawl).indexable:
             return
         sources = crawl.link_graph.follow_sources(page.url)
         if len(sources) > FEW_INLINKS:

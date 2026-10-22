@@ -44,7 +44,8 @@ over, how the score is scaled, and where the results are kept.
   own (their parsed links belong to the target, which has its own node).
   Pages with no out-edges spread their rank evenly over every node, the
   textbook treatment, so a 404 or a leaf page does not sink rank. Damping
-  is 0.85, iteration stops when the total change drops below 1e-9 or
+  is 0.85, iteration stops when the total change in rank over one round
+  drops below 1e-6 (more than enough for a score rounded to 0-100) or
   after 100 rounds. Canonicals are ignored for now: a canonicalised page
   keeps its own node. Reason: this is the graph search engines are told to
   follow, and every exclusion matches a rule the audit already has

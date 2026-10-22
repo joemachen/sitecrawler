@@ -101,8 +101,7 @@ def test_self_links_external_links_and_uncrawled_targets_are_ignored() -> None:
     g = view([home, blocked("/b")]).link_graph
     assert g.metrics[f"{SITE}/"].inlinks == 0
     assert g.metrics[f"{SITE}/"].link_score == 100  # everything is equal
-    assert g.metrics_for(f"{SITE}/nope") is None
-    assert g.metrics_for("https://www.site.test/") == g.metrics[f"{SITE}/"]
+    assert f"{SITE}/nope" not in g.metrics
 
 
 def test_empty_crawl_and_single_page() -> None:

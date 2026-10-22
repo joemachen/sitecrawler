@@ -188,7 +188,7 @@ One list of everything search engines will not index, whatever the cause: robots
 
 **Indexable page has one follow inlink or none** (severity: low)
 
-Internal links are how search engines judge which pages matter and how users move around. A page reachable from a single other page (or from none, when only a sitemap or a nofollow link points at it) gets little equity and is one broken link away from being an orphan. Links from the page to itself and nofollow links do not count.
+Internal links are how search engines judge which pages matter and how users move around. A page reachable from a single other page (or from none, when only a sitemap or a nofollow link points at it) gets little equity and is one broken link away from being an orphan. Links from the page to itself and nofollow links do not count. Silent in list mode, where the inlinks describe the list rather than the site.
 
 **Fix:** Link to the page from a relevant hub, a category or the navigation; if it does not deserve that, ask whether it should be indexable at all.
 

@@ -11,6 +11,7 @@ from rich.table import Table
 from sitecrawler.analysis import anchor_texts, link_report
 from sitecrawler.audit import CrawlView
 from sitecrawler.cli._run import err, fail, require_crawl_db
+from sitecrawler.models import LinkMetrics
 from sitecrawler.store import open_store
 
 links_app = typer.Typer(
@@ -43,7 +44,12 @@ def report(
     found = link_report(crawl)
     metrics = crawl.link_graph.metrics
     ranked = sorted(metrics.items(), key=lambda kv: (-kv[1].link_score, kv[0]))
-    shown = ranked if len(ranked) <= 2 * top else [*ranked[:top], None, *ranked[-top:]]
+    if top <= 0:
+        shown: list[tuple[str, LinkMetrics] | None] = []
+    elif len(ranked) <= 2 * top:
+        shown = list(ranked)
+    else:
+        shown = [*ranked[:top], None, *ranked[len(ranked) - top :]]
     table = Table(title=f"Link Score in {db}")
     table.add_column("URL")
     table.add_column("Score", justify="right")

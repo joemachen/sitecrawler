@@ -25,7 +25,7 @@ DAMPING = 0.85
 """PageRank damping factor: the share of rank that follows links rather than teleporting."""
 
 MAX_ITERATIONS = 100
-TOLERANCE = 1e-9
+TOLERANCE = 1e-6
 """Stop iterating when the total change in rank over one round is below this."""
 
 
@@ -98,11 +98,6 @@ class LinkGraph:
             return target
         final = self._crawl.page_for(target.final_url)
         return final if final is not None and final is not target else target
-
-    def metrics_for(self, url: str) -> LinkMetrics | None:
-        """Metrics of the page at ``url`` (any form), or None when it was not crawled."""
-        page = self._crawl.page_for(url)
-        return self.metrics.get(page.url) if page else None
 
     def follow_sources(self, url: str) -> list[str]:
         """The other pages with a follow link to ``url``, sorted."""

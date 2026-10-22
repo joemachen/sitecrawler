@@ -118,6 +118,10 @@ def test_links_report_command(crawled_db: Path, site: str) -> None:
     full = runner.invoke(app, ["links", "report", str(crawled_db), "--top", "100"])
     assert full.exit_code == 0
     assert "..." not in full.output.split("error\t")[0]
+    none = runner.invoke(app, ["links", "report", str(crawled_db), "--top", "0"])
+    assert none.exit_code == 0
+    assert re.search(rf"{re.escape(site)}/\W+100", _squash(none.output)) is None
+    assert f"error\t{site}/\t{site}/missing" in none.output
 
 
 def test_links_anchors_command(crawled_db: Path, site: str) -> None:

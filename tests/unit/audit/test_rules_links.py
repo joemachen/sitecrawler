@@ -55,6 +55,8 @@ def test_few_inlinks_counts_follow_links_from_other_pages() -> None:
         "/orphan": "no follow inlinks",
         "/other": "no follow inlinks",
     }
+    listed = [page("/a", found_on="list"), page("/b", found_on="list", links=links("/a"))]
+    assert flagged(FewInlinks(), listed) == {}  # list mode: the inlinks describe the list
 
 
 def test_high_depth_flags_indexable_pages_over_three_clicks() -> None:
