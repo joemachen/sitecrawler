@@ -30,6 +30,7 @@ from sitecrawler.models import (
     PageRecord,
     QueueItem,
     RedirectHop,
+    RenderDiff,
     ResumeState,
     Severity,
 )
@@ -40,6 +41,7 @@ from sitecrawler.store.schema import (
     IssueRow,
     LinkRow,
     PageHtmlRow,
+    PageRenderRow,
     PageRow,
     RedirectHopRow,
     SitemapUrlRow,
@@ -219,6 +221,7 @@ class Store:
                 if record.outcome is Outcome.FETCHED
                 else None
             )
+            page.render = _render_row(record)
             page.hreflang = [HreflangRow(lang=h.lang, href=h.href) for h in record.hreflang]
             src_host = urlparse(record.url).netloc
             page.links = [
@@ -364,7 +367,7 @@ class Store:
             select(PageRow)
             .where(PageRow.state == "done")
             .order_by(PageRow.url)
-            .options(selectinload(PageRow.html))
+            .options(selectinload(PageRow.html), selectinload(PageRow.render))
         )
         with Session(self.engine) as session:
             rows = session.scalars(stmt).all()
@@ -425,6 +428,59 @@ class Store:
         )
 
 
+def _render_row(record: PageRecord) -> PageRenderRow | None:
+    """The ``page_render`` row for ``record``, or None when rendering was not tried."""
+    diff = record.render
+    if diff is None:
+        if not record.render_error:
+            return None
+        return PageRenderRow(ok=False, render_ms=record.render_ms, error=record.render_error)
+    return PageRenderRow(
+        ok=True,
+        render_ms=record.render_ms,
+        raw_title=diff.raw_title,
+        rendered_title=diff.rendered_title,
+        raw_meta_description=diff.raw_meta_description,
+        rendered_meta_description=diff.rendered_meta_description,
+        raw_meta_robots=diff.raw_meta_robots,
+        rendered_meta_robots=diff.rendered_meta_robots,
+        raw_canonical=diff.raw_canonical,
+        rendered_canonical=diff.rendered_canonical,
+        raw_h1=diff.raw_h1,
+        rendered_h1=diff.rendered_h1,
+        raw_word_count=diff.raw_word_count,
+        rendered_word_count=diff.rendered_word_count,
+        raw_link_count=diff.raw_link_count,
+        rendered_link_count=diff.rendered_link_count,
+        links_added_json=json.dumps(list(diff.links_added)),
+        links_removed_json=json.dumps(list(diff.links_removed)),
+    )
+
+
+def render_diff_from_row(row: PageRenderRow | None) -> RenderDiff | None:
+    """Rebuild the :class:`~sitecrawler.models.RenderDiff` stored in ``row``, if it rendered."""
+    if row is None or not row.ok:
+        return None
+    return RenderDiff(
+        raw_title=row.raw_title,
+        rendered_title=row.rendered_title,
+        raw_meta_description=row.raw_meta_description,
+        rendered_meta_description=row.rendered_meta_description,
+        raw_meta_robots=row.raw_meta_robots,
+        rendered_meta_robots=row.rendered_meta_robots,
+        raw_canonical=row.raw_canonical,
+        rendered_canonical=row.rendered_canonical,
+        raw_h1=row.raw_h1,
+        rendered_h1=row.rendered_h1,
+        raw_word_count=row.raw_word_count,
+        rendered_word_count=row.rendered_word_count,
+        raw_link_count=row.raw_link_count,
+        rendered_link_count=row.rendered_link_count,
+        links_added=tuple(json.loads(row.links_added_json)),
+        links_removed=tuple(json.loads(row.links_removed_json)),
+    )
+
+
 def _to_record(
     row: PageRow,
     hops: Sequence[RedirectHop],
@@ -464,4 +520,7 @@ def _to_record(
         hreflang=tuple(hreflang),
         rel_prev=html.rel_prev if html else "",
         rel_next=html.rel_next if html else "",
+        render=render_diff_from_row(row.render),
+        render_ms=row.render.render_ms if row.render else 0,
+        render_error=row.render.error if row.render else "",
     )

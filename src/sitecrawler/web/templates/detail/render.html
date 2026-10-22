@@ -1,0 +1,51 @@
+{% from "detail/_macros.html" import field %}
+{% set page = detail.page %}
+{% set diff = page.render %}
+<h2>Rendering</h2>
+{% if diff is none and not page.render_error %}
+<p class="muted" data-render="none">Not rendered. Crawl with <code>--render</code> (or tick <em>Render JavaScript</em> in Settings) to compare the raw HTML with what a browser builds.</p>
+{% elif diff is none %}
+<table class="plain fields" data-render="failed">
+  {{ field("Render", "failed") }}
+  {{ field("Error", page.render_error) }}
+  {{ field("Render time (ms)", page.render_ms) }}
+</table>
+{% else %}
+<table class="plain fields" data-render="{{ 'changed' if diff.changed else 'same' }}">
+  {{ field("Render", "rendered") }}
+  {{ field("Render time (ms)", page.render_ms) }}
+  {{ field("Changed by JavaScript", diff.describe() or "nothing the audit reads") }}
+</table>
+<table class="plain render-diff">
+  <thead><tr><th>Field</th><th>Raw HTML</th><th>Rendered DOM</th></tr></thead>
+  <tbody>
+  {% for name, raw, rendered in [
+      ("Title", diff.raw_title, diff.rendered_title),
+      ("Meta description", diff.raw_meta_description, diff.rendered_meta_description),
+      ("Meta robots", diff.raw_meta_robots, diff.rendered_meta_robots),
+      ("Canonical", diff.raw_canonical, diff.rendered_canonical),
+      ("H1", diff.raw_h1, diff.rendered_h1),
+      ("Word count", diff.raw_word_count, diff.rendered_word_count),
+      ("Links", diff.raw_link_count, diff.rendered_link_count),
+  ] %}
+    <tr class="{{ 'changed' if raw != rendered else '' }}" data-field="{{ name | lower | replace(' ', '_') }}">
+      <th>{{ name }}</th>
+      <td>{% if raw == "" %}<span class="muted">–</span>{% else %}{{ raw }}{% endif %}</td>
+      <td>{% if rendered == "" %}<span class="muted">–</span>{% else %}{{ rendered }}{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% if diff.links_added %}
+<h3>Links only after rendering <span class="muted">({{ diff.links_added | length }})</span></h3>
+<ul class="render-links" data-links="added">
+  {% for href in diff.links_added %}<li>{{ href }}</li>{% endfor %}
+</ul>
+{% endif %}
+{% if diff.links_removed %}
+<h3>Links only before rendering <span class="muted">({{ diff.links_removed | length }})</span></h3>
+<ul class="render-links" data-links="removed">
+  {% for href in diff.links_removed %}<li>{{ href }}</li>{% endfor %}
+</ul>
+{% endif %}
+{% endif %}

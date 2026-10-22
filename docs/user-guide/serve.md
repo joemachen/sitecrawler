@@ -24,7 +24,8 @@ rule-backed filters fill while the crawl runs. **Pause** holds the crawl
 after the fetches in flight; **Resume** continues it; **Stop** ends it
 early; **Clear** forgets it and returns to an empty screen. **Settings**
 holds the same options as the `crawl` command: max pages, delay, workers,
-timeout, sitemaps, robots.txt, query strings.
+timeout, sitemaps, robots.txt, query strings, and **Render JavaScript**
+(see [JavaScript rendering](render.md); needs Chromium installed).
 
 Each crawl is written to its own file, `crawls/<host>-<timestamp>.db`
 under `--crawls-dir`, as it runs. When the crawl ends the final audit is
@@ -60,8 +61,9 @@ One page, three panes:
   pages, indexable, non-indexable and issue totals.
 - **Detail pane** at the bottom. Click a row and the pane shows that URL:
   **URL Details** (response, timing, depth), **HTML** (title, metas,
-  headings, canonical, robots), **Inlinks**, **Outlinks**, **Redirects**,
-  **HTTP Headers**, **Hreflang** and **Issues**. A link in Inlinks or
+  headings, canonical, robots), **Rendering** (raw HTML next to the
+  rendered DOM, for a crawl run with Render JavaScript on), **Inlinks**,
+  **Outlinks**, **Redirects**, **HTTP Headers**, **Hreflang** and **Issues**. A link in Inlinks or
   Outlinks selects that URL in turn; **Open full page** shows everything
   on one page you can bookmark.
 
@@ -76,6 +78,7 @@ are computed from the page itself.
 | Tab | Filters |
 | --- | --- |
 | Internal | HTML, Other content, Indexable, Non-indexable |
+| JavaScript | Rendered, Same as raw HTML, Changed by JavaScript, Render failed (crawls run with Render JavaScript) |
 | External | Link targets on other hosts (not fetched); Only nofollow links |
 | Response Codes | 2xx, 3xx, 4xx, 5xx, Blocked by robots.txt, No response, redirect chain / loop / to error / off-site / temporary |
 | URL | Non-ASCII, Uppercase, Underscores, Parameters, Over 115 characters |

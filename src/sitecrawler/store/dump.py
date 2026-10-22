@@ -24,6 +24,7 @@ from sitecrawler.store.schema import (
     RedirectHopRow,
     SitemapUrlRow,
 )
+from sitecrawler.store.store import render_diff_from_row
 
 if TYPE_CHECKING:
     from sitecrawler.store.store import Store
@@ -76,8 +77,21 @@ PAGE_COLUMNS: tuple[str, ...] = (
     "fetched_at",
     "indexable",
     "indexability_reason",
+    "render_status",
+    "render_changes",
 )
 """Column names of the ``pages`` dump, in order."""
+
+
+def _render_cells(page: PageRow) -> tuple[str, str]:
+    """``render_status`` (``rendered``, ``failed`` or empty) and what changed, or the error."""
+    row = page.render
+    if row is None:
+        return "", ""
+    diff = render_diff_from_row(row)
+    if diff is None:
+        return "failed", row.error
+    return "rendered", diff.describe()
 
 
 def _iso(value: datetime | None) -> str | None:
@@ -111,6 +125,7 @@ def _page_row(page: PageRow) -> tuple[Cell, ...]:
         _iso(page.fetched_at),
         page.indexable,
         page.indexability_reason,
+        *_render_cells(page),
     )
 
 
@@ -119,7 +134,7 @@ def _pages(session: Session) -> TableDump:
         select(PageRow)
         .where(PageRow.state == "done")
         .order_by(PageRow.url)
-        .options(selectinload(PageRow.html))
+        .options(selectinload(PageRow.html), selectinload(PageRow.render))
     ).all()
     return TableDump("pages", PAGE_COLUMNS, [_page_row(p) for p in pages])
 

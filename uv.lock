@@ -1572,6 +1572,11 @@ dependencies = [
     { name = "uvicorn" },
 ]
 
+[package.optional-dependencies]
+render = [
+    { name = "playwright" },
+]
+
 [package.dev-dependencies]
 dev = [
     { name = "lxml-stubs" },
@@ -1597,11 +1602,13 @@ requires-dist = [
     { name = "jinja2", specifier = ">=3.1" },
     { name = "lxml", specifier = ">=5.3" },
     { name = "openpyxl", specifier = ">=3.1" },
+    { name = "playwright", marker = "extra == 'render'", specifier = ">=1.49" },
     { name = "rich", specifier = ">=13.9" },
     { name = "sqlalchemy", specifier = ">=2.0" },
     { name = "typer", specifier = ">=0.15" },
     { name = "uvicorn", specifier = ">=0.34" },
 ]
+provides-extras = ["render"]
 
 [package.metadata.requires-dev]
 dev = [

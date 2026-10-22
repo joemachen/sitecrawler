@@ -59,6 +59,7 @@ def crawl_json(rows: RowStore) -> dict[str, object]:
 DETAIL_SUBS: tuple[tuple[str, str], ...] = (
     ("details", "URL Details"),
     ("html", "HTML"),
+    ("render", "Rendering"),
     ("inlinks", "Inlinks"),
     ("outlinks", "Outlinks"),
     ("redirects", "Redirects"),
@@ -163,6 +164,8 @@ class StartRequest(BaseModel):
     use_sitemap: bool = True
     keep_query: bool = False
     respect_robots: bool = True
+    render: bool = False
+    """Load every HTML page in headless Chromium as well; needs Playwright installed."""
 
     def to_config(self) -> CrawlConfig:
         """The crawl config these options describe."""
@@ -175,6 +178,7 @@ class StartRequest(BaseModel):
             use_sitemap=self.use_sitemap,
             keep_query=self.keep_query,
             respect_robots=self.respect_robots,
+            render=self.render,
         )
 
 

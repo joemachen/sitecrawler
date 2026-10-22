@@ -36,6 +36,14 @@ def audit(
     for row in result.counts():
         table.add_row(row.rule.severity.value, row.rule.id, str(row.count), row.rule.summary)
     err.print(table)
+    rendered = [p for p in crawl.pages if p.rendered or p.render_error]
+    if rendered:
+        changed = sum(1 for p in rendered if p.render is not None and p.render.changed)
+        failed = sum(1 for p in rendered if p.render_error)
+        err.print(
+            f"Rendered {len(rendered)} pages in headless Chromium: {changed} differ from "
+            f"their raw HTML (render.differs), {failed} could not be rendered (render.failed)."
+        )
     non_indexable = sum(1 for v in result.verdicts.values() if not v.indexable)
     err.print(
         f"[green]{stored} issues across {len(result.counts())} rules on "

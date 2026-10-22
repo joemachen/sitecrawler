@@ -49,6 +49,18 @@ class CrawlConfig:
     """List mode: fetch exactly these URLs instead of spidering from ``start_url``."""
     follow_links: bool = True
     """Queue the links found on each page. Off by default in list mode (see CLI)."""
+    render: bool = False
+    """Also load every HTML page in headless Chromium and parse the rendered DOM."""
+    render_workers: int = 2
+    """Browser tabs open at once; separate from ``workers`` because tabs are expensive."""
+    render_wait: str = "networkidle"
+    """When the page counts as loaded: ``load``, ``domcontentloaded`` or ``networkidle``."""
+    render_selector: str = ""
+    """CSS selector to wait for after ``render_wait``, for apps that fetch their content."""
+    render_timeout_seconds: float = 30.0
+    """Give up rendering a page after this long; the raw HTML is kept and the failure recorded."""
+    render_block: tuple[str, ...] = ("image", "font", "media")
+    """Resource types the browser is not allowed to load, for speed."""
 
 
 @dataclass(slots=True, frozen=True)
@@ -184,6 +196,85 @@ class FetchResult:
         return self.outcome is Outcome.FETCHED and "html" in self.content_type
 
 
+@dataclass(slots=True, frozen=True)
+class RenderResult:
+    """What headless Chromium produced for one URL. No parsing has happened yet."""
+
+    url: str
+    ok: bool
+    html: str = ""
+    """The DOM serialised after the page settled; empty when ``ok`` is False."""
+    final_url: str = ""
+    status_code: int | None = None
+    elapsed_ms: int = 0
+    error: str = ""
+
+
+@dataclass(slots=True, frozen=True)
+class RenderDiff:
+    """How the rendered DOM of one page differs from its raw HTML.
+
+    Both sides are kept for every compared field so the UI can show them next
+    to each other; :attr:`changes` names the ones that differ.
+    """
+
+    raw_title: str = ""
+    rendered_title: str = ""
+    raw_meta_description: str = ""
+    rendered_meta_description: str = ""
+    raw_meta_robots: str = ""
+    rendered_meta_robots: str = ""
+    raw_canonical: str = ""
+    rendered_canonical: str = ""
+    raw_h1: str = ""
+    rendered_h1: str = ""
+    raw_word_count: int = 0
+    rendered_word_count: int = 0
+    raw_link_count: int = 0
+    """Distinct hrefs in the raw HTML."""
+    rendered_link_count: int = 0
+    links_added: tuple[str, ...] = ()
+    """Hrefs that exist only after rendering."""
+    links_removed: tuple[str, ...] = ()
+    """Hrefs that exist only before rendering."""
+
+    @property
+    def changes(self) -> tuple[str, ...]:
+        """Names of the fields that differ.
+
+        Drawn from ``title``, ``meta description``, ``meta robots``,
+        ``canonical``, ``h1`` and ``links``.
+        """
+        pairs = (
+            ("title", self.raw_title, self.rendered_title),
+            ("meta description", self.raw_meta_description, self.rendered_meta_description),
+            ("meta robots", self.raw_meta_robots, self.rendered_meta_robots),
+            ("canonical", self.raw_canonical, self.rendered_canonical),
+            ("h1", self.raw_h1, self.rendered_h1),
+        )
+        changed = [name for name, raw, rendered in pairs if raw != rendered]
+        if self.links_added or self.links_removed:
+            changed.append("links")
+        return tuple(changed)
+
+    @property
+    def changed(self) -> bool:
+        """True when JavaScript changed anything the audit looks at."""
+        return bool(self.changes)
+
+    def describe(self) -> str:
+        """``title, canonical, links +3/-1``: the changes in one line, empty when none."""
+        parts = [name for name in self.changes if name != "links"]
+        if "links" in self.changes:
+            counts = [
+                f"{sign}{n}"
+                for sign, n in (("+", len(self.links_added)), ("-", len(self.links_removed)))
+                if n
+            ]
+            parts.append(f"links {'/'.join(counts)}")
+        return ", ".join(parts)
+
+
 @dataclass(slots=True)
 class ParsedPage:
     """What the parser extracted from one HTML document."""
@@ -249,6 +340,19 @@ class PageRecord:
     hreflang: tuple[HreflangRef, ...] = ()
     rel_prev: str = ""
     rel_next: str = ""
+    render: RenderDiff | None = None
+    """Rendered-vs-raw comparison; ``None`` unless the page was rendered successfully.
+
+    When set, the parsed fields above (title, links, ...) are the rendered ones."""
+    render_ms: int = 0
+    """Time spent in the browser, 0 when the page was not rendered."""
+    render_error: str = ""
+    """Why rendering failed; the parsed fields then come from the raw HTML."""
+
+    @property
+    def rendered(self) -> bool:
+        """True when the parsed fields come from the rendered DOM."""
+        return self.render is not None
 
     @property
     def status(self) -> str:

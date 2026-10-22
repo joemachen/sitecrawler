@@ -6,6 +6,35 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+Phase 5: JavaScript rendering.
+
+### Added
+
+- `sitecrawler crawl --render` loads every parsable HTML page in headless
+  Chromium (Playwright, async API) after the raw fetch and parses the
+  rendered DOM: the page's title, metas, canonical, links and word count
+  are then what a browser sees, and links that only exist after rendering
+  are crawled. `--render-workers` (default 2 tabs), `--render-wait`
+  (`load`, `domcontentloaded`, `networkidle`), `--render-selector` and
+  `--render-timeout` tune it; images, fonts and media are never loaded.
+  Playwright is the optional extra `sitecrawler[render]`; without it
+  `--render` exits 2 with the install commands before any request.
+- A rendered-vs-raw diff per page (`RenderDiff`, table `page_render`):
+  title, meta description, meta robots, canonical, H1, word count and link
+  count on both sides, plus the links present only after or only before
+  rendering. A page the browser could not load keeps its raw fields and
+  records the error.
+- Rules `render.differs` (medium, names the changed fields) and
+  `render.failed` (low); `audit` prints a one-line rendering summary.
+- Web UI: **Render JavaScript** in Settings, a **JavaScript** tab (Rendered,
+  Same as raw HTML, Changed by JavaScript, Render failed) and a
+  **Rendering** detail section with raw and rendered values side by side.
+- Exports: `render_status` and `render_changes` columns on `pages`; the
+  CSV gains `render_changes` as its last column.
+- Fixture page `/js-injected`, whose title, canonical and three links exist
+  only after its script runs; `tests/integration/test_render.py` crawls it
+  with and without `--render`. ADR-0008 records the design.
+
 ## [0.5.0] - 2026-10-21
 
 Phase 4: live crawl UI.

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Raw title before JavaScript runs on this page</title>
+  <meta name="description" content="A page whose title, canonical and links only exist after its script runs, so the raw HTML and the rendered DOM differ.">
+</head>
+<body>
+  <h1>JavaScript-injected page</h1>
+  <h2>What the script adds</h2>
+  <p>Before the script runs this page has no canonical tag and no links at all; the words of copy here keep the word count the same.</p>
+  <ul id="nav"></ul>
+  <script>
+    document.title = "Rendered title set by JavaScript on load";
+    var canonical = document.createElement("link");
+    canonical.rel = "canonical";
+    canonical.href = "/js-injected";
+    document.head.appendChild(canonical);
+    var targets = [["/about", "About"], ["/blog/", "Blog"], ["/audit/", "Audit fixtures"]];
+    var nav = document.getElementById("nav");
+    targets.forEach(function (pair) {
+      var item = document.createElement("li");
+      var link = document.createElement("a");
+      link.setAttribute("href", pair[0]);
+      link.textContent = pair[1];
+      item.appendChild(link);
+      nav.appendChild(item);
+    });
+  </script>
+</body>
+</html>

@@ -300,6 +300,24 @@ A redirect promises a replacement page; landing on an error instead is worse tha
 
 **Fix:** Redirect to a live, relevant page, or remove the redirect and let the URL return 404 or 410 honestly.
 
+## Rendering
+
+### `render.differs`
+
+**Title, canonical, meta or links change when JavaScript runs** (severity: medium)
+
+Google does run JavaScript, but in a second pass that can lag the raw crawl by days, and most other crawlers, social previews and AI agents never run it. A title, canonical, robots directive or navigation link that only exists after rendering is seen late or not at all, and one that the script changes leaves two versions of the page competing for the same URL.
+
+**Fix:** Put the title, canonical, meta tags and the links that matter in the server-rendered HTML, and let JavaScript enhance the page rather than define it. If the framework cannot, use server-side rendering or pre-rendering for crawlers.
+
+### `render.failed`
+
+**Page could not be rendered in headless Chromium** (severity: low)
+
+The HTML was fetched, but the browser did not finish loading the page within the render timeout, so what JavaScript adds to it is unknown for this URL. Googlebot gives up on slow pages too, and indexes whatever it had by then.
+
+**Fix:** Open the page with the browser's network panel: long-polling, slow third-party scripts or endless retries keep it from going idle. Fix the page, or crawl with --render-wait load or a longer --render-timeout.
+
 ## Response codes
 
 ### `response.4xx`

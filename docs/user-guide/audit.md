@@ -24,6 +24,11 @@ uv run sitecrawler issues example.db --rule response.4xx | cut -f3 > broken.txt
 Both tables are also in the xlsx and json exports (`issues` sheet, and the
 `indexable` / `indexability_reason` columns on `pages`).
 
+On a crawl run with `--render`, `audit` also prints how many pages were
+rendered, how many differ from their raw HTML (`render.differs`) and how
+many the browser could not load (`render.failed`); see
+[JavaScript rendering](render.md).
+
 ## Indexability
 
 Every page gets a verdict: indexable, or not indexable with the first reason

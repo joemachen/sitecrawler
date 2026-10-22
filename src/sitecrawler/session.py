@@ -162,8 +162,9 @@ def _config_from_json(start_url: str, config_json: str) -> CrawlConfig:
     data: dict[str, Any] = json.loads(config_json or "{}")  # Any: asdict(CrawlConfig) round-trip
     names = {f.name for f in fields(CrawlConfig)}
     kwargs = {k: v for k, v in data.items() if k in names}
-    if "seed_urls" in kwargs:
-        kwargs["seed_urls"] = tuple(kwargs["seed_urls"])
+    for name in ("seed_urls", "render_block"):
+        if name in kwargs:
+            kwargs[name] = tuple(kwargs[name])
     kwargs.setdefault("start_url", start_url)
     return CrawlConfig(**kwargs)
 
