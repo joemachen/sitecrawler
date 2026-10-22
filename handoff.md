@@ -1,7 +1,7 @@
 # Handoff: sitecrawler
 
 Read this first in a new session. It is the state of the project as of
-2026-10-22 (v0.6.0 released; Phase 6 implemented on PR #PRNUM, awaiting
+2026-10-22 (v0.6.0 released; Phase 6 implemented on PR #31, awaiting
 merge and the v0.7.0 release) and everything that is not obvious from the
 code.
 
@@ -65,7 +65,7 @@ links feed the frontier, the raw values are kept in a `RenderDiff` stored
 in `page_render`, and the two HTML bodies are not stored.
 
 **Phase 6 (custom extraction and custom search) is implemented** on one
-PR, `feat/extract` (#PRNUM), branched from `main` after v0.6.0. It is not
+PR, `feat/extract` (#31), branched from `main` after v0.6.0. It is not
 released: v0.7.0 waits for Joe's go-ahead. ADR-0009 records the design
 call: extractors run inside `Crawler._fetch_and_parse` over the text the
 page was parsed from (the rendered DOM under `--render`), the HTML bodies
@@ -196,7 +196,7 @@ Open:
   serve HTTPS (see the note under Phase 2 in the roadmap).
 - Dependabot's older uv can produce lockfile-downgrading PRs (#4 was closed
   for that); read the lock diff before merging.
-- Next: merge #PRNUM once CI is green (squash, like #28), then ask Joe
+- Next: merge #31 once CI is green (squash, like #28), then ask Joe
   before releasing **v0.7.0** (the release recipe is #29: bump
   `pyproject.toml` and `__init__.py`, move the CHANGELOG Unreleased block
   under the version, PR, merge, annotated tag). After that, **Phase 7, XML
