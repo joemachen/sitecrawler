@@ -1,9 +1,8 @@
 # Handoff: sitecrawler
 
 Read this first in a new session. It is the state of the project as of
-2026-10-22 (v0.6.0 released; Phase 6 implemented on PR #31, awaiting
-merge and the v0.7.0 release) and everything that is not obvious from the
-code.
+2026-10-22 (v0.7.0 released, Phase 7 not started) and everything that is
+not obvious from the code.
 
 ## What this is
 
@@ -64,10 +63,14 @@ heuristic), the rendered fields become the page record and rendered-only
 links feed the frontier, the raw values are kept in a `RenderDiff` stored
 in `page_render`, and the two HTML bodies are not stored.
 
-**Phase 6 (custom extraction and custom search) is implemented** on one
-PR, `feat/extract` (#31), branched from `main` after v0.6.0. It is not
-released: v0.7.0 waits for Joe's go-ahead. ADR-0009 records the design
-call: extractors run inside `Crawler._fetch_and_parse` over the text the
+**Phase 6 (custom extraction and custom search) is complete and released
+as v0.7.0** (annotated tag on `main`, 2026-10-22). One PR, `feat/extract`
+(#31, squash-merged as 6e69cb5), then `chore/release-v0.7.0` (#32) and
+`docs/handoff-v0.7.0` (#33). A `/code-review` pass on #31 found an XPath
+expression that compiles but fails at evaluation (an XPath 2.0 function)
+would have turned every page into an ERROR record; every XPath is now
+probed against a tiny document at compile time and a page-specific failure
+counts as no match. ADR-0009 records the design call: extractors run inside `Crawler._fetch_and_parse` over the text the
 page was parsed from (the rendered DOM under `--render`), the HTML bodies
 are still not stored, and lxml + cssselect replaced BeautifulSoup (every
 existing parser test stayed green; `tests/unit/test_html.py` gained edge
@@ -196,11 +199,13 @@ Open:
   serve HTTPS (see the note under Phase 2 in the roadmap).
 - Dependabot's older uv can produce lockfile-downgrading PRs (#4 was closed
   for that); read the lock diff before merging.
-- Next: merge #31 once CI is green (squash, like #28), then ask Joe
-  before releasing **v0.7.0** (the release recipe is #29: bump
-  `pyproject.toml` and `__init__.py`, move the CHANGELOG Unreleased block
-  under the version, PR, merge, annotated tag). After that, **Phase 7, XML
-  sitemap audit and generation** in `docs/ROADMAP.md`.
+- Next piece of work: **Phase 7, XML sitemap audit and generation**
+  (`docs/ROADMAP.md`). The release recipe is #32: bump `pyproject.toml`,
+  `__init__.py` and `uv.lock` (`uv lock`), date the CHANGELOG Unreleased
+  block, PR, squash-merge, annotated tag on `main`, then a handoff PR.
+- GitHub's auto-merge cannot be enabled on this private repository (the
+  settings PATCH is accepted and ignored), so PRs are merged by hand with
+  `gh pr merge N --squash` once `gh pr checks N` is green.
 - Phase 6 left for later: storing raw and rendered HTML bodies behind a
   flag so extractors can be re-run on a finished crawl (ADR-0009 names it
   as the obvious next step; today a changed extractor means crawling
@@ -219,7 +224,8 @@ Open:
   file). Summary counts are recomputed per `(seq, audit_rev)` over every
   filter of every tab; fine at 10k pages, not profiled beyond.
 - Merged branches `feat/render`, `chore/release-v0.6.0`,
-  `docs/handoff-v0.6.0` and (once merged) `feat/extract` may still exist on origin (Claude Code's sandbox
+  `docs/handoff-v0.6.0`, `feat/extract`, `chore/release-v0.7.0` and
+  `docs/handoff-v0.7.0` may still exist on origin (Claude Code's sandbox
   refuses `git push --delete`); delete them by hand if `git branch -r`
   still lists them. The local checkout also carries every merged Phase 3
   and 4 branch plus a `.claude/worktrees/` entry for the Phase 5 session;
