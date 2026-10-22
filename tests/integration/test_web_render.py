@@ -44,10 +44,14 @@ def test_render_setting_renders_the_crawl_and_fills_the_javascript_tab(
     assert rows[f"{site}/about"]["render_status"] == "rendered"
     assert rows[f"{site}/about"]["render_changes"] == ""
     assert rows[f"{site}/missing"]["render_status"] == ""
+    download = rows[f"{site}/audit/render-download"]
+    assert download["render_status"] == "failed"
+    assert download["render_error"].startswith("render failed: ")
+    assert "render.failed" in download["rules"]
 
     tabs = client.get("/api/summary").json()["tabs"]["javascript"]
     assert tabs["differs"] == 1
-    assert tabs["failed"] == 0
+    assert tabs["failed"] == 1
     assert tabs["rendered"] == tabs["same"] + 1
     assert tabs["rendered"] > 1
 

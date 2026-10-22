@@ -14,6 +14,7 @@ from pathlib import Path
 import pytest
 from pytest_httpserver import HTTPServer
 from typer.testing import CliRunner
+from werkzeug.wrappers import Request, Response
 
 from sitecrawler.audit import CrawlView, run_audit
 from sitecrawler.cli.main import app
@@ -101,9 +102,14 @@ def test_every_other_html_page_renders_the_same_as_its_raw_html(
     assert set(rendered) == set(site_pages())
     html = {path: r for path, r in rendered.items() if r.render is not None}
     assert "/js-injected" in html
-    assert not any(r.render_error for r in rendered.values()), "nothing failed to render"
+    failed = sorted(path for path, r in rendered.items() if r.render_error)
+    assert failed == ["/audit/render-download"], "the download fixture is the only failure"
+    assert rendered["/audit/render-download"].render_error.startswith("render failed: ")
     differing = sorted(path for path, r in html.items() if r.render and r.render.changed)
     assert differing == ["/js-injected"]
+    # redirect sources carry the target's content and are not rendered themselves
+    assert rendered["/redirect-start"].render is None
+    assert rendered["/redirect-start"].render_error == ""
     # pages that are not parsable HTML are never rendered
     assert rendered["/missing"].render is None
     assert rendered["/audit/server-error"].render is None
@@ -116,7 +122,7 @@ def test_render_rules_fire_only_on_the_fixture_page(rendered: dict[str, PageReco
     for issue in result.issues:
         by_rule.setdefault(issue.rule_id, set()).add(issue.url.rsplit("/", 1)[-1])
     assert by_rule["render.differs"] == {"js-injected"}
-    assert "render.failed" not in by_rule
+    assert by_rule["render.failed"] == {"render-download"}
     message = next(i.message for i in result.issues if i.rule_id == "render.differs")
     assert message == "title, canonical, links +3"
     # the rendered canonical is self-referencing, so canonical.missing no longer fires
@@ -141,6 +147,38 @@ def test_render_timeout_is_reported_not_raised(site: str) -> None:
     assert page.render_ms > 0
 
 
+def test_render_that_gets_an_http_error_keeps_the_raw_parse(
+    site: str, httpserver: HTTPServer
+) -> None:
+    """The second (browser) request may be throttled; its error page must not become the page."""
+    hits: list[int] = []
+
+    def flaky(_request: Request) -> Response:
+        hits.append(len(hits))
+        if len(hits) == 1:
+            return Response(
+                "<html><head><title>Real title</title></head><body><h1>Real</h1></body></html>",
+                content_type="text/html",
+            )
+        return Response(
+            "<html><head><title>Service Unavailable</title></head></html>",
+            status=503,
+            content_type="text/html",
+        )
+
+    httpserver.expect_request("/audit/flaky").respond_with_handler(flaky)
+    config = CrawlConfig(
+        seed_urls=(f"{site}/audit/flaky",), follow_links=False, delay_seconds=0, render=True
+    )
+    (page,) = Crawler(config).run()
+    assert len(hits) == 2, "one raw fetch, one browser load"
+    assert page.status_code == 200
+    assert page.title == "Real title"
+    assert page.render is None
+    assert page.render_error == "render returned HTTP 503"
+    assert page.render_ms > 0
+
+
 def test_cli_render_stores_the_diff_and_audit_reports_it(site: str, tmp_path: Path) -> None:
     db = tmp_path / "crawl.db"
     runner = CliRunner()
@@ -160,7 +198,7 @@ def test_cli_render_stores_the_diff_and_audit_reports_it(site: str, tmp_path: Pa
     flat = " ".join(audit.output.split())
     assert "render.differs" in flat
     assert "1 differ from their raw HTML" in flat
-    assert "0 could not be rendered" in flat
+    assert "1 could not be rendered" in flat
 
     issues = runner.invoke(app, ["issues", str(db), "--rule", "render.differs"])
     assert issues.exit_code == 0, issues.output

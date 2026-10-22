@@ -162,9 +162,10 @@ def _config_from_json(start_url: str, config_json: str) -> CrawlConfig:
     data: dict[str, Any] = json.loads(config_json or "{}")  # Any: asdict(CrawlConfig) round-trip
     names = {f.name for f in fields(CrawlConfig)}
     kwargs = {k: v for k, v in data.items() if k in names}
-    for name in ("seed_urls", "render_block"):
-        if name in kwargs:
-            kwargs[name] = tuple(kwargs[name])
+    # JSON turned every tuple field into a list; CrawlConfig is hashable only with tuples.
+    tuple_fields = {f.name for f in fields(CrawlConfig) if str(f.type).startswith("tuple")}
+    for name in tuple_fields & kwargs.keys():
+        kwargs[name] = tuple(kwargs[name])
     kwargs.setdefault("start_url", start_url)
     return CrawlConfig(**kwargs)
 

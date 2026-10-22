@@ -237,14 +237,18 @@ class Crawler:
         if final and not self.frontier.in_scope(urlparse(final).netloc):
             record.error = f"redirected off-site to {result.final_url}"
             return record, []
-        if final and final != item.url:
+        redirected = final is not None and final != item.url
+        if final and redirected:
             record.canonical = final  # overwritten below if the page declares one
 
         if not self._is_parsable(result):
             return record, []
 
         page = parse_html(result.text, result.final_url)
-        if self.renderer is not None:
+        # A redirect source is never audited as HTML (its content belongs to the
+        # target, which is rendered on its own), so rendering it would spend a
+        # browser load for nothing.
+        if self.renderer is not None and not redirected:
             page = await self._render(record, result, page)
         record.title = page.title
         record.meta_description = page.meta_description
@@ -284,7 +288,13 @@ class Crawler:
             record.render_error = rendered.error
             log.warning("could not render %s: %s", record.url, rendered.error)
             return raw
-        page = parse_html(rendered.html, rendered.final_url or result.final_url)
+        landed = rendered.final_url or result.final_url
+        if not self.frontier.in_scope(urlparse(landed).netloc):
+            # The DOM is another site's page; the HTTP redirect check above never saw it.
+            record.render_error = f"JavaScript redirected off-site to {landed}"
+            log.warning("could not render %s: %s", record.url, record.render_error)
+            return raw
+        page = parse_html(rendered.html, landed)
         record.render = diff_rendered(raw, page)
         return page
 

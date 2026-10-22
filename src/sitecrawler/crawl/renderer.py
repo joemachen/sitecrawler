@@ -9,6 +9,7 @@ starts a loop of its own and refuses to run inside one.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import importlib.util
 import time
 from types import TracebackType
@@ -79,14 +80,18 @@ class Renderer:
         """Validate the options; nothing starts until the context is entered.
 
         Raises:
-            ValueError: ``wait`` is not one of :data:`WAIT_STRATEGIES`, or
-                ``workers`` is below 1.
+            ValueError: ``wait`` is not one of :data:`WAIT_STRATEGIES`,
+                ``workers`` is below 1, or ``timeout_seconds`` is not positive
+                (Playwright reads a timeout of 0 as "wait forever").
         """
         if wait not in WAIT_STRATEGIES:
             msg = f"render_wait must be one of {', '.join(WAIT_STRATEGIES)}, not {wait!r}"
             raise ValueError(msg)
         if workers < 1:
             msg = f"render_workers must be at least 1, not {workers}"
+            raise ValueError(msg)
+        if timeout_seconds <= 0:
+            msg = f"render_timeout must be above 0 seconds, not {timeout_seconds:g}"
             raise ValueError(msg)
         self.user_agent = user_agent
         self.workers = workers
@@ -119,9 +124,14 @@ class Renderer:
             self._playwright = None
             msg = f"could not start Chromium: {str(exc).splitlines()[0]}. {INSTALL_HINT}"
             raise RenderUnavailableError(msg) from exc
-        self._context = await self._browser.new_context(user_agent=self.user_agent)
-        if self.block:
-            await self._context.route("**/*", self._route)
+        try:
+            self._context = await self._browser.new_context(user_agent=self.user_agent)
+            if self.block:
+                await self._context.route("**/*", self._route)
+        except Error:
+            # Nothing may be left running when the crawl never starts.
+            await self.aclose()
+            raise
         self._slots = asyncio.Semaphore(self.workers)
         return self
 
@@ -160,22 +170,34 @@ class Renderer:
     async def render(self, url: str) -> RenderResult:
         """Load ``url`` in a fresh tab and return the DOM once the page has settled.
 
-        Never raises for page errors or timeouts; those come back with
-        ``ok=False`` and an ``error`` message.
+        Never raises for page errors, timeouts or a lost browser; those come
+        back with ``ok=False`` and an ``error`` message. A navigation that
+        ends on an HTTP error (status 400 or above) is a failure too: its DOM
+        is the server's error page, not the page being audited.
         """
         if self._context is None or self._slots is None:
             msg = "Renderer must be entered with `async with` before rendering"
             raise RuntimeError(msg)
-        from playwright.async_api import Error, TimeoutError
+        from playwright.async_api import Error, Page, TimeoutError
 
         timeout_ms = self.timeout_seconds * 1000
         async with self._slots:
             if self.throttle is not None:
                 await self.throttle.acquire(urlparse(url).netloc.lower())
             started = time.monotonic()
-            page = await self._context.new_page()
+            page: Page | None = None
             try:
+                page = await self._context.new_page()
                 response = await page.goto(url, wait_until=self.wait, timeout=timeout_ms)
+                status = response.status if response is not None else None
+                if status is not None and status >= 400:
+                    return RenderResult(
+                        url=url,
+                        ok=False,
+                        status_code=status,
+                        elapsed_ms=_elapsed(started),
+                        error=f"render returned HTTP {status}",
+                    )
                 if self.selector:
                     await page.wait_for_selector(self.selector, timeout=timeout_ms)
                 html = await page.content()
@@ -184,7 +206,7 @@ class Renderer:
                     ok=True,
                     html=html,
                     final_url=page.url,
-                    status_code=response.status if response is not None else None,
+                    status_code=status,
                     elapsed_ms=_elapsed(started),
                 )
             except TimeoutError:
@@ -196,6 +218,7 @@ class Renderer:
                     error=f"render timed out after {self.timeout_seconds:g}s waiting for {waited}",
                 )
             except Error as exc:
+                # Covers a page that could not load and a browser that has gone away.
                 return RenderResult(
                     url=url,
                     ok=False,
@@ -203,7 +226,9 @@ class Renderer:
                     error=f"render failed: {str(exc).splitlines()[0][:200]}",
                 )
             finally:
-                await page.close()
+                if page is not None:
+                    with contextlib.suppress(Error):  # the browser may already be gone
+                        await page.close()
 
 
 def _elapsed(started: float) -> int:

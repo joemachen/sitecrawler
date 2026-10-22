@@ -18,6 +18,11 @@ def test_wait_strategy_is_validated() -> None:
         Renderer("ua", wait="eventually")
     with pytest.raises(ValueError, match="render_workers"):
         Renderer("ua", workers=0)
+    # Playwright reads timeout=0 as "no timeout", which would hang the crawl on one page.
+    with pytest.raises(ValueError, match="render_timeout must be above 0"):
+        Renderer("ua", timeout_seconds=0)
+    with pytest.raises(ValueError, match="render_timeout"):
+        Renderer("ua", timeout_seconds=-1)
 
 
 def test_blocked_resource_types() -> None:

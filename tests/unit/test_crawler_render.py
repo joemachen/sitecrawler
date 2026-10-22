@@ -41,23 +41,31 @@ class FakeFetcher:
 
     async def fetch(self, url: str) -> FetchResult:
         path = url.removeprefix(SITE)
+        if path == "/moved":  # a 301 the real fetcher followed: the content is /raw's
+            path, url_final = "/raw", f"{SITE}/raw"
+        else:
+            url_final = url
         if path not in RAW:
             return FetchResult(url=url, outcome=Outcome.FETCHED, status_code=404, final_url=url)
         return FetchResult(
             url=url,
             outcome=Outcome.FETCHED,
             status_code=200,
-            final_url=url,
+            final_url=url_final,
             content_type="text/html",
             text=RAW[path],
         )
 
 
 class FakeRenderer:
-    """Returns ``RENDERED`` where it has an entry, the raw HTML otherwise; fails on demand."""
+    """Returns ``RENDERED`` where it has an entry, the raw HTML otherwise; fails on demand.
 
-    def __init__(self, *, fail: str = "") -> None:
+    ``land`` maps a path to the URL the browser ends on, for JavaScript redirects.
+    """
+
+    def __init__(self, *, fail: str = "", land: dict[str, str] | None = None) -> None:
         self.fail = fail
+        self.land = land or {}
         self.rendered: list[str] = []
         self.entered = 0
         self.exited = 0
@@ -80,7 +88,11 @@ class FakeRenderer:
         if path == self.fail:
             return RenderResult(url=url, ok=False, elapsed_ms=7, error="render timed out")
         return RenderResult(
-            url=url, ok=True, html=RENDERED.get(path, RAW[path]), final_url=url, elapsed_ms=12
+            url=url,
+            ok=True,
+            html=RENDERED.get(path, RAW[path]),
+            final_url=self.land.get(path, url),
+            elapsed_ms=12,
         )
 
 
@@ -148,3 +160,30 @@ def test_renderer_is_closed_when_the_crawl_stops_early(workers: int) -> None:
     crawler.renderer = renderer  # type: ignore[assignment]
     assert len(crawler.run()) == 1
     assert (renderer.entered, renderer.exited) == (1, 1)
+
+
+def test_redirect_sources_are_not_rendered() -> None:
+    renderer = FakeRenderer()
+    crawler = Crawler(
+        CrawlConfig(seed_urls=(f"{SITE}/moved",), follow_links=False, delay_seconds=0)
+    )
+    crawler.fetcher = FakeFetcher()  # type: ignore[assignment]
+    crawler.renderer = renderer  # type: ignore[assignment]
+    (moved,) = crawler.run()
+    assert moved.final_url == f"{SITE}/raw"
+    assert moved.title == "Raw page", "the target's raw HTML is still parsed"
+    assert moved.render is None
+    assert moved.render_error == ""
+    assert renderer.rendered == [], "the target is rendered when it is crawled itself"
+
+
+def test_javascript_redirect_off_site_is_a_render_failure() -> None:
+    landing = "https://other.test/landing"
+    by_path = _crawl(FakeRenderer(land={"/": landing}))
+    home = by_path["/"]
+    assert home.outcome is Outcome.FETCHED
+    assert home.title == "Raw home", "the foreign DOM never becomes the page"
+    assert home.render is None
+    assert home.render_error == f"JavaScript redirected off-site to {landing}"
+    assert home.render_ms == 12
+    assert set(by_path) == {"/", "/raw"}, "only the raw links were followed"

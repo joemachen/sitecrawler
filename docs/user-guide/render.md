@@ -26,8 +26,11 @@ With `--render` on:
 - Two audit rules read the diff: `render.differs` (medium) lists pages
   where JavaScript changes the title, canonical, meta or links, with the
   changed fields in the message, and `render.failed` (low) lists pages the
-  browser could not finish loading. `sitecrawler audit` also prints one line
-  with how many pages rendered, differed and failed.
+  browser could not deliver: a timeout, an HTTP error on the browser's
+  request (a site that throttles repeat visits), a response the browser
+  treats as a download, or a script that sends the browser to another site.
+  A failed page keeps its raw HTML fields. `sitecrawler audit` also prints
+  one line with how many pages rendered, differed and failed.
 - Pages that are not parsable HTML (errors, 4xx and 5xx, redirects to other
   pages, non-HTML files) are never rendered.
 

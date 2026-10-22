@@ -2,20 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
-
 from sitecrawler.models import ParsedPage, RenderDiff
-
-
-def _unique(links: Iterable[str]) -> list[str]:
-    """Distinct hrefs in first-seen order."""
-    seen: set[str] = set()
-    ordered: list[str] = []
-    for link in links:
-        if link not in seen:
-            seen.add(link)
-            ordered.append(link)
-    return ordered
 
 
 def diff_rendered(raw: ParsedPage, rendered: ParsedPage) -> RenderDiff:
@@ -25,8 +12,8 @@ def diff_rendered(raw: ParsedPage, rendered: ParsedPage) -> RenderDiff:
     on the page is not a change. Word counts are reported but never counted
     as a change: almost every script adds or removes a few words.
     """
-    raw_links = _unique(raw.links)
-    rendered_links = _unique(rendered.links)
+    raw_links = list(dict.fromkeys(raw.links))  # distinct, first-seen order
+    rendered_links = list(dict.fromkeys(rendered.links))
     raw_set = set(raw_links)
     rendered_set = set(rendered_links)
     return RenderDiff(

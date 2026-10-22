@@ -103,7 +103,8 @@ TRIGGERS: dict[str, set[str]] = {
     "pagination.to_non_200": {"/audit/paged-bad-1"},
     "pagination.canonical_to_first": {"/audit/paged-bad-2"},
     "pagination.broken_sequence": {"/audit/paged-bad-2"},
-    # Rendering rules need --render; tests/integration/test_render.py covers the rendered crawl.
+    # Rendering rules need --render; tests/integration/test_render.py crawls the site with it
+    # and expects /js-injected under render.differs and /audit/render-download under render.failed.
     "render.differs": set(),
     "render.failed": set(),
 }

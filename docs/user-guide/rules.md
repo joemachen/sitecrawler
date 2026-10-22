@@ -314,9 +314,9 @@ Google does run JavaScript, but in a second pass that can lag the raw crawl by d
 
 **Page could not be rendered in headless Chromium** (severity: low)
 
-The HTML was fetched, but the browser did not finish loading the page within the render timeout, so what JavaScript adds to it is unknown for this URL. Googlebot gives up on slow pages too, and indexes whatever it had by then.
+The HTML was fetched, but the browser did not deliver a usable DOM: the page did not finish loading within the render timeout, the second request got an HTTP error, the response started a download, or a script sent the browser to another site. What JavaScript adds to this URL is unknown. Googlebot gives up on slow pages too, and indexes whatever it had by then.
 
-**Fix:** Open the page with the browser's network panel: long-polling, slow third-party scripts or endless retries keep it from going idle. Fix the page, or crawl with --render-wait load or a longer --render-timeout.
+**Fix:** Open the page with the browser's network panel: long-polling, slow third-party scripts or endless retries keep it from going idle. Fix the page, or crawl with --render-wait load or a longer --render-timeout. An HTTP error on the second request usually means the site throttles repeat visits; raise --delay.
 
 ## Response codes
 

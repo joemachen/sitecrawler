@@ -69,7 +69,13 @@ What exists now:
   async API, `render_workers` tabs through a semaphore, images/fonts/media
   blocked, the fetcher's per-host throttle shared). `Crawler._render` hands
   the DOM to `parse_html` and `diff_rendered` (`parse/render_diff.py`).
-  A failed render keeps the raw parse and sets `record.render_error`.
+  A failed render keeps the raw parse and sets `record.render_error`; an
+  HTTP status of 400 or above on the browser's request, a download, a lost
+  browser and a JavaScript redirect off-site all count as failures.
+  Redirect sources are not rendered (their fields are the target's, and
+  the target is rendered when it is crawled). Fixture for `render.failed`:
+  `/audit/render-download`, served with `Content-Disposition: attachment`
+  from `routes.json`.
   Rules `render.differs` (medium) and `render.failed` (low) in
   `audit/rules/render.py`; `audit` prints a one-line rendering summary.
   Web: `StartRequest.render`, a **Render JavaScript** checkbox in Settings,

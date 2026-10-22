@@ -355,6 +355,13 @@ class PageRecord:
         return self.render is not None
 
     @property
+    def render_status(self) -> str:
+        """``rendered``, ``failed``, or empty when rendering was not attempted."""
+        if self.render is not None:
+            return "rendered"
+        return "failed" if self.render_error else ""
+
+    @property
     def status(self) -> str:
         """Status code as text, or the outcome name when there was no response."""
         return self.status_text(self.status_code, self.outcome.value)
