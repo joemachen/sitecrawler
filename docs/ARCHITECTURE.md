@@ -97,7 +97,7 @@ set of tables in SQLite:
 | `hreflang` | page_id, lang, href. |
 | `pagination` | page_id, rel (prev/next), href. |
 | `structured_data` | page_id, format (jsonld/microdata/rdfa), type, raw JSON. |
-| `extractions` | page_id, extractor name, value(s). Custom extraction output. |
+| `extractions` | page_id, name, kind (`css`/`xpath`/`regex`/`search`), match count, kept value(s) as JSON. Custom extraction and search output (Phase 6, ADR-0009). |
 | `sitemap_urls` | Every URL from every sitemap, with which sitemap it came from. |
 | `issues` | page_id, rule_id, severity, message. Rebuilt whenever rules run. |
 

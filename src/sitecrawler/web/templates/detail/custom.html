@@ -1,0 +1,19 @@
+{% set page = detail.page %}
+<h2>Custom extraction</h2>
+{% if not page.extractions %}
+<p class="muted" data-custom="none">Nothing extracted for this page. Set extractors with <code>--extract</code> and searches with <code>--search</code> (or the Extract and Search boxes in Settings); they run on every HTML page.</p>
+{% else %}
+<table class="plain extractions" data-custom="{{ page.extractions | length }}">
+  <thead><tr><th>Name</th><th>Kind</th><th>Matches</th><th>Value</th></tr></thead>
+  <tbody>
+  {% for extraction in page.extractions %}
+    <tr data-name="{{ extraction.name }}" class="{{ 'found' if extraction.matched else 'missing' }}">
+      <th>{{ extraction.name }}</th>
+      <td>{{ extraction.kind }}</td>
+      <td>{{ extraction.count }}</td>
+      <td>{% if extraction.kind == "search" %}{{ "contains" if extraction.matched else "does not contain" }}{% elif extraction.value == "" %}<span class="muted">–</span>{% else %}{{ extraction.value }}{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}

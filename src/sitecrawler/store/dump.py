@@ -7,16 +7,18 @@ link) live here, inside the store.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from sitecrawler.models import PageRecord
+from sitecrawler.models import Extraction, PageRecord
 from sitecrawler.store.schema import (
+    ExtractionRow,
     HreflangRow,
     IssueRow,
     LinkRow,
@@ -39,6 +41,7 @@ EXPORT_TABLES: tuple[str, ...] = (
     "redirects",
     "hreflang",
     "sitemap_urls",
+    "extractions",
 )
 """Names (and order) of the tables every export contains."""
 
@@ -80,7 +83,11 @@ PAGE_COLUMNS: tuple[str, ...] = (
     "render_status",
     "render_changes",
 )
-"""Column names of the ``pages`` dump, in order."""
+"""Column names of the ``pages`` dump, in order.
+
+A crawl with custom extractors or searches appends one ``extract_<name>`` or
+``search_<name>`` column per name after these, in first-seen order.
+"""
 
 
 def _render_cells(page: PageRow) -> tuple[str, str]:
@@ -129,14 +136,55 @@ def _page_row(page: PageRow) -> tuple[Cell, ...]:
     )
 
 
+def _extraction_names(session: Session) -> list[tuple[str, str]]:
+    rows = session.execute(
+        select(ExtractionRow.name, ExtractionRow.kind)
+        .group_by(ExtractionRow.name, ExtractionRow.kind)
+        .order_by(func.min(ExtractionRow.id))
+    ).all()
+    return [(name, kind) for name, kind in rows]
+
+
+def extraction_cell(extraction: Extraction) -> Cell:
+    """What a page row shows for one extraction: found or not for a search, the value otherwise."""
+    return extraction.matched if extraction.kind == "search" else extraction.value
+
+
 def _pages(session: Session) -> TableDump:
     pages = session.scalars(
         select(PageRow)
         .where(PageRow.state == "done")
         .order_by(PageRow.url)
-        .options(selectinload(PageRow.html), selectinload(PageRow.render))
+        .options(
+            selectinload(PageRow.html),
+            selectinload(PageRow.render),
+            selectinload(PageRow.extractions),
+        )
     ).all()
-    return TableDump("pages", PAGE_COLUMNS, [_page_row(p) for p in pages])
+    names = _extraction_names(session)
+    columns = (*PAGE_COLUMNS, *(Extraction(name, kind).column for name, kind in names))
+    rows: list[tuple[Cell, ...]] = []
+    for page in pages:
+        found = {
+            (e.name, e.kind): Extraction(e.name, e.kind, tuple(json.loads(e.values_json)), e.count)
+            for e in page.extractions
+        }
+        extra: list[Cell] = [extraction_cell(found[key]) if key in found else None for key in names]
+        rows.append((*_page_row(page), *extra))
+    return TableDump("pages", columns, rows)
+
+
+def _extractions(session: Session) -> TableDump:
+    found = session.execute(
+        select(PageRow.url, ExtractionRow)
+        .join(ExtractionRow, ExtractionRow.page_id == PageRow.id)
+        .order_by(PageRow.url, ExtractionRow.id)
+    ).all()
+    return TableDump(
+        "extractions",
+        ("url", "name", "kind", "count", "value"),
+        [(url, e.name, e.kind, e.count, " | ".join(json.loads(e.values_json))) for url, e in found],
+    )
 
 
 def _issues(session: Session) -> TableDump:
@@ -208,6 +256,7 @@ _LOADERS: dict[str, Callable[[Session], TableDump]] = {
     "redirects": _redirects,
     "hreflang": _hreflang,
     "sitemap_urls": _sitemap_urls,
+    "extractions": _extractions,
 }
 
 

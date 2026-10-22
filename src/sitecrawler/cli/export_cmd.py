@@ -46,7 +46,7 @@ def export(
             fail(str(exc))
             return
         if fmt is ExportFormat.CSV:
-            rows = write_csv(store.iter_pages(), output)
+            rows = write_csv(store.iter_pages(), output, extra_columns=store.extraction_columns())
         elif fmt is ExportFormat.XLSX:
             rows = write_xlsx(dump_tables(store), output)
         else:

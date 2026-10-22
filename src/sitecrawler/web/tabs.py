@@ -10,7 +10,8 @@ Python twin, used for the summary counts and as the test oracle.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from collections.abc import Sequence
+from dataclasses import asdict, dataclass, field
 from typing import Literal
 
 from sitecrawler.store.dump import Cell
@@ -60,6 +61,8 @@ class TabSpec:
     columns: tuple[str, ...]
     filters: tuple[FilterSpec, ...] = (ALL,)
     source: Source = "pages"
+    titles: dict[str, str] = field(default_factory=dict)
+    """Column headers that differ from the column name (the Custom tab's extractor names)."""
 
 
 def matches(row: Row, spec: FilterSpec) -> bool:
@@ -96,6 +99,41 @@ def to_json(tabs: tuple[TabSpec, ...] = ()) -> list[dict[str, object]]:
 def tab_by_id(tab_id: str) -> TabSpec | None:
     """The tab with ``tab_id``, or None."""
     return next((t for t in TABS if t.id == tab_id), None)
+
+
+CUSTOM = "custom"
+"""Id of the Custom tab, whose columns depend on the crawl."""
+
+
+def custom_tab(extractions: Sequence[tuple[str, str]] = ()) -> TabSpec:
+    """The Custom tab for a crawl that extracted or searched for these ``(name, kind)`` pairs.
+
+    One column per name (the extracted value, or True/False for a search) and
+    a found / not-found filter pair each; with nothing configured it lists
+    URLs only. A page the extractors never ran on (not HTML) passes neither
+    filter of a pair.
+    """
+    columns = ["url"]
+    filters = [ALL]
+    titles: dict[str, str] = {}
+    for name, kind in extractions:
+        if kind == "search":
+            column = f"search_{name}"
+            filters.append(_F(f"has:{name}", f"{name}: contains", column, "truthy"))
+            filters.append(_F(f"not:{name}", f"{name}: does not contain", column, "eq", False))
+        else:
+            column = f"extract_{name}"
+            filters.append(_F(f"has:{name}", f"{name}: found", f"{column}_n", "gt", 0))
+            filters.append(_F(f"not:{name}", f"{name}: not found", f"{column}_n", "eq", 0))
+        columns.append(column)
+        titles[column] = name
+    columns += ["status_code", "indexable"]
+    return TabSpec(CUSTOM, "Custom", tuple(columns), tuple(filters), titles=titles)
+
+
+def with_custom(extractions: Sequence[tuple[str, str]]) -> tuple[TabSpec, ...]:
+    """The tab strip with the Custom tab built for ``extractions``."""
+    return tuple(custom_tab(extractions) if tab.id == CUSTOM else tab for tab in TABS)
 
 
 def rule_filters() -> list[tuple[TabSpec, FilterSpec]]:
@@ -372,6 +410,7 @@ TABS: tuple[TabSpec, ...] = (
             _R("failed", "Render failed", "render.failed"),
         ),
     ),
+    custom_tab(),
     TabSpec("issues", "Issues", ("rule_id", "severity", "count"), (ALL,), source="issues"),
 )
 """The tab strip, in display order."""

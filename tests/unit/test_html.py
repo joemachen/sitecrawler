@@ -86,3 +86,40 @@ def test_anchors_carry_text_and_rel() -> None:
     assert page.anchors[0].rel == "nofollow noopener"
     assert page.anchors[0].nofollow
     assert not page.anchors[1].nofollow
+
+
+def test_br_and_nested_tags_separate_words() -> None:
+    page = parse_html("<h1>Hello<br>World</h1><h2>a<b>b</b>c</h2>", BASE)
+    assert page.h1 == "Hello World"
+    assert page.h2s == ["a b c"]
+
+
+def test_comments_and_noscript_are_not_text() -> None:
+    html = "<p>one <!-- hidden words --> two</p><noscript>three</noscript> four"
+    assert parse_html(html, BASE).word_count == 3
+
+
+def test_empty_and_xml_prologue_documents() -> None:
+    assert parse_html("", BASE) == parse_html("   \n", BASE)
+    assert parse_html("", BASE).word_count == 0
+    xhtml = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<html xmlns="http://www.w3.org/1999/xhtml" lang="fr"><head><title>X</title></head>'
+        "<body><h1>Un</h1></body></html>"
+    )
+    page = parse_html(xhtml, BASE)
+    assert page.title == "X"
+    assert page.lang == "fr"
+    assert page.h1 == "Un"
+
+
+def test_og_url_and_meta_name_matching_are_tolerant() -> None:
+    html = """
+    <meta property="og:url" content=" /og ">
+    <meta name=" Description " content="desc">
+    <meta name="description" content="second">
+    """
+    page = parse_html(html, BASE)
+    assert page.og_url == "https://example.com/og"
+    assert page.meta_description == "desc"
+    assert page.meta_description_count == 2

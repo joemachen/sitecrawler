@@ -80,6 +80,8 @@ header .db { margin-left: auto; max-width: 24rem; font-family: ui-monospace, mon
 }
 .settings-body label { display: flex; justify-content: space-between; gap: 1rem; align-items: center; }
 .settings-body input[type="number"] { width: 6rem; padding: 0.2rem 0.4rem; border: 1px solid var(--line); border-radius: 4px; }
+.settings-body label.wide { align-items: flex-start; }
+.settings-body textarea { width: 20rem; font: inherit; font-size: 0.85rem; padding: 0.2rem 0.4rem; border: 1px solid var(--line); border-radius: 4px; resize: vertical; }
 .progress { display: flex; align-items: center; gap: 0.5rem; white-space: nowrap; min-width: 0; overflow: hidden; }
 .app { overflow: hidden; }
 .progress progress { width: 10rem; height: 0.8rem; }

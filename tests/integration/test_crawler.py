@@ -79,8 +79,8 @@ def test_parsed_fields(crawled: dict[str, PageRecord]) -> None:
     assert about.internal_links == 2
 
     home = crawled["/"]
-    # 14 page anchors collapse to 11 distinct URLs, plus the same-site PDF and image links.
-    assert home.internal_links == 13
+    # 15 page anchors collapse to 12 distinct URLs, plus the same-site PDF and image links.
+    assert home.internal_links == 14
     assert "ignored" not in home.title
 
     assert crawled["/notitle"].title == ""

@@ -9,6 +9,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
+from typing import Literal
+
+ExtractorKind = Literal["css", "xpath", "regex"]
+"""How an extractor finds its matches: a CSS selector, an XPath expression or a regex."""
+
+ExtractMode = Literal["text", "html", "attr"]
+"""What an extractor keeps from each matched element."""
 
 
 class Outcome(StrEnum):
@@ -61,6 +68,79 @@ class CrawlConfig:
     """Give up rendering a page after this long; the raw HTML is kept and the failure recorded."""
     render_block: tuple[str, ...] = ("image", "font", "media")
     """Resource types the browser is not allowed to load, for speed."""
+    extract: tuple[ExtractorSpec, ...] = ()
+    """Custom extractors run on every parsable HTML page (the rendered DOM with ``render``)."""
+    search: tuple[SearchSpec, ...] = ()
+    """Custom searches: patterns every parsable HTML page is checked for."""
+
+
+@dataclass(slots=True, frozen=True)
+class ExtractorSpec:
+    """One custom extractor: a named CSS selector, XPath expression or regex.
+
+    The command-line form is ``NAME=KIND[MODIFIERS]:EXPRESSION``, for example
+    ``price=css:.price``, ``img=css[attr=src,all]:img`` or
+    ``ga=regex:G-[A-Z0-9]+``; :mod:`sitecrawler.parse.extract` parses it and
+    the TOML form.
+    """
+
+    name: str
+    """Letters, digits, ``_`` and ``-``; names the ``extract_<name>`` column."""
+    kind: ExtractorKind
+    expr: str
+    mode: ExtractMode = "text"
+    """``text`` (visible text), ``html`` (inner HTML) or ``attr`` (one attribute)."""
+    attr: str = ""
+    """The attribute to read when ``mode`` is ``attr``."""
+    all: bool = False
+    """Keep every match, joined with `` | ``, instead of the first."""
+
+    @property
+    def column(self) -> str:
+        """The column this extractor fills in exports and the web UI."""
+        return f"extract_{self.name}"
+
+
+@dataclass(slots=True, frozen=True)
+class SearchSpec:
+    """One custom search: a regex every page is checked for, case-insensitively."""
+
+    name: str
+    pattern: str
+    """Matched against the HTML source, so text and markup both count."""
+
+    @property
+    def column(self) -> str:
+        """The column this search fills in exports and the web UI."""
+        return f"search_{self.name}"
+
+
+@dataclass(slots=True, frozen=True)
+class Extraction:
+    """What one extractor or search found on one page."""
+
+    name: str
+    kind: str
+    """``css``, ``xpath``, ``regex`` or ``search``."""
+    values: tuple[str, ...] = ()
+    """The first match, or every match for an ``all`` extractor; the first match for a search."""
+    count: int = 0
+    """How many matches the page had, whether or not they are all in ``values``."""
+
+    @property
+    def matched(self) -> bool:
+        """True when the page had at least one match."""
+        return self.count > 0
+
+    @property
+    def value(self) -> str:
+        """The values as one cell, joined with `` | ``."""
+        return " | ".join(self.values)
+
+    @property
+    def column(self) -> str:
+        """``search_<name>`` for a search, ``extract_<name>`` otherwise."""
+        return f"search_{self.name}" if self.kind == "search" else f"extract_{self.name}"
 
 
 @dataclass(slots=True, frozen=True)
@@ -348,6 +428,8 @@ class PageRecord:
     """Time spent in the browser, 0 when the page was not rendered."""
     render_error: str = ""
     """Why rendering failed; the parsed fields then come from the raw HTML."""
+    extractions: tuple[Extraction, ...] = ()
+    """Custom extraction and search results, in config order; empty unless the page was parsed."""
 
     @property
     def rendered(self) -> bool:

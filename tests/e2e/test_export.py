@@ -29,13 +29,14 @@ def test_export_xlsx_has_a_sheet_per_table(crawled_db: Path) -> None:
             "redirects",
             "hreflang",
             "sitemap_urls",
+            "extractions",
         ]
         pages = list(workbook["pages"].iter_rows(values_only=True))
         assert pages[0][0] == "url"
         assert len(pages) == 1 + len(site_pages())
         redirects = list(workbook["redirects"].iter_rows(values_only=True))
         # chain 2, loop 2, /blog and /audit trailing-slash 301s, redirect-to-missing, off-site
-        assert len(redirects) == 1 + 8
+        assert len(redirects) == 1 + 9
         assert redirects[0] == ("url", "hop_no", "from_url", "to_url", "status_code")
         assert len(list(workbook["sitemap_urls"].iter_rows(values_only=True))) == 1 + 6
     finally:
@@ -66,6 +67,7 @@ def test_export_json(crawled_db: Path, site: str) -> None:
         "/redirect-start",
         "/loop-a",
         "/blog",
+        "/products",
         "/audit",
         "/audit/redirect-to-missing",
         "/audit/redirect-off-site",
