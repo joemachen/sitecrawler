@@ -16,6 +16,7 @@ from sitecrawler.audit import CrawlView, load_rules, run_audit
 from sitecrawler.crawl import Crawler
 from sitecrawler.models import CrawlConfig
 from sitecrawler.store import open_store
+from tests.conftest import site_pages
 
 OLD_HTML = {
     "/",
@@ -107,7 +108,26 @@ TRIGGERS: dict[str, set[str]] = {
     # and expects /js-injected under render.differs and /audit/render-download under render.failed.
     "render.differs": set(),
     "render.failed": set(),
+    "sitemap.orphan": {"/orphan"},
+    "sitemap.non_indexable": {
+        "/about",
+        "/blocked/secret",
+        "/blocked/sitemap-only",
+        "/audit/noindex-in-sitemap",
+    },
+    "sitemap.duplicate": {"/audit/sitemap-twice"},
 }
+
+IN_SITEMAP = {
+    "/",
+    "/about",
+    "/orphan",
+    "/blocked/secret",
+    "/blocked/sitemap-only",
+    "/audit/noindex-in-sitemap",
+    "/audit/sitemap-twice",
+}
+"""On-site pages the fixture sitemaps list (``tests/fixtures/site/sitemap*.xml``)."""
 
 NON_INDEXABLE: dict[str, str] = {
     "/missing": "status 404",
@@ -133,6 +153,8 @@ NON_INDEXABLE: dict[str, str] = {
     "/audit/paged-bad-2": "canonicalised to",
 }
 TRIGGERS["page.non_indexable"] = set(NON_INDEXABLE)
+TRIGGERS["sitemap.missing"] = set(site_pages()) - set(NON_INDEXABLE) - IN_SITEMAP
+"""Every indexable 200 page the sitemaps do not list; ``/blog/post-2`` is the roadmap's example."""
 
 
 @pytest.fixture

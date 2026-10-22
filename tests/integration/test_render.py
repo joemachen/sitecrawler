@@ -52,7 +52,7 @@ def rendered(site_module: str) -> dict[str, PageRecord]:
 
 
 def test_without_render_the_page_is_what_the_server_sent(site: str) -> None:
-    records = Crawler(_config(site, max_pages=60)).run()
+    records = Crawler(_config(site, max_pages=100)).run()
     page = next(r for r in records if r.url.endswith("/js-injected"))
     assert page.title == RAW_TITLE
     assert page.canonical == ""

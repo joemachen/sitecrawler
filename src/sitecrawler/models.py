@@ -175,6 +175,41 @@ class QueueItem:
 
 
 @dataclass(slots=True, frozen=True)
+class SitemapEntry:
+    """One ``<url>`` (or, in an index, one ``<sitemap>``) of one sitemap file."""
+
+    sitemap_url: str
+    """The file this entry was read from."""
+    loc: str
+    """The URL as written in the file, before any normalisation."""
+    lastmod: str = ""
+    """``<lastmod>`` text as written (a W3C date), or empty."""
+    changefreq: str = ""
+    priority: str = ""
+
+
+@dataclass(slots=True, frozen=True)
+class SitemapFile:
+    """One sitemap or sitemap index the crawl tried to read, usable or not."""
+
+    url: str
+    found_in: str
+    """``robots.txt``, ``default`` (``/sitemap.xml`` guessed) or the index URL that listed it."""
+    kind: str = ""
+    """``urlset``, ``index``, or empty when the file could not be used."""
+    status_code: int | None = None
+    error: str = ""
+    """Why the file was unusable: ``status 404``, ``not sitemap XML``, ``fetch error: ...``."""
+    url_count: int = 0
+    """Entries in the file: pages for a urlset, child sitemaps for an index."""
+
+    @property
+    def ok(self) -> bool:
+        """True when the file parsed as a sitemap or an index."""
+        return bool(self.kind)
+
+
+@dataclass(slots=True, frozen=True)
 class ResumeState:
     """What a store hands back so an interrupted crawl can carry on."""
 

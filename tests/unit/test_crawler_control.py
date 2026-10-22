@@ -18,6 +18,8 @@ from sitecrawler.models import (
     PageRecord,
     QueueItem,
     ResumeState,
+    SitemapEntry,
+    SitemapFile,
 )
 
 SITE = "https://x.test"
@@ -63,7 +65,12 @@ class RecordingSink:
     def begin(self, config: CrawlConfig, *, resume: bool) -> ResumeState:
         return ResumeState()
 
-    def seeded(self, items: Sequence[QueueItem], sitemap_urls: Sequence[tuple[str, str]]) -> None:
+    def seeded(
+        self,
+        items: Sequence[QueueItem],
+        sitemap_files: Sequence[SitemapFile],
+        sitemap_entries: Sequence[SitemapEntry],
+    ) -> None:
         return None
 
     def page_done(self, record: PageRecord, discovered: Sequence[QueueItem]) -> None:

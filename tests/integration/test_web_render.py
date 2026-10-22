@@ -27,7 +27,7 @@ def client(tmp_path: Path) -> Iterator[TestClient]:
 def test_render_setting_renders_the_crawl_and_fills_the_javascript_tab(
     client: TestClient, site: str
 ) -> None:
-    start(client, site, render=True, max_pages=60)
+    start(client, site, render=True, max_pages=100)
     crawl = wait(client, settled, timeout=120)
     assert crawl["status"] == "done", crawl
     page = f"{site}/js-injected"

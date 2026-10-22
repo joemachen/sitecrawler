@@ -1,8 +1,9 @@
 # Handoff: sitecrawler
 
 Read this first in a new session. It is the state of the project as of
-2026-10-22 (v0.7.0 released, Phase 7 not started) and everything that is
-not obvious from the code.
+2026-10-22 (v0.7.0 released; Phase 7 implemented on `feat/sitemaps`, PR
+open, v0.8.0 not yet released) and everything that is not obvious from the
+code.
 
 ## What this is
 
@@ -76,7 +77,69 @@ are still not stored, and lxml + cssselect replaced BeautifulSoup (every
 existing parser test stayed green; `tests/unit/test_html.py` gained edge
 cases for `<br>`, comments, empty documents and XHTML prologues).
 
+**Phase 7 (XML sitemap audit and generation) is implemented** on
+`feat/sitemaps` (one PR against `main`; see the PR list), not yet merged
+or released as v0.8.0. ADR-0010 records the design calls: the per-page
+findings are four audit rules in a `Sitemaps` category that compare the
+sitemap entries, normalised the crawl's way, with the pages and their
+indexability verdict; facts about the sitemap *files* (unreadable files,
+entries on other hosts, entries never crawled) are a `SitemapReport` in
+`analysis/sitemaps.py` rather than issues, because an issue row needs a
+crawled page to hang on; generation is an export (`export/sitemap.py`) with
+`<lastmod>` only on request and never `changefreq`/`priority`. One
+behaviour change: `/sitemap.xml` is guessed only when robots.txt names no
+sitemap, so a site that declares its sitemaps no longer logs a spurious 404.
+
 What exists now:
+
+- **Sitemaps.** `parse/sitemap.py` returns `SitemapDoc(kind, entries)`
+  where each `SitemapEntry(sitemap_url, loc, lastmod, changefreq,
+  priority)` knows its file; it gunzips on the gzip magic bytes and matches
+  elements by local name (a missing or odd namespace still parses).
+  `Crawler._seed_from_sitemaps` records every file it tries as a
+  `SitemapFile(url, found_in, kind, status_code, error, url_count)`
+  (`found_in` is `robots.txt`, `default` or the index URL), follows indexes
+  to any depth, and hands `CrawlSink.seeded(items, sitemap_files,
+  sitemap_entries)` everything (the old `(sitemap_url, loc)` pairs are
+  gone; `_SessionSink`, `Store` and the test fakes all take the new
+  signature). Store: new `sitemaps` table (`SitemapRow`), `lastmod` /
+  `changefreq` / `priority` columns on `sitemap_urls`,
+  `Store.sitemap_files()` / `.sitemap_entries()` (`.sitemap_urls()` still
+  exists); both tables are export sheets (`sitemaps` before
+  `sitemap_urls` in `EXPORT_TABLES`). `CrawlView` gained `sitemap_entries`,
+  `sitemap_files`, `sitemap_listings` (normalised URL to its entries) and
+  `sitemap_listings_for(url)`; `sitemap_urls` is derived from the entries
+  and `from_records(sitemap_urls=...)` still works for membership-only
+  tests. Rules in `audit/rules/sitemaps.py`: `sitemap.orphan` (medium:
+  indexable, listed, no inlink from another page; self-links do not count
+  and `found_on == "start"` is never an orphan), `sitemap.non_indexable`
+  (medium: listed and verdict not indexable, message is the reason),
+  `sitemap.missing` (low: indexable 200 page not listed, silent when
+  `crawl.sitemap_entries` is empty), `sitemap.duplicate` (low: more than
+  one listing, across files or two spellings). `robots.noindex_in_sitemap`
+  stays. CLI: `sitecrawler sitemap report crawl.db` (files table + one
+  tab-separated line per other-host / not-crawled / duplicate entry) and
+  `sitecrawler sitemap generate crawl.db [-o sitemap.xml] [--lastmod]
+  [--base-url URL]` (indexable 200 pages via `audit.indexability()`, so no
+  audit run needed; `write_sitemap()` splits into `<stem>-N.xml` parts plus
+  an index over `SITEMAP_MAX_URLS` = 50,000, which needs `base_url`);
+  `audit` prints the report's one-line summary when the crawl tried any
+  sitemap. Web: the Sitemaps tab's filters are rule filters plus
+  `in_sitemap` / `not_in_sitemap` and the tab shows `inlinks`; the computed
+  `non_indexable_in_sitemap` cell is gone; `PageDetail.sitemaps` lists the
+  entries naming the page and `detail/details.html` shows them. Fixture:
+  robots.txt names `/sitemap.xml` and `/sitemap-index.xml`; the index
+  lists `/sitemap-extra.xml.gz` (served gzip-compressed by the conftest
+  from `sitemap-extra.xml` via the `gzip` list in `routes.json`; it lists
+  `/audit/sitemap-twice` with lastmod/changefreq/priority and
+  `https://elsewhere.test/page`) and `/sitemap-missing.xml` (404);
+  `audit/sitemap-twice.html` is linked from the audit hub and in
+  `sitemap.xml` too. The sitemaps.org XSDs are vendored under
+  `tests/fixtures/schemas/` and `tests/unit/test_sitemap_export.py` /
+  `tests/integration/test_sitemaps.py` validate generated files against
+  them. `TRIGGERS["sitemap.missing"]` is computed:
+  `site_pages() - NON_INDEXABLE - IN_SITEMAP`. User guide:
+  `docs/user-guide/sitemaps.md`.
 
 - `sitecrawler crawl URL --extract NAME=KIND[MODS]:EXPR ... --search
   [NAME=]PATTERN ... --extract-file extract.toml` (and the same three
@@ -168,7 +231,7 @@ What exists now:
 - `sitecrawler crawl URL [-o pages.csv] [--db crawl.db [--resume]]`,
   `sitecrawler list urls.txt|- [--follow]`, `sitecrawler export crawl.db
   --format csv|xlsx|json`: see the Phase 1 notes in `docs/ROADMAP.md`.
-- `sitecrawler audit crawl.db`: runs 53 rules over a stored crawl, writes the
+- `sitecrawler audit crawl.db`: runs 57 rules over a stored crawl, writes the
   `issues` table and an indexability verdict per page, prints the fix list by
   severity. `sitecrawler issues crawl.db --rule ID` lists affected URLs.
 - Rules live in `src/sitecrawler/audit/rules/<category>.py` as classes with
@@ -185,8 +248,8 @@ What exists now:
   detail pane; vendored `htmx.min.js` (2.0.11), `tabulator.min.js`/`.css`
   (6.7.0). Rule explanations are rendered in-app at `/rules/<id>`, the
   full page per URL at `/page?url=`, built from `templates/detail/*`.
-- ~560 offline tests (19 of them headless Chromium, marker `browser`:
-  the UI e2e tests plus the rendered crawls). ADRs 0001-0009.
+- ~590 offline tests (19 of them headless Chromium, marker `browser`:
+  the UI e2e tests plus the rendered crawls). ADRs 0001-0010.
 
 Open:
 
@@ -199,10 +262,23 @@ Open:
   serve HTTPS (see the note under Phase 2 in the roadmap).
 - Dependabot's older uv can produce lockfile-downgrading PRs (#4 was closed
   for that); read the lock diff before merging.
-- Next piece of work: **Phase 7, XML sitemap audit and generation**
-  (`docs/ROADMAP.md`). The release recipe is #32: bump `pyproject.toml`,
-  `__init__.py` and `uv.lock` (`uv lock`), date the CHANGELOG Unreleased
-  block, PR, squash-merge, annotated tag on `main`, then a handoff PR.
+- Next steps: merge the Phase 7 PR (`feat/sitemaps`) once CI is green and
+  Joe says so, then **release v0.8.0** with the #32 recipe: bump
+  `pyproject.toml`, `__init__.py` and `uv.lock` (`uv lock`), date the
+  CHANGELOG Unreleased block, PR, squash-merge, annotated tag on `main`,
+  then a handoff PR. After that, **Phase 8, internal linking analysis**
+  (`docs/ROADMAP.md`); `CrawlView.inlinks` and the `links` table are the
+  starting point, and `sitemap.orphan` is the first rule to lean on inlinks
+  site-wide.
+- Phase 7 left for later: the sitemap report is CLI-only (no grid of
+  sitemap entries in the web UI; the Sitemaps tab is still per page);
+  sitemap extensions (`<image:>`, `<video:>`, `<xhtml:link>` hreflang) are
+  ignored; `generate` writes one flat sitemap (or an index of numbered
+  parts), not per-section files; `lastmod` can only come from the
+  `Last-Modified` header; the 50 MB-per-file limit is not checked (only the
+  50,000-URL one); sitemap files over other hosts are fetched but never
+  recorded as pages. Old crawl files have no `sitemaps` table and open with
+  an error; re-crawl (there are no migrations during 0.x).
 - GitHub's auto-merge cannot be enabled on this private repository (the
   settings PATCH is accepted and ignored), so PRs are merged by hand with
   `gh pr merge N --squash` once `gh pr checks N` is green.
@@ -252,6 +328,7 @@ Open:
 | Live crawl | `CrawlSession` on a worker thread, audit thread with adaptive gap, file written as it goes and closed before `done`; browser polls, no websockets (ADR-0007) |
 | Tabs and filters | Data in `web/tabs.py`; a filter with a rule id is that rule; presentational filters (URL flags, status class) are computed columns, not rules; the Custom tab is the one tab built per crawl, from the extraction names in the rows |
 | Custom extraction | Runs in the crawl pass over the HTML in hand (rendered DOM under `--render`); bodies not stored; grammar `NAME=KIND[MODS]:EXPR` + TOML; columns `extract_<name>` / `search_<name>` (ADR-0009) |
+| Sitemaps | Per-page findings are audit rules (`sitemap.*`) over normalised entries and the indexability verdict; file-level facts are `sitemap report`, not issues; `sitemap generate` is an export, `lastmod` only with `--lastmod`, never `changefreq`/`priority`; `/sitemap.xml` guessed only when robots.txt names none (ADR-0010) |
 
 Full rationale in `docs/adr/`.
 
@@ -265,6 +342,8 @@ uv run sitecrawler crawl https://example.com --db example.db --extract "price=cs
 uv run sitecrawler audit example.db
 uv run sitecrawler issues example.db --rule title.missing
 uv run sitecrawler export example.db --format xlsx
+uv run sitecrawler sitemap report example.db      # sitemap files read, other-host / uncrawled / duplicate entries
+uv run sitecrawler sitemap generate example.db --lastmod   # sitemap.xml of indexable 200 pages next to the DB
 uv run sitecrawler serve                     # web UI on http://127.0.0.1:8765, crawl from the browser
 uv run sitecrawler serve example.db          # browse a stored crawl read-only
 uv run playwright install chromium           # once per machine, for tests/e2e/test_web_ui.py
@@ -377,6 +456,13 @@ test, then regenerate `rules.md`.
   GA snippet from the fixture server's own `/gtag.js` (a 404, harmless).
 - Attribute values extracted with `attr=` or `/@href` come back as written
   in the page (relative), not resolved against the URL.
+- An `Issue` must name a crawled page: `Store.replace_issues` maps
+  `issue.url` to `pages.id` and raises `KeyError` otherwise. Findings about
+  things that are not pages (a sitemap file, an entry on another host) go in
+  a report, not a rule (ADR-0010).
+- The audit test helper `page()` defaults `found_on="start"`; a rule that
+  treats the start page specially (`sitemap.orphan`) needs its test pages
+  given another `found_on`.
 - **Never `gh pr merge --delete-branch` on a PR that other PRs are based
   on.** Deleting the base branch closed #22 and GitHub refused to reopen
   it or change its base; #26 is the same branch re-filed against `main`.
@@ -385,11 +471,19 @@ test, then regenerate `rules.md`.
 
 ## Where to look next
 
-- Phase 7 scope and acceptance: `docs/ROADMAP.md` under "Phase 7". Sitemap
-  parsing is `parse/sitemap.py` (locs only today), sitemap membership is
-  `CrawlView.in_sitemap`, and the stored URLs are `sitemap_urls`.
+- Phase 8 scope and acceptance: `docs/ROADMAP.md` under "Phase 8".
+  `CrawlView.inlinks` / `inlinks_to()` is the inlink index every rule uses
+  today (built from `PageRecord.links`, internal targets only); the `links`
+  table has anchor text, `rel` and `is_internal` per anchor; `analysis/` is
+  where the link graph belongs, next to `analysis/sitemaps.py`.
   `Crawler.arun()` is the entry point for callers that already have an
   event loop; `CrawlSession` is how the UI drives it.
+- Sitemaps: `parse/sitemap.py` (entries, gzip), `Crawler._seed_from_sitemaps`
+  (files and entries), `audit/rules/sitemaps.py` (the four rules),
+  `analysis/sitemaps.py` (`SitemapReport`), `export/sitemap.py`
+  (`write_sitemap`, index splitting), `cli/sitemap_cmd.py`. The conftest
+  serves any fixture file gzip-compressed at `<path>.gz` when `routes.json`
+  lists it under `gzip`.
 - Custom extraction: `parse/extract.py` (grammar, TOML, `ExtractorSet`),
   `Crawler._fetch_and_parse` (where it runs), `store/dump.py::_pages` and
   `web/tabs.py::custom_tab` (where the per-crawl columns come from).

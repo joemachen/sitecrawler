@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gzip
 import json
 import re
 import time
@@ -148,6 +149,10 @@ def serve_site(httpserver: HTTPServer) -> str:
         httpserver.expect_request(path).respond_with_data(
             body, content_type=content_type, headers=extra_headers.get(path, {})
         )
+        if path in routes.get("gzip", []):
+            httpserver.expect_request(f"{path}.gz").respond_with_data(
+                gzip.compress(body), content_type="application/gzip"
+            )
         if len(path) > 1 and path.endswith("/"):
             _redirect(httpserver, path[:-1], f"{base}{path}", status=301)
 

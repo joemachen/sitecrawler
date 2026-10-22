@@ -24,6 +24,7 @@ from sitecrawler.store.schema import (
     LinkRow,
     PageRow,
     RedirectHopRow,
+    SitemapRow,
     SitemapUrlRow,
 )
 from sitecrawler.store.store import render_diff_from_row
@@ -40,6 +41,7 @@ EXPORT_TABLES: tuple[str, ...] = (
     "links",
     "redirects",
     "hreflang",
+    "sitemaps",
     "sitemap_urls",
     "extractions",
 )
@@ -235,12 +237,23 @@ def _hreflang(session: Session) -> TableDump:
     )
 
 
+def _sitemaps(session: Session) -> TableDump:
+    files = session.scalars(select(SitemapRow).order_by(SitemapRow.id)).all()
+    return TableDump(
+        "sitemaps",
+        ("url", "found_in", "kind", "status_code", "url_count", "error"),
+        [(f.url, f.found_in, f.kind, f.status_code, f.url_count, f.error) for f in files],
+    )
+
+
 def _sitemap_urls(session: Session) -> TableDump:
     sitemap_urls = session.scalars(
         select(SitemapUrlRow).order_by(SitemapUrlRow.sitemap_url, SitemapUrlRow.loc)
     ).all()
     return TableDump(
-        "sitemap_urls", ("sitemap_url", "loc"), [(s.sitemap_url, s.loc) for s in sitemap_urls]
+        "sitemap_urls",
+        ("sitemap_url", "loc", "lastmod", "changefreq", "priority"),
+        [(s.sitemap_url, s.loc, s.lastmod, s.changefreq, s.priority) for s in sitemap_urls],
     )
 
 
@@ -250,6 +263,7 @@ _LOADERS: dict[str, Callable[[Session], TableDump]] = {
     "links": _links,
     "redirects": _redirects,
     "hreflang": _hreflang,
+    "sitemaps": _sitemaps,
     "sitemap_urls": _sitemap_urls,
     "extractions": _extractions,
 }

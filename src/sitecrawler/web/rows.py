@@ -20,7 +20,7 @@ from sitecrawler.audit import AuditResult, CrawlView, Rule
 from sitecrawler.audit.engine import RuleCount, robots_directives
 from sitecrawler.audit.view import Inlink
 from sitecrawler.crawl.urls import normalize, same_site
-from sitecrawler.models import Issue, Outcome, PageRecord, Severity
+from sitecrawler.models import Issue, Outcome, PageRecord, Severity, SitemapEntry
 from sitecrawler.session import CrawlSession, SessionState
 from sitecrawler.web.tabs import Row, TabSpec, matches, with_custom
 
@@ -35,7 +35,6 @@ NO_AUDIT: Row = {
     "indexable": None,
     "indexability_reason": "",
     "inlinks": 0,
-    "non_indexable_in_sitemap": False,
 }
 """Audit cells of a page the audit has not seen yet."""
 
@@ -214,7 +213,6 @@ class AuditIndex:
         for issue in result.issues:
             by_url[issue.url].append(issue)
         self._issues = dict(by_url)
-        self._in_sitemap = view.in_sitemap
 
     def issues_for_url(self, url: str) -> list[Issue]:
         """This revision's findings on ``url``, most severe first."""
@@ -224,15 +222,12 @@ class AuditIndex:
         """The audit half of the row for ``url``."""
         issues = self.issues_for_url(url)
         verdict = self.result.verdicts.get(url)
-        indexable = verdict.indexable if verdict else None
-        key = self.view.normalize(url)
         return {
             "rules": [i.rule_id for i in issues],
             "issues_n": len(issues),
-            "indexable": indexable,
+            "indexable": verdict.indexable if verdict else None,
             "indexability_reason": verdict.reason if verdict else "",
             "inlinks": len(self.view.inlinks_to(url)),
-            "non_indexable_in_sitemap": indexable is False and key in self._in_sitemap,
         }
 
 
@@ -289,6 +284,8 @@ class PageDetail:
     inlinks: list[Inlink]
     outlinks: list[Row]
     """``href``, ``text``, ``rel`` and ``crawled`` (True when the target is a page row)."""
+    sitemaps: list[SitemapEntry] = field(default_factory=list)
+    """Every sitemap entry naming this page; empty when no sitemap lists it."""
 
 
 class RowStore:
@@ -524,6 +521,7 @@ class RowStore:
                     }
                     for link in page.links
                 ],
+                sitemaps=self._index.view.sitemap_listings_for(page.url) if self._index else [],
             )
 
 

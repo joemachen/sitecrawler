@@ -27,6 +27,7 @@ nav:
       - Exporting: user-guide/export.md
       - Auditing: user-guide/audit.md
       - Audit rules: user-guide/rules.md
+      - Sitemaps: user-guide/sitemaps.md
       - Browsing a crawl: user-guide/serve.md
   - Project:
       - Development process: DEVELOPMENT.md
@@ -43,6 +44,7 @@ nav:
           - 0007 Live crawl session: adr/0007-live-crawl-session.md
           - 0008 Render every page, keep the diff: adr/0008-render-every-page-and-keep-the-diff.md
           - 0009 Extract in the crawl pass: adr/0009-extract-in-the-crawl-pass.md
+          - 0010 Sitemap audit as page rules: adr/0010-sitemap-audit-as-page-rules.md
   - API reference: reference.md
 
 markdown_extensions:

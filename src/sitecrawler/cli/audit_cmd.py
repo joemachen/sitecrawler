@@ -8,6 +8,7 @@ from typing import Annotated
 import typer
 from rich.table import Table
 
+from sitecrawler.analysis import sitemap_report
 from sitecrawler.audit import CrawlView, load_rules, rule_by_id, run_audit
 from sitecrawler.cli._run import err, fail, require_crawl_db
 from sitecrawler.store import open_store
@@ -44,6 +45,8 @@ def audit(
             f"Rendered {len(rendered)} pages in headless Chromium: {changed} differ from "
             f"their raw HTML (render.differs), {failed} could not be rendered (render.failed)."
         )
+    if crawl.sitemap_files:
+        err.print(f"{sitemap_report(crawl).summary()} Details: sitecrawler sitemap report {db}")
     non_indexable = sum(1 for v in result.verdicts.values() if not v.indexable)
     err.print(
         f"[green]{stored} issues across {len(result.counts())} rules on "

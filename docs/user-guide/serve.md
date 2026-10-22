@@ -94,7 +94,7 @@ are computed from the page itself.
 | Directives | Index, Noindex, Follow, Nofollow, None, Conflicting, Noindex but linked, Blocked but linked |
 | Hreflang | Contains hreflang, Invalid language code, Missing self reference, Missing x-default, Missing return link, To non-200, To non-canonical |
 | Links | No inlinks, Links to redirects, Has nofollow outlinks |
-| Sitemaps | In sitemap, Not in sitemap, Non-indexable in sitemap, Noindex in sitemap |
+| Sitemaps | In sitemap, Not in sitemap, Orphans (in sitemap, no inlinks), Non-indexable in sitemap, Noindex in sitemap, Indexable but not in sitemap, Listed more than once |
 | Issues | One row per rule that fired, most severe first; click a row for its URLs, click the rule id for why it matters and how to fix it |
 
 On Response Codes a redirected page counts under 3xx by the status of its

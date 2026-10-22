@@ -1,3 +1,4 @@
 User-agent: *
 Disallow: /blocked/
 Sitemap: /sitemap.xml
+Sitemap: /sitemap-index.xml

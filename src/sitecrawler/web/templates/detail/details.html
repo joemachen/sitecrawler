@@ -11,4 +11,6 @@
   {{ field("Error", page.error) }}
   {{ field("Depth", page.depth) }}
   {{ field("Found on", page.found_on) }}
+  {{ field("Listed in sitemaps", detail.sitemaps | map(attribute="sitemap_url") | join(", ")) }}
+  {{ field("Sitemap lastmod", detail.sitemaps | map(attribute="lastmod") | select | join(", ")) }}
 </table>

@@ -13,7 +13,14 @@ import pytest
 from sitecrawler.crawl import CrawlControl
 from sitecrawler.crawl.crawler import ProgressCallback
 from sitecrawler.crawl.sink import CrawlSink
-from sitecrawler.models import CrawlConfig, Outcome, PageRecord, QueueItem
+from sitecrawler.models import (
+    CrawlConfig,
+    Outcome,
+    PageRecord,
+    QueueItem,
+    SitemapEntry,
+    SitemapFile,
+)
 from sitecrawler.session import (
     AuditSnapshot,
     CrawlSession,
@@ -50,7 +57,12 @@ class FakeRunner:
     async def arun(self, on_progress: ProgressCallback | None = None) -> list[PageRecord]:
         self.sink.begin(self.config, resume=False)
         seeds = [QueueItem(f"{SITE}/p{i}", 0, "start") for i in range(self.pages)]
-        self.sink.seeded(seeds, [(f"{SITE}/sitemap.xml", f"{SITE}/p0")])
+        sitemap = f"{SITE}/sitemap.xml"
+        self.sink.seeded(
+            seeds,
+            [SitemapFile(sitemap, "robots.txt", "urlset", 200, "", 1)],
+            [SitemapEntry(sitemap, f"{SITE}/p0")],
+        )
         done = 0
         for item in seeds:
             while self.control.paused and not self.control.stopping:

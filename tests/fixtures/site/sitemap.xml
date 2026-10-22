@@ -6,4 +6,5 @@
   <url><loc>/blocked/secret</loc></url>
   <url><loc>/blocked/sitemap-only</loc></url>
   <url><loc>/audit/noindex-in-sitemap</loc></url>
+  <url><loc>/audit/sitemap-twice</loc></url>
 </urlset>

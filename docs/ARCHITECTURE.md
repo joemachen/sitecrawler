@@ -37,9 +37,10 @@ that pass between stages are typed records from `sitecrawler.models`.
                sitemap diff
 ```
 
-**Status (after Phase 5):** `crawl/` (with the Playwright `Renderer`,
-ADR-0008), `parse/`, `store/`, `export/`, `audit/` (53 rules), `cli/`,
-`session.py` and `web/` exist. `session.py`
+**Status (after Phase 7):** `crawl/` (with the Playwright `Renderer`,
+ADR-0008), `parse/`, `store/`, `export/` (including the sitemap writer,
+ADR-0010), `audit/` (57 rules), `analysis/` (the sitemap-versus-crawl
+report), `cli/`, `session.py` and `web/` exist. `session.py`
 (`CrawlSession`, ADR-0007) runs a crawl on a worker thread with pause and
 stop, audits it as pages arrive and writes the result to the file at the
 end, or opens a finished file read-only into the same shape. `web/` is a
@@ -48,7 +49,8 @@ filters as data, `rows.py` turns page records into grid rows (base cells
 once, audit cells per audit revision) and computes the summary counts,
 `app.py` holds the routes; the one-page shell, templates and vendored
 htmx/Tabulator sit beside them (ADR-0006 for the client-side grids).
-`analysis/` is still an empty package.
+`analysis/` holds only the sitemap report so far; the link graph and
+duplicate clusters arrive in Phases 8 and 9.
 
 ---
 
@@ -98,7 +100,8 @@ set of tables in SQLite:
 | `pagination` | page_id, rel (prev/next), href. |
 | `structured_data` | page_id, format (jsonld/microdata/rdfa), type, raw JSON. |
 | `extractions` | page_id, name, kind (`css`/`xpath`/`regex`/`search`), match count, kept value(s) as JSON. Custom extraction and search output (Phase 6, ADR-0009). |
-| `sitemap_urls` | Every URL from every sitemap, with which sitemap it came from. |
+| `sitemaps` | Every sitemap or index the crawl tried to read: where it was found, kind, status, entry count, why it was unusable (Phase 7, ADR-0010). |
+| `sitemap_urls` | Every URL from every sitemap, with which sitemap it came from and its `lastmod`, `changefreq`, `priority`. |
 | `issues` | page_id, rule_id, severity, message. Rebuilt whenever rules run. |
 
 Exports and the web UI are views over these tables. Re-running `audit` on an
