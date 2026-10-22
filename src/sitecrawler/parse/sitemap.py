@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import gzip
 from dataclasses import dataclass, field
+from io import BytesIO
 from typing import Literal
+from urllib.parse import urljoin
 from xml.etree import ElementTree
 
 from sitecrawler.models import SitemapEntry
 
 _GZIP_MAGIC = b"\x1f\x8b"
+GZIP_MAX_BYTES = 64 * 1024 * 1024
+"""Largest decompressed sitemap accepted; the protocol caps a file at 50 MB."""
 _FIELDS = ("loc", "lastmod", "changefreq", "priority")
 
 
@@ -40,27 +44,39 @@ def _entry(container: ElementTree.Element, source: str) -> SitemapEntry | None:
             values[name] = child.text.strip()
     if not values["loc"]:
         return None
-    return SitemapEntry(
-        source, values["loc"], values["lastmod"], values["changefreq"], values["priority"]
-    )
+    loc = urljoin(source, values["loc"]) if source else values["loc"]
+    return SitemapEntry(source, loc, values["lastmod"], values["changefreq"], values["priority"])
+
+
+def _gunzip(xml: bytes) -> bytes | None:
+    """Decompress ``xml``, or ``None`` when it is corrupt or inflates past the limit."""
+    try:
+        with gzip.GzipFile(fileobj=BytesIO(xml)) as stream:
+            data = stream.read(GZIP_MAX_BYTES + 1)
+    except (OSError, EOFError):
+        return None
+    return data if len(data) <= GZIP_MAX_BYTES else None
 
 
 def parse_sitemap(xml: bytes, source: str = "") -> SitemapDoc | None:
     """Parse a sitemap or sitemap index, gzip-compressed or plain.
 
     Elements are matched by local name, so a file that omits or misspells the
-    sitemaps.org namespace still parses. Returns ``None`` if the bytes are not
-    usable XML with a ``urlset`` or ``sitemapindex`` root.
+    sitemaps.org namespace still parses. A relative ``<loc>`` is resolved
+    against ``source``; a URL listed twice in one file is one entry. Returns
+    ``None`` if the bytes are not usable XML with a ``urlset`` or
+    ``sitemapindex`` root, or a gzip file that inflates past
+    :data:`GZIP_MAX_BYTES`.
 
     Args:
         xml: The file's bytes as fetched.
         source: The sitemap's own URL, recorded on every entry.
     """
     if xml.startswith(_GZIP_MAGIC):
-        try:
-            xml = gzip.decompress(xml)
-        except (OSError, EOFError):
+        inflated = _gunzip(xml)
+        if inflated is None:
             return None
+        xml = inflated
     try:
         root = ElementTree.fromstring(xml)
     except ElementTree.ParseError:
@@ -75,10 +91,12 @@ def parse_sitemap(xml: bytes, source: str = "") -> SitemapDoc | None:
         child_name = "url"
     else:
         return None
+    seen: set[str] = set()
     for container in root:
         if _local(container.tag) != child_name:
             continue
         entry = _entry(container, source)
-        if entry is not None:
+        if entry is not None and entry.loc not in seen:
+            seen.add(entry.loc)
             doc.entries.append(entry)
     return doc

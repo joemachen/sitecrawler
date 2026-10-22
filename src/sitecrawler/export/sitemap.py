@@ -6,8 +6,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from email.utils import parsedate_to_datetime
 from pathlib import Path
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 from xml.etree import ElementTree
+
+from sitecrawler.audit import CrawlView, indexability
 
 SITEMAP_NS = "http://www.sitemaps.org/schemas/sitemap/0.9"
 SITEMAP_MAX_URLS = 50_000
@@ -32,6 +34,28 @@ def lastmod_from_header(last_modified: str) -> str:
     except (TypeError, ValueError, IndexError):
         return ""
     return parsed.isoformat(timespec="seconds")
+
+
+def sitemap_urls_for(crawl: CrawlView, *, lastmod: bool = False) -> list[SitemapUrl]:
+    """The pages a sitemap of ``crawl`` should list: status 200 and indexable, in URL order.
+
+    With ``lastmod`` each page's ``Last-Modified`` response header becomes its
+    ``<lastmod>``; pages without the header get none.
+    """
+    return [
+        SitemapUrl(
+            page.url,
+            lastmod_from_header(page.headers.get("last-modified", "")) if lastmod else "",
+        )
+        for page in crawl.pages
+        if page.status_code == 200 and indexability(page, crawl).indexable
+    ]
+
+
+def site_origin(url: str) -> str:
+    """``https://example.com/`` for any URL on the site; the default ``base_url``."""
+    parts = urlparse(url)
+    return f"{parts.scheme}://{parts.netloc}/" if parts.scheme and parts.netloc else ""
 
 
 def _urlset(urls: Sequence[SitemapUrl]) -> ElementTree.Element:
@@ -83,6 +107,7 @@ def write_sitemap(
 
     Raises:
         ValueError: more than ``max_urls`` URLs and no ``base_url``.
+        OSError: ``output`` cannot be written (missing directory, permissions).
     """
     if len(urls) <= max_urls:
         _write(_urlset(urls), output)

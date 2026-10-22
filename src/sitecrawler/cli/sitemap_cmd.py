@@ -4,15 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Annotated
-from urllib.parse import urlparse
 
 import typer
 from rich.table import Table
 
 from sitecrawler.analysis import sitemap_report
-from sitecrawler.audit import CrawlView, indexability
+from sitecrawler.audit import CrawlView
 from sitecrawler.cli._run import err, fail, require_crawl_db
-from sitecrawler.export import SitemapUrl, lastmod_from_header, write_sitemap
+from sitecrawler.export import site_origin, sitemap_urls_for, write_sitemap
 from sitecrawler.store import open_store
 
 sitemap_app = typer.Typer(
@@ -22,11 +21,12 @@ sitemap_app = typer.Typer(
 )
 
 
-def _view(db: Path) -> CrawlView:
+def _view(db: Path) -> tuple[CrawlView, str]:
+    """The stored crawl as a view, plus its start URL (empty in list mode)."""
     require_crawl_db(db)
     with open_store(db) as store:
         try:
-            return CrawlView.from_store(store)
+            return CrawlView.from_store(store), store.crawl().start_url
         except ValueError as exc:
             fail(str(exc))
             raise  # unreachable: fail() exits
@@ -37,7 +37,7 @@ def report(
     db: Annotated[Path, typer.Argument(help="Crawl database written by crawl --db.")],
 ) -> None:
     """Which sitemap files the crawl read, and the entries that match no page."""
-    crawl = _view(db)
+    crawl, _ = _view(db)
     found = sitemap_report(crawl)
     table = Table(title=f"Sitemap files in {db}")
     table.add_column("Sitemap")
@@ -91,23 +91,14 @@ def generate(
     ] = "",
 ) -> None:
     """Write a sitemap of every indexable 200 page in the crawl (an index when over 50,000)."""
-    crawl = _view(db)
+    crawl, start_url = _view(db)
     output = output or db.with_name("sitemap.xml")
-    if not base_url and crawl.pages:
-        origin = urlparse(crawl.pages[0].url)
-        base_url = f"{origin.scheme}://{origin.netloc}/"
-    urls = [
-        SitemapUrl(
-            page.url,
-            lastmod_from_header(page.headers.get("last-modified", "")) if lastmod else "",
-        )
-        for page in crawl.pages
-        if page.status_code == 200 and indexability(page, crawl).indexable
-    ]
+    base_url = base_url or site_origin(start_url)
+    urls = sitemap_urls_for(crawl, lastmod=lastmod)
     try:
         written = write_sitemap(urls, output, base_url=base_url)
-    except ValueError as exc:
-        fail(str(exc))
+    except (ValueError, OSError) as exc:
+        fail(f"cannot write {output}: {exc}" if isinstance(exc, OSError) else str(exc))
         return
     files = ", ".join(str(path) for path in written)
     err.print(f"[green]{len(urls)} URLs written to {files}[/green]")

@@ -6,6 +6,8 @@ from sitecrawler.export.sitemap import (
     SITEMAP_MAX_URLS,
     SitemapUrl,
     lastmod_from_header,
+    site_origin,
+    sitemap_urls_for,
     write_sitemap,
 )
 from sitecrawler.export.xlsx import write_xlsx
@@ -15,6 +17,8 @@ __all__ = [
     "SITEMAP_MAX_URLS",
     "SitemapUrl",
     "lastmod_from_header",
+    "site_origin",
+    "sitemap_urls_for",
     "write_csv",
     "write_json",
     "write_sitemap",

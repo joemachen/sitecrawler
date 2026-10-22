@@ -1,5 +1,7 @@
 import gzip
 
+import pytest
+
 from sitecrawler.models import SitemapEntry
 from sitecrawler.parse import parse_sitemap
 
@@ -41,12 +43,29 @@ def test_index() -> None:
     assert doc.entries[0].lastmod == "2026-02-02"
 
 
-def test_gzip_is_transparent() -> None:
+def test_gzip_is_transparent(monkeypatch: pytest.MonkeyPatch) -> None:
     xml = f"<urlset {NS}><url><loc>https://x/z</loc></url></urlset>".encode()
     doc = parse_sitemap(gzip.compress(xml))
     assert doc is not None
     assert doc.locs == ["https://x/z"]
     assert parse_sitemap(b"\x1f\x8bnot really gzip") is None
+    monkeypatch.setattr("sitecrawler.parse.sitemap.GZIP_MAX_BYTES", len(xml) - 1)
+    assert parse_sitemap(gzip.compress(xml)) is None  # a gzip bomb is not a sitemap
+
+
+def test_relative_locs_resolve_and_repeats_collapse() -> None:
+    xml = f"""<urlset {NS}>
+      <url><loc>/a</loc></url>
+      <url><loc>b?x=1</loc></url>
+      <url><loc>/a</loc><lastmod>2026-01-01</lastmod></url>
+    </urlset>"""
+    doc = parse_sitemap(xml.encode(), "https://x/dir/sitemap.xml")
+    assert doc is not None
+    assert doc.locs == ["https://x/a", "https://x/dir/b?x=1"]
+    assert doc.entries[0].lastmod == ""  # the first listing wins
+    bare = parse_sitemap(xml.encode())
+    assert bare is not None
+    assert bare.locs == ["/a", "b?x=1"]  # nothing to resolve against
 
 
 def test_namespace_is_optional_and_other_namespaces_are_tolerated() -> None:

@@ -87,4 +87,4 @@ def test_bare_sitemap_urls_still_work_for_membership() -> None:
     hits = flagged(sitemaps.Missing(), pages, sitemap_urls=[f"{SITE}/a"])
     assert set(hits) == {"/b"}
     orphan = flagged(sitemaps.Orphan(), pages, sitemap_urls=[f"{SITE}/a"])
-    assert orphan["/a"].message == "listed in , linked from nowhere"
+    assert orphan["/a"].message == "listed in a sitemap, linked from nowhere"

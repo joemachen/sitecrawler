@@ -7,7 +7,14 @@ from pathlib import Path
 import pytest
 from lxml import etree
 
-from sitecrawler.export import SitemapUrl, lastmod_from_header, write_sitemap
+from sitecrawler.export import (
+    SitemapUrl,
+    lastmod_from_header,
+    site_origin,
+    sitemap_urls_for,
+    write_sitemap,
+)
+from tests.unit.audit.helpers import SITE, blocked, page, view
 
 SCHEMAS = Path(__file__).parent.parent / "fixtures" / "schemas"
 
@@ -53,6 +60,27 @@ def test_index_needs_a_base_url(tmp_path: Path) -> None:
     urls = [SitemapUrl("https://example.com/a"), SitemapUrl("https://example.com/b")]
     with pytest.raises(ValueError, match="base_url"):
         write_sitemap(urls, tmp_path / "s.xml", max_urls=1)
+
+
+def test_sitemap_urls_for_keeps_indexable_200_pages_only() -> None:
+    pages = [
+        page("/b", headers={"last-modified": "Wed, 21 Oct 2026 10:00:00 GMT"}),
+        page("/a"),
+        page("/gone", 404),
+        page("/ni", meta_robots="noindex"),
+        page("/moved", 301, final_url=f"{SITE}/a"),
+        page("/empty", 204),
+        blocked("/blocked"),
+    ]
+    urls = sitemap_urls_for(view(pages))
+    assert urls == [SitemapUrl(f"{SITE}/a"), SitemapUrl(f"{SITE}/b")]
+    with_dates = sitemap_urls_for(view(pages), lastmod=True)
+    assert [u.lastmod for u in with_dates] == ["", "2026-10-21T10:00:00+00:00"]
+
+
+def test_site_origin() -> None:
+    assert site_origin("https://www.example.com/deep/page?x=1") == "https://www.example.com/"
+    assert site_origin("") == ""
 
 
 def test_lastmod_from_header() -> None:

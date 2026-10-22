@@ -121,6 +121,13 @@ def test_generate_default_output_sits_next_to_the_db(crawled_db: Path) -> None:
     assert (crawled_db.parent / "sitemap.xml").is_file()
 
 
+def test_generate_fails_cleanly_on_an_unwritable_output(crawled_db: Path, tmp_path: Path) -> None:
+    out = tmp_path / "no-such-dir" / "sitemap.xml"
+    result = runner.invoke(app, ["sitemap", "generate", str(crawled_db), "-o", str(out)])
+    assert result.exit_code == 2
+    assert "cannot write" in result.output
+
+
 def test_generate_rejects_a_non_db(tmp_path: Path) -> None:
     bogus = tmp_path / "x.db"
     bogus.write_text("nope")

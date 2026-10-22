@@ -20,12 +20,12 @@ CATEGORY = "Sitemaps"
 
 def _files(crawl: CrawlView, page: PageRecord) -> str:
     """``sitemap.xml, sitemap-2.xml``: the files that list ``page``, shortest form."""
-    names = []
+    names: list[str] = []
     for entry in crawl.sitemap_listings_for(page.url):
         name = entry.sitemap_url.rsplit("/", 1)[-1] or entry.sitemap_url
-        if name not in names:
+        if name and name not in names:
             names.append(name)
-    return ", ".join(names)
+    return ", ".join(names) or "a sitemap"
 
 
 class Orphan(HtmlPageRule):
