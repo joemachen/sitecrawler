@@ -40,7 +40,7 @@ Deliverables:
 Acceptance:
 
 - [x] All quality gates green locally and in CI (2026-10-21).
-- [ ] A capped crawl of mabelslabels.com matches the original CSV row for row (blocked: site returning 503 after the first full crawl; retry with a longer delay).
+- [x] A capped crawl of mabelslabels.com matches the original CSV row for row (2026-10-22: 300 pages at `--delay 1`; every difference is the original CSV's Latin-1 double-encoding, site content that changed since, or the documented blocked-row zeros and `render_changes` column; see `handoff.md`).
 
 ---
 
