@@ -5,7 +5,16 @@ from __future__ import annotations
 from pathlib import Path
 
 from sitecrawler.audit import run_audit
-from sitecrawler.models import CrawlConfig, HreflangRef, LinkRef, Outcome, PageRecord, RedirectHop
+from sitecrawler.models import (
+    CrawlConfig,
+    HreflangRef,
+    LinkRef,
+    Outcome,
+    PageRecord,
+    RedirectHop,
+    SitemapEntry,
+    SitemapFile,
+)
 from sitecrawler.session import CrawlSession
 from sitecrawler.store import open_store
 from sitecrawler.web.rows import NO_AUDIT, AuditIndex, RowStore, base_row, external_rows
@@ -117,7 +126,7 @@ def test_audit_index_cells() -> None:
     assert cells["issues_n"] == len(cells["rules"])  # type: ignore[arg-type]
     assert "response.4xx" in cells["rules"]  # type: ignore[operator]
     assert cells["rules"][0] == "response.4xx"  # type: ignore[index]  # most severe first
-    assert cells["non_indexable_in_sitemap"] is True
+    assert "sitemap.non_indexable" in cells["rules"]  # type: ignore[operator]
     assert index.cells("https://nowhere.test/") == {**NO_AUDIT, "inlinks": 0}
 
 
@@ -125,7 +134,12 @@ def _stored_session(tmp_path: Path, records: list[PageRecord]) -> CrawlSession:
     db = tmp_path / "crawl.db"
     with open_store(db) as store:
         store.begin(CrawlConfig(start_url=f"{SITE}/"), resume=False)
-        store.seeded([], [(f"{SITE}/sitemap.xml", f"{SITE}/a")])
+        sitemap = f"{SITE}/sitemap.xml"
+        store.seeded(
+            [],
+            [SitemapFile(sitemap, "robots.txt", "urlset", 200, "", 1)],
+            [SitemapEntry(sitemap, f"{SITE}/a", lastmod="2026-03-04")],
+        )
         for record in records:
             store.page_done(record, [])
         store.finish(pages_done=len(records), complete=True)

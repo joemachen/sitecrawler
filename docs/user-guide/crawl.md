@@ -7,7 +7,7 @@ uv run sitecrawler crawl https://example.com -o pages.csv
 The crawler:
 
 1. Fetches `robots.txt` and honours its `Disallow` rules.
-2. Seeds its queue from the site's sitemap(s), including sitemap indexes.
+2. Seeds its queue from the sitemaps `robots.txt` names (or `/sitemap.xml` when it names none), following sitemap indexes and decompressing gzip; see [Sitemaps](sitemaps.md).
 3. Follows every internal link breadth-first until nothing is left or `--max-pages` is hit.
 4. Skips other hosts, non-HTML files (images, PDFs, CSS, JS), and `mailto:`/`tel:` links.
 5. Writes one row per URL, sorted alphabetically.

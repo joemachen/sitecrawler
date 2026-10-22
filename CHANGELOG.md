@@ -6,6 +6,46 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+Phase 7: XML sitemap audit and generation.
+
+### Added
+
+- Four audit rules in a new `Sitemaps` category: `sitemap.orphan` (an
+  indexable page the sitemap lists and no other page links to),
+  `sitemap.non_indexable` (a listed page that redirects, errors, is blocked,
+  is noindex or canonicalises elsewhere, with the reason), `sitemap.missing`
+  (an indexable 200 page no sitemap lists; silent when no sitemap was read)
+  and `sitemap.duplicate` (a page listed more than once, across files or as
+  two spellings). ADR-0010.
+- `sitecrawler sitemap report crawl.db`: every sitemap file the crawl tried
+  with its outcome, plus the entries that match no page (other hosts, never
+  crawled, duplicates). `audit` prints the same as one summary line.
+- `sitecrawler sitemap generate crawl.db [-o sitemap.xml] [--lastmod]
+  [--base-url URL]`: a sitemaps.org-valid sitemap of every indexable 200
+  page, or an index plus numbered parts over 50,000 URLs. `--lastmod` copies
+  each page's `Last-Modified` header as a W3C datetime; `changefreq` and
+  `priority` are never written.
+- The crawl now records every sitemap file it tries in a new `sitemaps`
+  table (`url`, `found_in`, `kind`, `status_code`, `url_count`, `error`),
+  reads gzip-compressed sitemaps, tolerates a missing namespace, and keeps
+  `lastmod`, `changefreq` and `priority` on `sitemap_urls`. Both tables are
+  in the xlsx and json exports.
+- Web UI: the **Sitemaps** tab's filters are now the rules (Orphans,
+  Non-indexable in sitemap, Indexable but not in sitemap, Listed more than
+  once) and show inlinks; URL Details lists the sitemap files naming a page
+  and their `lastmod`.
+- Fixture: `sitemap-index.xml` pointing at a gzipped `sitemap-extra.xml.gz`
+  and a missing file, `audit/sitemap-twice.html`, and the sitemaps.org
+  schemas under `tests/fixtures/schemas/`; `tests/integration/test_sitemaps.py`.
+
+### Changed
+
+- `/sitemap.xml` is guessed only when `robots.txt` names no sitemap, so a
+  site that declares its sitemaps no longer reports a spurious 404.
+- `CrawlSink.seeded` takes the sitemap files and entries instead of
+  `(sitemap_url, loc)` pairs; `CrawlView` carries `sitemap_entries` and
+  `sitemap_files` (the `sitemap_urls` set is derived from them).
+
 ## [0.7.0] - 2026-10-22
 
 Phase 6: custom extraction and custom search.

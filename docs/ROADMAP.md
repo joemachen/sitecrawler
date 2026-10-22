@@ -16,8 +16,8 @@ against `tests/fixtures/site/`, the user guide has a page for it, and
 | 3 | Local web UI | v0.4.0 | Done (2026-10-21) |
 | 4 | Live crawl UI | v0.5.0 | Done (2026-10-21) |
 | 5 | JavaScript rendering | v0.6.0 | Done (2026-10-21) |
-| 6 | Custom extraction and search | v0.7.0 | |
-| 7 | XML sitemap audit and generation | v0.8.0 | |
+| 6 | Custom extraction and search | v0.7.0 | Done (2026-10-22) |
+| 7 | XML sitemap audit and generation | v0.8.0 | Implemented (2026-10-22), release pending |
 | 8 | Internal linking analysis | v0.9.0 | |
 | 9 | Duplicate content detection | v0.10.0 | |
 | 10 | Structured data validation | v1.0.0 | |
@@ -216,8 +216,26 @@ one spec per line.
 
 Acceptance:
 
-- [ ] Fixture `orphan` page is reported as an orphan; `blocked/secret` is reported as non-indexable-in-sitemap; `blog/post-2` as missing-from-sitemap.
-- [ ] Generated sitemap validates against the sitemaps.org XSD.
+- [x] Fixture `orphan` page is reported as an orphan; `blocked/secret` is reported as non-indexable-in-sitemap; `blog/post-2` as missing-from-sitemap (`tests/integration/test_audit.py` `TRIGGERS` for `sitemap.orphan`, `sitemap.non_indexable`, `sitemap.missing`).
+- [x] Generated sitemap validates against the sitemaps.org XSD (`tests/unit/test_sitemap_export.py` and `tests/integration/test_sitemaps.py::test_generate_writes_every_indexable_200_page_and_validates`, against the schemas vendored in `tests/fixtures/schemas/`).
+
+Design notes: ADR-0010. The per-page findings are four audit rules in a
+`Sitemaps` category (`sitemap.orphan`, `sitemap.non_indexable`,
+`sitemap.missing`, `sitemap.duplicate`) that compare the sitemap entries,
+normalised the crawl's way, with the pages and their indexability verdict.
+File-level facts (files read or unreadable, entries on other hosts, entries
+never crawled) are a `SitemapReport` in `analysis/sitemaps.py`, printed by
+`sitecrawler sitemap report` and as one line under `audit`. Every file tried
+is stored in a new `sitemaps` table; `sitemap_urls` gained `lastmod`,
+`changefreq` and `priority`. `sitecrawler sitemap generate` is an export
+(`export/sitemap.py`): indexable 200 pages, an index plus numbered parts over
+50,000 URLs, `<lastmod>` from `Last-Modified` only with `--lastmod`, never
+`changefreq` or `priority`. `/sitemap.xml` is now guessed only when
+robots.txt names no sitemap. Fixture: `sitemap-index.xml` listing a gzipped
+`sitemap-extra.xml.gz` (one page also in `sitemap.xml`, one entry on another
+host) and a missing file; `audit/sitemap-twice.html`. Left for later: a
+grid of sitemap entries in the web UI (the report is CLI-only), `<image:>` /
+`<video:>` / `<xhtml:link>` extensions, and generating per-section sitemaps.
 
 ---
 

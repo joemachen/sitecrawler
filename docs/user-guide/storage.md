@@ -23,7 +23,8 @@ Exports (`sitecrawler export`) read from these tables; see [Exporting](export.md
 | `page_html` | fetched page | `title`, `meta_description`, `meta_robots`, `canonical`, `h1`, `h1s_json`, `h2s_json`, `lang`, `word_count`, `internal_links` |
 | `page_render` | page the crawl tried to render (`--render`) | `ok`, `render_ms`, `error`, raw and rendered `title`, `meta_description`, `meta_robots`, `canonical`, `h1`, `word_count`, `link_count`, `links_added_json`, `links_removed_json` |
 | `links` | anchor on a page | `page_id`, `dst_url`, `anchor_text`, `rel`, `nofollow`, `is_internal` |
-| `sitemap_urls` | URL in a sitemap | `sitemap_url`, `loc` |
+| `sitemaps` | sitemap file the crawl tried to read | `url`, `found_in` (`robots.txt`, `default` or the index that listed it), `kind` (`urlset`, `index`, empty when unusable), `status_code`, `error`, `url_count` |
+| `sitemap_urls` | URL in a sitemap | `sitemap_url`, `loc`, `lastmod`, `changefreq`, `priority` |
 
 Notes:
 

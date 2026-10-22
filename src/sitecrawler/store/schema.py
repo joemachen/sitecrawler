@@ -222,8 +222,26 @@ class LinkRow(Base):
     page: Mapped[PageRow] = relationship(back_populates="links")
 
 
+class SitemapRow(Base):
+    """One sitemap or sitemap index the crawl tried to read."""
+
+    __tablename__ = "sitemaps"
+    __table_args__ = (UniqueConstraint("crawl_id", "url"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    crawl_id: Mapped[int] = mapped_column(ForeignKey("crawls.id"))
+    url: Mapped[str]
+    found_in: Mapped[str]
+    """``robots.txt``, ``default`` or the index that listed it."""
+    kind: Mapped[str] = mapped_column(default="")
+    """``urlset``, ``index`` or empty when unusable."""
+    status_code: Mapped[int | None] = mapped_column(default=None)
+    error: Mapped[str] = mapped_column(default="")
+    url_count: Mapped[int] = mapped_column(default=0)
+
+
 class SitemapUrlRow(Base):
-    """One URL from one sitemap file."""
+    """One URL from one sitemap file. A URL listed twice in one file is one row."""
 
     __tablename__ = "sitemap_urls"
     __table_args__ = (UniqueConstraint("crawl_id", "sitemap_url", "loc"),)
@@ -232,3 +250,6 @@ class SitemapUrlRow(Base):
     crawl_id: Mapped[int] = mapped_column(ForeignKey("crawls.id"))
     sitemap_url: Mapped[str]
     loc: Mapped[str]
+    lastmod: Mapped[str] = mapped_column(default="")
+    changefreq: Mapped[str] = mapped_column(default="")
+    priority: Mapped[str] = mapped_column(default="")

@@ -375,18 +375,16 @@ TABS: tuple[TabSpec, ...] = (
     TabSpec(
         "sitemaps",
         "Sitemaps",
-        ("url", "in_sitemap", "indexable", "indexability_reason", "status_code"),
+        ("url", "in_sitemap", "indexable", "indexability_reason", "inlinks", "status_code"),
         (
             ALL,
             _F("in_sitemap", "In sitemap", "in_sitemap", "truthy"),
             _F("not_in_sitemap", "Not in sitemap", "in_sitemap", "falsy"),
-            _F(
-                "non_indexable_in_sitemap",
-                "Non-indexable in sitemap",
-                "non_indexable_in_sitemap",
-                "truthy",
-            ),
+            _R("orphan", "Orphans (in sitemap, no inlinks)", "sitemap.orphan"),
+            _R("non_indexable_in_sitemap", "Non-indexable in sitemap", "sitemap.non_indexable"),
             _R("noindex_in_sitemap", "Noindex in sitemap", "robots.noindex_in_sitemap"),
+            _R("missing", "Indexable, not in sitemap", "sitemap.missing"),
+            _R("duplicate", "Listed more than once", "sitemap.duplicate"),
         ),
     ),
     TabSpec(

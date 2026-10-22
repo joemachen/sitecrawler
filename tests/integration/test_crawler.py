@@ -131,4 +131,4 @@ def test_parser_failure_becomes_error_record(site: str, monkeypatch: pytest.Monk
     assert by_path["/"].outcome is Outcome.ERROR
     assert "parser exploded" in by_path["/"].error
     assert by_path["/about"].outcome is Outcome.ERROR  # the crawl carried on (sitemap URL)
-    assert len(records) == 6  # start URL plus the five other sitemap URLs
+    assert len(records) == 7  # start URL plus the six other on-site sitemap URLs

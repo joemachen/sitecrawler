@@ -41,6 +41,8 @@ from sitecrawler.models import (
     QueueItem,
     ResumeState,
     SearchSpec,
+    SitemapEntry,
+    SitemapFile,
 )
 from sitecrawler.store import Store, open_store
 
@@ -151,9 +153,14 @@ class _SessionSink:
     def begin(self, config: CrawlConfig, *, resume: bool) -> ResumeState:
         return self._store.begin(config, resume=resume)
 
-    def seeded(self, items: Sequence[QueueItem], sitemap_urls: Sequence[tuple[str, str]]) -> None:
-        self._store.seeded(items, sitemap_urls)
-        self._session._seeded(items, sitemap_urls)
+    def seeded(
+        self,
+        items: Sequence[QueueItem],
+        sitemap_files: Sequence[SitemapFile],
+        sitemap_entries: Sequence[SitemapEntry],
+    ) -> None:
+        self._store.seeded(items, sitemap_files, sitemap_entries)
+        self._session._seeded(items, sitemap_files, sitemap_entries)
 
     def page_done(self, record: PageRecord, discovered: Sequence[QueueItem]) -> None:
         self._store.page_done(record, discovered)
@@ -229,7 +236,8 @@ class CrawlSession:
         self._db: Path | None = None
         self._read_only = False
         self._records: list[PageRecord] = []
-        self._sitemap_urls: set[str] = set()
+        self._sitemap_files: list[SitemapFile] = []
+        self._sitemap_entries: list[SitemapEntry] = []
         self._queued = 0
         self._audit_rev = 0
         self._audit_result: AuditResult | None = None
@@ -259,11 +267,15 @@ class CrawlSession:
             info = store.crawl()
             config = _config_from_json(info.start_url, info.config_json)
             records = list(store.iter_pages())
-            sitemap_urls = store.sitemap_urls()
+            sitemap_files = store.sitemap_files()
+            sitemap_entries = store.sitemap_entries()
             issues = store.iter_issues()
             verdicts = store.indexability()
         view = CrawlView.from_records(
-            records, sitemap_urls=sitemap_urls, keep_query=config.keep_query
+            records,
+            sitemap_entries=sitemap_entries,
+            sitemap_files=sitemap_files,
+            keep_query=config.keep_query,
         )
         result = (
             AuditResult(issues, verdicts, session._rules)
@@ -274,7 +286,8 @@ class CrawlSession:
         session._db = Path(db)
         session._read_only = True
         session._records = records
-        session._sitemap_urls = set(sitemap_urls)
+        session._sitemap_files = sitemap_files
+        session._sitemap_entries = sitemap_entries
         session._audit_rev = 1
         session._audit_result = result
         session._audit_view = view
@@ -414,7 +427,13 @@ class CrawlSession:
     def sitemap_urls(self) -> frozenset[str]:
         """Every URL seen in a sitemap so far, as written there."""
         with self._lock:
-            return frozenset(self._sitemap_urls)
+            return frozenset(e.loc for e in self._sitemap_entries)
+
+    @property
+    def sitemap_entries(self) -> tuple[SitemapEntry, ...]:
+        """Every sitemap entry seen so far, with its file."""
+        with self._lock:
+            return tuple(self._sitemap_entries)
 
     @property
     def rules(self) -> Sequence[Rule]:
@@ -422,9 +441,15 @@ class CrawlSession:
         return self._rules
 
     # ------------------------------------------------------------ callbacks
-    def _seeded(self, items: Sequence[QueueItem], sitemap_urls: Sequence[tuple[str, str]]) -> None:
+    def _seeded(
+        self,
+        items: Sequence[QueueItem],
+        sitemap_files: Sequence[SitemapFile],
+        sitemap_entries: Sequence[SitemapEntry],
+    ) -> None:
         with self._lock:
-            self._sitemap_urls.update(loc for _, loc in sitemap_urls)
+            self._sitemap_files.extend(sitemap_files)
+            self._sitemap_entries.extend(sitemap_entries)
             self._queued = len(items)
 
     def _page_done(self, record: PageRecord) -> None:
@@ -503,9 +528,15 @@ class CrawlSession:
         started = time.monotonic()
         with self._lock:
             records = list(self._records)
-            sitemap_urls = frozenset(self._sitemap_urls)
+            sitemap_files = tuple(self._sitemap_files)
+            sitemap_entries = tuple(self._sitemap_entries)
             keep_query = self._config.keep_query
-        view = CrawlView.from_records(records, sitemap_urls=sitemap_urls, keep_query=keep_query)
+        view = CrawlView.from_records(
+            records,
+            sitemap_entries=sitemap_entries,
+            sitemap_files=sitemap_files,
+            keep_query=keep_query,
+        )
         result = run_audit(view, self._rules)
         with self._lock:
             self._audit_rev += 1

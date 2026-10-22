@@ -73,6 +73,8 @@ def test_headers_and_sitemap_urls_are_stored(site: str, tmp_path: Path) -> None:
         f"{site}/blocked/secret",
         f"{site}/blocked/sitemap-only",
         f"{site}/audit/noindex-in-sitemap",
+        f"{site}/audit/sitemap-twice",
+        "https://elsewhere.test/page",
     }
 
 

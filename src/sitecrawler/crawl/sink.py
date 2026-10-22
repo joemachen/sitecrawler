@@ -10,7 +10,14 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Protocol
 
-from sitecrawler.models import CrawlConfig, PageRecord, QueueItem, ResumeState
+from sitecrawler.models import (
+    CrawlConfig,
+    PageRecord,
+    QueueItem,
+    ResumeState,
+    SitemapEntry,
+    SitemapFile,
+)
 
 
 class CrawlSink(Protocol):
@@ -20,12 +27,18 @@ class CrawlSink(Protocol):
         """Start (or resume) a crawl. Raises ``ValueError`` if that is not possible."""
         ...
 
-    def seeded(self, items: Sequence[QueueItem], sitemap_urls: Sequence[tuple[str, str]]) -> None:
-        """Record the start URL and sitemap seeds as queued, plus every sitemap URL seen.
+    def seeded(
+        self,
+        items: Sequence[QueueItem],
+        sitemap_files: Sequence[SitemapFile],
+        sitemap_entries: Sequence[SitemapEntry],
+    ) -> None:
+        """Record the seeds as queued, plus every sitemap file read and every entry in them.
 
         Args:
             items: Queue items the frontier accepted during seeding.
-            sitemap_urls: ``(sitemap_url, loc)`` for every URL in every sitemap file.
+            sitemap_files: Every sitemap or index the crawl tried to read, usable or not.
+            sitemap_entries: Every ``<url>`` of every usable sitemap, with its file.
         """
         ...
 

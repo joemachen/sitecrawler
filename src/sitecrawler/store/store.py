@@ -34,6 +34,8 @@ from sitecrawler.models import (
     RenderDiff,
     ResumeState,
     Severity,
+    SitemapEntry,
+    SitemapFile,
 )
 from sitecrawler.store.schema import (
     Base,
@@ -46,6 +48,7 @@ from sitecrawler.store.schema import (
     PageRenderRow,
     PageRow,
     RedirectHopRow,
+    SitemapRow,
     SitemapUrlRow,
 )
 
@@ -153,18 +156,49 @@ class Store:
                 seen=self.seen_urls(), pending=tuple(self.pending_items()), done=existing.pages_done
             )
 
-    def seeded(self, items: Sequence[QueueItem], sitemap_urls: Sequence[tuple[str, str]]) -> None:
-        """Insert pending rows for the seeds and remember every sitemap URL."""
+    def seeded(
+        self,
+        items: Sequence[QueueItem],
+        sitemap_files: Sequence[SitemapFile],
+        sitemap_entries: Sequence[SitemapEntry],
+    ) -> None:
+        """Insert pending rows for the seeds; remember every sitemap file and entry."""
         crawl_id = self._crawl_id()
         with Session(self.engine) as session:
             self._queue_pending(session, crawl_id, items)
-            if sitemap_urls:
+            if sitemap_files:
+                session.execute(
+                    insert(SitemapRow)
+                    .values(
+                        [
+                            {
+                                "crawl_id": crawl_id,
+                                "url": f.url,
+                                "found_in": f.found_in,
+                                "kind": f.kind,
+                                "status_code": f.status_code,
+                                "error": f.error,
+                                "url_count": f.url_count,
+                            }
+                            for f in sitemap_files
+                        ]
+                    )
+                    .on_conflict_do_nothing()
+                )
+            if sitemap_entries:
                 session.execute(
                     insert(SitemapUrlRow)
                     .values(
                         [
-                            {"crawl_id": crawl_id, "sitemap_url": sm, "loc": loc}
-                            for sm, loc in sitemap_urls
+                            {
+                                "crawl_id": crawl_id,
+                                "sitemap_url": e.sitemap_url,
+                                "loc": e.loc,
+                                "lastmod": e.lastmod,
+                                "changefreq": e.changefreq,
+                                "priority": e.priority,
+                            }
+                            for e in sitemap_entries
                         ]
                     )
                     .on_conflict_do_nothing()
@@ -287,6 +321,26 @@ class Store:
         """Every URL listed in any sitemap, as written there."""
         with Session(self.engine) as session:
             return frozenset(session.scalars(select(SitemapUrlRow.loc)))
+
+    def sitemap_entries(self) -> list[SitemapEntry]:
+        """Every sitemap entry with its file, ordered by file then URL."""
+        with Session(self.engine) as session:
+            rows = session.scalars(
+                select(SitemapUrlRow).order_by(SitemapUrlRow.sitemap_url, SitemapUrlRow.id)
+            )
+            return [
+                SitemapEntry(r.sitemap_url, r.loc, r.lastmod, r.changefreq, r.priority)
+                for r in rows
+            ]
+
+    def sitemap_files(self) -> list[SitemapFile]:
+        """Every sitemap file the crawl tried, in the order it tried them."""
+        with Session(self.engine) as session:
+            rows = session.scalars(select(SitemapRow).order_by(SitemapRow.id))
+            return [
+                SitemapFile(r.url, r.found_in, r.kind, r.status_code, r.error, r.url_count)
+                for r in rows
+            ]
 
     def replace_issues(self, issues: Sequence[Issue]) -> int:
         """Drop every stored issue and write ``issues``. Returns how many were written."""

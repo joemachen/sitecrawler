@@ -1,1 +1,5 @@
-"""Whole-crawl analysis: link graph, duplicates, sitemap diff. Arrives in Phases 6-8."""
+"""Whole-crawl analysis: sitemap diff now; link graph and duplicates in Phases 8-9."""
+
+from sitecrawler.analysis.sitemaps import SitemapReport, sitemap_report
+
+__all__ = ["SitemapReport", "sitemap_report"]

@@ -6,6 +6,7 @@ import asyncio
 import logging
 from collections.abc import Callable
 from contextlib import AsyncExitStack
+from dataclasses import replace
 from urllib.parse import urljoin, urlparse
 
 from sitecrawler.crawl.control import POLL_SECONDS, CrawlControl
@@ -23,6 +24,8 @@ from sitecrawler.models import (
     ParsedPage,
     QueueItem,
     ResumeState,
+    SitemapEntry,
+    SitemapFile,
 )
 from sitecrawler.parse import (
     compile_extractors,
@@ -159,7 +162,8 @@ class Crawler:
     # ------------------------------------------------------------------ setup
     async def _seed(self) -> None:
         seeds: list[QueueItem] = []
-        sitemap_urls: list[tuple[str, str]] = []
+        sitemap_files: list[SitemapFile] = []
+        sitemap_entries: list[SitemapEntry] = []
         if self.list_mode:
             for url in self.seeds:
                 item = self.frontier.add_seed(url, "list")
@@ -175,34 +179,54 @@ class Crawler:
                     "start URL %s does not look like a page; nothing to crawl", self.start_url
                 )
             if self.config.use_sitemap:
-                await self._seed_from_sitemaps(seeds, sitemap_urls)
+                await self._seed_from_sitemaps(seeds, sitemap_files, sitemap_entries)
         if self.sink is not None:
-            self.sink.seeded(seeds, sitemap_urls)
+            self.sink.seeded(seeds, sitemap_files, sitemap_entries)
 
     async def _seed_from_sitemaps(
-        self, seeds: list[QueueItem], sitemap_urls: list[tuple[str, str]]
+        self,
+        seeds: list[QueueItem],
+        files: list[SitemapFile],
+        entries: list[SitemapEntry],
     ) -> None:
+        """Read every sitemap robots.txt names (or ``/sitemap.xml``), indexes included.
+
+        Every file tried is recorded in ``files`` with what happened to it;
+        every ``<url>`` of every usable sitemap goes to ``entries`` and, when
+        it is a page on this site, to the frontier at depth 0.
+        """
         policy = await self.robots.policy(self.fetcher, self.start_url)
-        candidates = [*policy.sitemaps(), urljoin(self.start_url, "/sitemap.xml")]
+        candidates = [(url, "robots.txt") for url in policy.sitemaps()]
+        if not candidates:
+            candidates.append((urljoin(self.start_url, "/sitemap.xml"), "default"))
         visited: set[str] = set()
         from_sitemaps = 0
         while candidates:
-            sitemap_url = candidates.pop(0)
+            sitemap_url, found_in = candidates.pop(0)
             if sitemap_url in visited:
                 continue
             visited.add(sitemap_url)
             result = await self.fetcher.fetch(sitemap_url)
-            if result.outcome is not Outcome.FETCHED or result.status_code != 200:
-                continue
-            doc = parse_sitemap(result.content)
+            file = SitemapFile(sitemap_url, found_in, status_code=result.status_code)
+            doc = None
+            if result.outcome is not Outcome.FETCHED:
+                file = replace(file, error=f"fetch error: {result.error}"[:200])
+            elif result.status_code != 200:
+                file = replace(file, error=f"status {result.status_code}")
+            elif (doc := parse_sitemap(result.content, sitemap_url)) is None:
+                file = replace(file, error="not sitemap XML")
+            else:
+                file = replace(file, kind=doc.kind, url_count=len(doc.entries))
+            files.append(file)
             if doc is None:
+                log.warning("sitemap %s skipped: %s", sitemap_url, file.error)
                 continue
             if doc.kind == "index":
-                candidates.extend(doc.locs)
+                candidates.extend((entry.loc, sitemap_url) for entry in doc.entries)
                 continue
-            for loc in doc.locs:
-                sitemap_urls.append((sitemap_url, loc))
-                item = self.frontier.add(loc, 0, f"sitemap:{sitemap_url}")
+            for entry in doc.entries:
+                entries.append(entry)
+                item = self.frontier.add(entry.loc, 0, f"sitemap:{sitemap_url}")
                 if item is not None:
                     seeds.append(item)
                     from_sitemaps += 1

@@ -16,6 +16,8 @@ from sitecrawler.models import (
     PageRecord,
     QueueItem,
     RedirectHop,
+    SitemapEntry,
+    SitemapFile,
 )
 from sitecrawler.store import Store, open_store
 from sitecrawler.store.schema import LinkRow, PageHtmlRow, PageRow, RedirectHopRow, SitemapUrlRow
@@ -65,7 +67,8 @@ def test_page_done_writes_every_table(store: Store) -> None:
     store.begin(CONFIG, resume=False)
     store.seeded(
         [QueueItem("https://x.test/", 0, "start"), QueueItem("https://x.test/a", 0, "sitemap:s")],
-        [("https://x.test/sitemap.xml", "https://x.test/a")],
+        [SitemapFile("https://x.test/sitemap.xml", "robots.txt", "urlset", 200, "", 1)],
+        [SitemapEntry("https://x.test/sitemap.xml", "https://x.test/a", lastmod="2026-01-02")],
     )
     record = _page(
         "https://x.test/",
@@ -114,7 +117,7 @@ def test_resume_state_round_trip(tmp_path: Path) -> None:
     path = tmp_path / "r.db"
     with open_store(path) as store:
         store.begin(CONFIG, resume=False)
-        store.seeded([QueueItem("https://x.test/", 0, "start")], [])
+        store.seeded([QueueItem("https://x.test/", 0, "start")], [], [])
         store.page_done(
             _page("https://x.test/", status_code=200),
             [
@@ -201,4 +204,4 @@ def test_issues_for_unknown_urls_are_dropped_with_a_warning(
 
 def test_writing_before_begin_fails(store: Store) -> None:
     with pytest.raises(RuntimeError, match="begin"):
-        store.seeded([QueueItem("https://x.test/", 0, "start")], [])
+        store.seeded([QueueItem("https://x.test/", 0, "start")], [], [])

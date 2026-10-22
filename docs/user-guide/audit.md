@@ -29,6 +29,11 @@ rendered, how many differ from their raw HTML (`render.differs`) and how
 many the browser could not load (`render.failed`); see
 [JavaScript rendering](render.md).
 
+When the crawl read sitemaps, `audit` ends with one line on them: files
+read, entries, and how many point at other hosts, were never crawled or are
+listed twice; `sitecrawler sitemap report` has the detail and the four
+`sitemap.*` rules are part of the fix list. See [Sitemaps](sitemaps.md).
+
 ## Indexability
 
 Every page gets a verdict: indexable, or not indexable with the first reason

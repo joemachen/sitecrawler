@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from sitecrawler.crawl.urls import normalize, strip_www
-from sitecrawler.models import LinkRef, Outcome, PageRecord
+from sitecrawler.models import LinkRef, Outcome, PageRecord, SitemapEntry, SitemapFile
 
 if TYPE_CHECKING:
     from sitecrawler.store import Store
@@ -37,14 +37,24 @@ class CrawlView:
     pages: list[PageRecord]
     """Every fetched page, sorted by URL."""
     sitemap_urls: frozenset[str] = frozenset()
+    """Every URL listed in any sitemap, as written there; derived from ``sitemap_entries``."""
     keep_query: bool = False
+    sitemap_entries: tuple[SitemapEntry, ...] = ()
+    """Every sitemap entry with the file it came from."""
+    sitemap_files: tuple[SitemapFile, ...] = ()
+    """Every sitemap file the crawl tried to read."""
     _by_url: dict[str, PageRecord] = field(init=False, repr=False)
     _normalized: dict[str, str | None] = field(init=False, repr=False, default_factory=dict)
 
     def __post_init__(self) -> None:
-        """Index the pages."""
+        """Index the pages and reconcile the two sitemap fields."""
         self.pages = sorted(self.pages, key=lambda p: p.url)
         self._by_url = {p.url: p for p in self.pages}
+        if self.sitemap_entries:
+            self.sitemap_urls = frozenset(e.loc for e in self.sitemap_entries)
+        elif self.sitemap_urls:
+            # Built from bare URLs (older callers, tests): one entry each, file unknown.
+            self.sitemap_entries = tuple(SitemapEntry("", loc) for loc in sorted(self.sitemap_urls))
 
     @classmethod
     def from_records(
@@ -52,17 +62,34 @@ class CrawlView:
         pages: Iterable[PageRecord],
         *,
         sitemap_urls: Iterable[str] = (),
+        sitemap_entries: Iterable[SitemapEntry] = (),
+        sitemap_files: Iterable[SitemapFile] = (),
         keep_query: bool = False,
     ) -> CrawlView:
-        """Build a view from in-memory records."""
-        return cls(list(pages), frozenset(sitemap_urls), keep_query)
+        """Build a view from in-memory records.
+
+        Give ``sitemap_entries`` when the files are known; ``sitemap_urls``
+        alone is enough for the membership lookups.
+        """
+        return cls(
+            list(pages),
+            frozenset(sitemap_urls),
+            keep_query,
+            tuple(sitemap_entries),
+            tuple(sitemap_files),
+        )
 
     @classmethod
     def from_store(cls, store: Store) -> CrawlView:
-        """Load every fetched page and sitemap URL from ``store``."""
+        """Load every fetched page, sitemap file and sitemap entry from ``store``."""
         config = json.loads(store.crawl().config_json or "{}")
         keep_query = bool(config.get("keep_query", False))
-        return cls(list(store.iter_pages()), store.sitemap_urls(), keep_query)
+        return cls(
+            list(store.iter_pages()),
+            keep_query=keep_query,
+            sitemap_entries=tuple(store.sitemap_entries()),
+            sitemap_files=tuple(store.sitemap_files()),
+        )
 
     # ------------------------------------------------------------ lookups
     def normalize(self, url: str) -> str | None:
@@ -148,14 +175,29 @@ class CrawlView:
         return dict(groups)
 
     @cached_property
+    def sitemap_listings(self) -> dict[str, list[SitemapEntry]]:
+        """Sitemap entries grouped by the normalised URL they name, in file order."""
+        index: dict[str, list[SitemapEntry]] = defaultdict(list)
+        for entry in self.sitemap_entries:
+            key = self.normalize(entry.loc)
+            if key is not None:
+                index[key].append(entry)
+        return dict(index)
+
+    @cached_property
     def in_sitemap(self) -> frozenset[str]:
         """Normalised URLs listed in a sitemap."""
-        return frozenset(n for n in (self.normalize(u) for u in self.sitemap_urls) if n)
+        return frozenset(self.sitemap_listings)
 
     def listed_in_sitemap(self, url: str) -> bool:
         """True when ``url`` appears in any sitemap."""
         key = self.normalize(url)
         return key in self.in_sitemap if key else False
+
+    def sitemap_listings_for(self, url: str) -> list[SitemapEntry]:
+        """Every sitemap entry naming ``url`` (any form); several means it is listed twice."""
+        key = self.normalize(url)
+        return self.sitemap_listings.get(key, []) if key else []
 
     def pages_matching(self, predicate: Callable[[PageRecord], bool]) -> Sequence[PageRecord]:
         """Pages for which ``predicate`` holds."""
