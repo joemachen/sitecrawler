@@ -1,8 +1,7 @@
 # Handoff: sitecrawler
 
 Read this first in a new session. It is the state of the project as of
-2026-10-22 (v0.8.0 released; Phase 8 built on PR #38, not yet merged or
-released) and everything that is
+2026-10-22 (v0.9.0 released, Phase 9 not started) and everything that is
 not obvious from the code.
 
 ## What this is
@@ -96,9 +95,11 @@ crawled page to hang on; generation is an export (`export/sitemap.py`) with
 behaviour change: `/sitemap.xml` is guessed only when robots.txt names no
 sitemap, so a site that declares its sitemaps no longer logs a spurious 404.
 
-**Phase 8 (internal linking analysis) is built and waiting on PR #38**
-(`feat/links`, against `main`, not yet merged; the next release is v0.9.0).
-One PR plus a review-fix commit. A `/code-review` pass found and fixed:
+**Phase 8 (internal linking analysis) is complete and released as
+v0.9.0** (annotated tag on `main` at cd85c5d, 2026-10-22). One PR,
+`feat/links` (#38, squash-merged as 0cdc95d), then `chore/release-v0.9.0`
+(#39) and `docs/handoff-v0.9.0` (#40). A `/code-review` pass on #38 found
+and fixed:
 `link.few_inlinks` firing on every page of a list-mode crawl (it is now
 silent when the crawl has no start page), `links report --top 0` printing
 every row, an unused `LinkGraph.metrics_for`, and a PageRank tolerance
@@ -324,24 +325,33 @@ What exists now:
 
 Open:
 
-- **mabelslabels.com row-for-row check (Phase 0 acceptance) is still
-  parked.** The 503 on 2026-10-21 was the site being taken down for emergency
-  patching of a worldwide Magento vulnerability, not the crawler being
-  blocked. Retry once the site is back; use `--delay 1`.
+- **mabelslabels.com row-for-row check (Phase 0 acceptance) passed on
+  2026-10-22**: 300 pages at `--delay 1` against `mabelslabels_pages.csv`
+  (the original script's full crawl, ignored by git). Every difference
+  had a cause outside the crawler: the original CSV is Latin-1
+  double-encoded (the site sends no charset header; `®`, curly quotes and
+  non-breaking spaces are mojibake there and correct now), the site's
+  content grew (product pages count about twice the words; the old
+  BeautifulSoup method and the current lxml parser agree exactly on
+  today's HTML), the sitemap gained entries (two pages moved to depth 0),
+  one page's 500 became a 200, and two format changes since Phase 0:
+  blocked rows write `0` where the original left blanks, and the CSV ends
+  with `render_changes`. The 503 on 2026-10-21 was the site being taken
+  down for emergency patching of a Magento vulnerability.
 - The xlsx export has not been opened in Excel by hand.
 - `redirect.http_to_https_missing` is deferred until the fixture server can
   serve HTTPS (see the note under Phase 2 in the roadmap).
 - Dependabot's older uv can produce lockfile-downgrading PRs (#4 was closed
   for that); read the lock diff before merging.
-- Next steps: merge #38 once CI is green (`gh pr merge 38 --squash`),
-  then release v0.9.0 with the #35 recipe: bump `pyproject.toml`,
-  `__init__.py` and `uv.lock` (`uv lock`), date the CHANGELOG Unreleased
-  block, mark the roadmap row Done, PR, squash-merge, annotated tag on
-  `main`, then a handoff PR. After that: **Phase 9, duplicate and
-  near-duplicate content** (`docs/ROADMAP.md`); `analysis/` is where the
-  clusters belong, next to `sitemaps.py` and `links.py`, and the HTML
-  bodies are still not stored (ADR-0009 names storing them behind a flag as
-  the obvious next step, which content hashing will want).
+- Next piece of work: **Phase 9, duplicate and near-duplicate content**
+  (`docs/ROADMAP.md`); `analysis/` is where the clusters belong, next to
+  `sitemaps.py` and `links.py`, and the HTML bodies are still not stored
+  (ADR-0009 names storing them behind a flag as the obvious next step,
+  which content hashing will want). The release recipe is #39: bump
+  `pyproject.toml`, `__init__.py` and `uv.lock` (`uv lock`), date the
+  CHANGELOG Unreleased block, mark the roadmap row Done, PR, squash-merge
+  once `gh pr checks N` is green, annotated tag on `main`, then a handoff
+  PR.
 - Phase 8 left for later: canonicals are ignored by the link graph (a
   canonicalised page keeps its own node and score); no row-per-link grid in
   the web UI (the detail pane and `links report` cover it); the rule
@@ -381,15 +391,13 @@ Open:
   resuming a stopped crawl from the UI (the CLI's `--resume` works on the
   file). Summary counts are recomputed per `(seq, audit_rev)` over every
   filter of every tab; fine at 10k pages, not profiled beyond.
-- `feat/links` (#38) is unmerged; after the squash merge delete it like
-  the rest. Merged branches `feat/render`, `chore/release-v0.6.0`,
-  `docs/handoff-v0.6.0`, `feat/extract`, `chore/release-v0.7.0`,
-  `docs/handoff-v0.7.0`, `feat/sitemaps`, `chore/release-v0.8.0` and
-  `docs/handoff-v0.8.0` may still exist on origin (Claude Code's sandbox
-  refuses `git push --delete`); delete them by hand if `git branch -r`
-  still lists them. The local checkout also carries every merged Phase 3
-  and 4 branch plus `.claude/worktrees/` entries for the Phase 5, 6 and 7
-  sessions; `git worktree prune` and `git branch -d` clean those up.
+- Merged branches are deleted from origin by hand after each merge
+  (`git push origin --delete <branch>` from a terminal; Claude Code's
+  sandbox refuses it); `git branch -r` should list only `origin/main`.
+  The local checkout is clean of merged branches; `.claude/worktrees/`
+  still holds empty folders from earlier sessions that `git worktree
+  prune` has already forgotten (delete them once nothing holds them
+  open).
 - Dependabot will now also see fastapi/uvicorn/jinja2/playwright; the
   vendored htmx/Tabulator files are upgraded by hand (replace the three files
   under `src/sitecrawler/web/static/`).
