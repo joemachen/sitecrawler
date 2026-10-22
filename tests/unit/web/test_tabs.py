@@ -118,7 +118,7 @@ def test_custom_tab_is_built_from_the_extraction_names() -> None:
     )
     not_html = base_row(page("/pdf", content_type="application/pdf"))
     by_id = {f.id: f for f in tab.filters}
-    assert (found["extract_price"], found["extract_price_n"], found["search_ga"]) == (
+    assert (found["extract_price"], found["extract_price:n"], found["search_ga"]) == (
         "$1",
         1,
         False,

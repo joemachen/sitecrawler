@@ -145,11 +145,6 @@ def _extraction_names(session: Session) -> list[tuple[str, str]]:
     return [(name, kind) for name, kind in rows]
 
 
-def extraction_cell(extraction: Extraction) -> Cell:
-    """What a page row shows for one extraction: found or not for a search, the value otherwise."""
-    return extraction.matched if extraction.kind == "search" else extraction.value
-
-
 def _pages(session: Session) -> TableDump:
     pages = session.scalars(
         select(PageRow)
@@ -169,7 +164,7 @@ def _pages(session: Session) -> TableDump:
             (e.name, e.kind): Extraction(e.name, e.kind, tuple(json.loads(e.values_json)), e.count)
             for e in page.extractions
         }
-        extra: list[Cell] = [extraction_cell(found[key]) if key in found else None for key in names]
+        extra: list[Cell] = [found[key].cell if key in found else None for key in names]
         rows.append((*_page_row(page), *extra))
     return TableDump("pages", columns, rows)
 

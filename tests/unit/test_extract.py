@@ -72,11 +72,18 @@ def test_parse_extractor(text: str, expected: ExtractorSpec) -> None:
         ("price=regex:(", "invalid regex"),
         ("price=regex[html]:x", "does not apply"),
         ("price=regex[attr=src]:x", "does not apply"),
+        ("h=xpath:lower-case(//h1)", "invalid XPath expression"),
+        ("h=css[html,attr=src]:img", "contradict each other"),
     ],
 )
 def test_parse_extractor_errors(text: str, message: str) -> None:
     with pytest.raises(ValueError, match=message):
         parse_extractor(text)
+
+
+def test_regex_expression_keeps_its_trailing_whitespace() -> None:
+    assert parse_extractor(r"x=regex:foo\ ").expr == r"foo\ "
+    assert parse_extractor(" x = css: .p ").expr == ".p"
 
 
 def test_make_extractor_checks_loose_parts() -> None:
@@ -89,6 +96,9 @@ def test_make_extractor_checks_loose_parts() -> None:
         make_extractor("a", "sql", "p")
     with pytest.raises(ValueError, match="names are letters"):
         make_extractor("a b", "css", "p")
+    with pytest.raises(ValueError, match="contradict"):
+        make_extractor("a", "css", "p", mode="html", attr="href")
+    assert make_extractor("a", "css", "p", mode="attr", attr="href").mode == "attr"
 
 
 def test_parse_search() -> None:

@@ -46,9 +46,7 @@ def _row(record: PageRecord) -> dict[str, str | int | bool]:
         "render_changes": record.render.describe() if record.render else record.render_error,
     }
     for extraction in record.extractions:
-        row[extraction.column] = (
-            extraction.matched if extraction.kind == "search" else extraction.value
-        )
+        row[extraction.column] = extraction.cell
     return row
 
 

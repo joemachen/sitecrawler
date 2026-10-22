@@ -349,7 +349,7 @@ def test_web_custom_tab_shows_the_columns_and_filters(client: TestClient, site: 
         "WID-001",
         GA_ID,
     )
-    assert (widget["search_gtag"], widget["search_gtag_n"]) == (True, 2)
+    assert (widget["search_gtag"], widget["search_gtag:n"]) == (True, 2)
     assert rows["/products/gizmo"]["search_gtag"] is False
     assert "search_gtag" not in rows["/missing"]
 

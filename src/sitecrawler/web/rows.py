@@ -168,10 +168,8 @@ def base_row(
         "raw_canonical": record.render.raw_canonical if record.render else "",
     }
     for extraction in record.extractions:
-        row[extraction.column] = (
-            extraction.matched if extraction.kind == "search" else extraction.value
-        )
-        row[f"{extraction.column}_n"] = extraction.count
+        row[extraction.column] = extraction.cell
+        row[extraction.count_column] = extraction.count
     return row
 
 

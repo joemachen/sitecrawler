@@ -142,6 +142,16 @@ class Extraction:
         """``search_<name>`` for a search, ``extract_<name>`` otherwise."""
         return f"search_{self.name}" if self.kind == "search" else f"extract_{self.name}"
 
+    @property
+    def cell(self) -> str | bool:
+        """What a page row shows: found or not for a search, the joined value otherwise."""
+        return self.matched if self.kind == "search" else self.value
+
+    @property
+    def count_column(self) -> str:
+        """The row key holding :attr:`count`; ``:`` keeps it clear of any extractor name."""
+        return f"{self.column}:n"
+
 
 @dataclass(slots=True, frozen=True)
 class RedirectHop:

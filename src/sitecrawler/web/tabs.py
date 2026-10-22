@@ -14,6 +14,7 @@ from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from typing import Literal
 
+from sitecrawler.models import Extraction
 from sitecrawler.store.dump import Cell
 
 Op = Literal["eq", "ne", "has", "gt", "truthy", "falsy"]
@@ -123,8 +124,9 @@ def custom_tab(extractions: Sequence[tuple[str, str]] = ()) -> TabSpec:
             filters.append(_F(f"not:{name}", f"{name}: does not contain", column, "eq", False))
         else:
             column = f"extract_{name}"
-            filters.append(_F(f"has:{name}", f"{name}: found", f"{column}_n", "gt", 0))
-            filters.append(_F(f"not:{name}", f"{name}: not found", f"{column}_n", "eq", 0))
+            count = Extraction(name, kind).count_column
+            filters.append(_F(f"has:{name}", f"{name}: found", count, "gt", 0))
+            filters.append(_F(f"not:{name}", f"{name}: not found", count, "eq", 0))
         columns.append(column)
         titles[column] = name
     columns += ["status_code", "indexable"]

@@ -40,6 +40,7 @@ TOML form, one table per extractor or search under ``[extract]`` and
 from __future__ import annotations
 
 import html as html_escape
+import logging
 import re
 import tomllib
 from collections.abc import Iterable, Sequence
@@ -52,6 +53,8 @@ from lxml.cssselect import CSSSelector
 
 from sitecrawler.models import Extraction, ExtractMode, ExtractorKind, ExtractorSpec, SearchSpec
 from sitecrawler.parse.html import parse_document, text_of
+
+log = logging.getLogger(__name__)
 
 KINDS: tuple[str, ...] = get_args(ExtractorKind)
 MODES: tuple[str, ...] = get_args(ExtractMode)
@@ -76,7 +79,7 @@ def parse_extractor(text: str) -> ExtractorSpec:
     if not sep or not _NAME.fullmatch(name):
         msg = f"extractor {text!r}: expected {_GRAMMAR} (NAME is letters, digits, _ and -)"
         raise ValueError(msg)
-    match = _HEAD.fullmatch(rest.strip())
+    match = _HEAD.fullmatch(rest.lstrip())
     if match is None:
         msg = f"extractor {name!r}: expected {_GRAMMAR} after the ="
         raise ValueError(msg)
@@ -100,8 +103,10 @@ def _modifiers(name: str, text: str) -> tuple[ExtractMode, str, bool]:
         if token in ("text", "html"):
             mode = "text" if token == "text" else "html"
         elif token.startswith("attr="):
-            attr = token.removeprefix("attr=").strip()
-            mode = "attr"
+            attr = token.removeprefix("attr=").strip()  # make_extractor turns this into mode attr
+            if not attr:
+                msg = f"extractor {name!r}: mode attr needs the attribute name (attr=NAME)"
+                raise ValueError(msg)
         elif token == "all":
             keep_all = True
         elif token == "first":
@@ -140,8 +145,11 @@ def make_extractor(
     if mode not in MODES:
         msg = f"extractor {name!r}: unknown mode {mode!r}; use text, html or attr"
         raise ValueError(msg)
+    if attr and mode == "text":
+        mode = "attr"  # ``attr=NAME`` alone is enough; a stated ``text`` is the default
     if attr and mode != "attr":
-        mode = "attr"
+        msg = f"extractor {name!r}: mode {mode!r} and attr {attr!r} contradict each other"
+        raise ValueError(msg)
     if mode == "attr" and not attr:
         msg = f"extractor {name!r}: mode attr needs the attribute name (attr=NAME)"
         raise ValueError(msg)
@@ -302,12 +310,23 @@ class _Compiled:
     pattern: re.Pattern[str] | None = None
 
 
+_PROBE = parse_document("<html><body><p>probe</p></body></html>")
+"""A tiny document every XPath is evaluated against once at compile time.
+
+lxml compiles XPath lazily: an unknown function (``lower-case()`` is XPath 2.0)
+or a type error only surfaces on evaluation, which must not happen on the
+first crawled page.
+"""
+
+
 def _compile_extractor(spec: ExtractorSpec) -> _Compiled:
     try:
         if spec.kind == "css":
             return _Compiled(spec, xpath=CSSSelector(spec.expr))
         if spec.kind == "xpath":
-            return _Compiled(spec, xpath=etree.XPath(spec.expr))
+            xpath = etree.XPath(spec.expr)
+            xpath(_PROBE)
+            return _Compiled(spec, xpath=xpath)
         return _Compiled(spec, pattern=re.compile(spec.expr))
     except (SelectorError, etree.XPathError, re.error) as exc:
         label = {"css": "CSS selector", "xpath": "XPath expression", "regex": "regex"}[spec.kind]
@@ -356,14 +375,18 @@ class ExtractorSet:
             if compiled.pattern is not None:
                 values = _regex_values(compiled.pattern, html)
             elif compiled.xpath is not None and doc is not None:
-                values = _node_values(compiled.xpath(doc), spec)
+                values = _evaluate(compiled.xpath, doc, spec)
             else:  # pragma: no cover - every compiled extractor has one or the other
                 values = []
             kept = values if spec.all else values[:1]
             results.append(Extraction(spec.name, spec.kind, tuple(kept), len(values)))
         for search, pattern in self._searches:
-            found = [m.group(0) for m in pattern.finditer(html)]
-            results.append(Extraction(search.name, "search", tuple(found[:1]), len(found)))
+            first = ""
+            count = 0
+            for match in pattern.finditer(html):
+                count += 1
+                first = first or match.group(0)
+            results.append(Extraction(search.name, "search", (first,) if count else (), count))
         return tuple(results)
 
 
@@ -376,6 +399,17 @@ def compile_extractors(
         ValueError: an expression its parser rejects, or a name used twice.
     """
     return ExtractorSet(extractors, searches)
+
+
+def _evaluate(xpath: etree.XPath, doc: etree._Element, spec: ExtractorSpec) -> list[str]:
+    """Run one compiled selector or expression; a page that trips it counts as no match."""
+    try:
+        return _node_values(xpath(doc), spec)
+    except etree.XPathError as exc:
+        # Compile-time probing catches unknown functions; this is the rare page-specific
+        # failure (a type error on this document). One extractor must never fail the page.
+        log.warning("extractor %r failed on this page: %s", spec.name, exc)
+        return []
 
 
 def _regex_values(pattern: re.Pattern[str], html: str) -> list[str]:
