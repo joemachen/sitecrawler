@@ -79,7 +79,7 @@ cases for `<br>`, comments, empty documents and XHTML prologues).
 **Phase 7 (XML sitemap audit and generation) is complete and released as
 v0.8.0** (annotated tag on `main` at f5a7c53, 2026-10-22). One PR,
 `feat/sitemaps` (#34, squash-merged as 573408b), then
-`chore/release-v0.8.0` (#35) and `docs/handoff-v0.8.0`. A `/code-review`
+`chore/release-v0.8.0` (#35) and `docs/handoff-v0.8.0` (#36). A `/code-review`
 pass on #34 found and fixed: relative `<loc>` values not resolved against
 the sitemap URL, a URL listed twice in one file differing between the live
 session and the store, unbounded gzip inflation, the page selection living
@@ -253,7 +253,7 @@ What exists now:
   detail pane; vendored `htmx.min.js` (2.0.11), `tabulator.min.js`/`.css`
   (6.7.0). Rule explanations are rendered in-app at `/rules/<id>`, the
   full page per URL at `/page?url=`, built from `templates/detail/*`.
-- ~590 offline tests (19 of them headless Chromium, marker `browser`:
+- 602 offline tests (19 of them headless Chromium, marker `browser`:
   the UI e2e tests plus the rendered crawls). ADRs 0001-0010.
 
 Open:
@@ -421,6 +421,12 @@ test, then regenerate `rules.md`.
 - Python scripts that rewrite files on this machine write CRLF; the repo is
   LF. Convert before committing or the diff is every line
   (`write_text(..., newline="\n")`).
+- `tests/integration/test_session_live.py::test_live_crawl_matches_the_cli_audit`
+  failed once on the Windows CI runner (#36, a docs-only change) with two
+  `response.error` pages instead of one: a transient socket failure on the
+  runner turned a second fixture page into an ERROR record. A re-run of
+  the job passed. Treat a lone Windows failure of that test as a flake and
+  re-run before investigating.
 - **Playwright clicks and `<details>` menus**: an open Settings panel in
   the top bar covers the Start button; the e2e tests close it before
   clicking. The Tabulator search box matches every column, so select a
