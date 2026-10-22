@@ -1,7 +1,8 @@
 # Handoff: sitecrawler
 
 Read this first in a new session. It is the state of the project as of
-2026-10-21 (v0.5.0 released, Phase 5 not started) and everything that is
+2026-10-21 (v0.5.0 released; Phase 5, JavaScript rendering, implemented on
+PR #28 `feat/render`, not yet merged or released) and everything that is
 not obvious from the code.
 
 ## What this is
@@ -48,7 +49,41 @@ produced a byte-identical tree, so no merge waited for a fresh CI run.
 The roadmap calls the live UI Phase 4 and JS rendering Phase 5 (later
 phases shifted by one).
 
+**Phase 5 (JavaScript rendering) is implemented on one PR, #28
+`feat/render`** (branch from `main` at 47f5a97). It was small enough for a
+single PR rather than a stack. Done means: merge it once CI is green, then
+cut `chore/release-v0.6.0` the way #25 did (bump `pyproject.toml` and
+`src/sitecrawler/__init__.py`, move the Unreleased block in `CHANGELOG.md`
+under `[0.6.0]`, annotated tag on `main`). ADR-0008 records the design:
+every parsable HTML page is rendered (no "looks JS-dependent" heuristic),
+the rendered fields become the page record and rendered-only links feed
+the frontier, the raw values are kept in a `RenderDiff` stored in
+`page_render`, and the two HTML bodies are not stored.
+
 What exists now:
+
+- `sitecrawler crawl URL --render [--render-workers 2] [--render-wait
+  networkidle|load|domcontentloaded] [--render-selector CSS]
+  [--render-timeout 30]`: after the raw httpx fetch, every parsable HTML
+  page is loaded in one headless Chromium (`crawl/renderer.py`, Playwright
+  async API, `render_workers` tabs through a semaphore, images/fonts/media
+  blocked, the fetcher's per-host throttle shared). `Crawler._render` hands
+  the DOM to `parse_html` and `diff_rendered` (`parse/render_diff.py`).
+  A failed render keeps the raw parse and sets `record.render_error`.
+  Rules `render.differs` (medium) and `render.failed` (low) in
+  `audit/rules/render.py`; `audit` prints a one-line rendering summary.
+  Web: `StartRequest.render`, a **Render JavaScript** checkbox in Settings,
+  a **JavaScript** tab in `web/tabs.py`, a **Rendering** detail section
+  (`templates/detail/render.html`). Exports: `render_status`,
+  `render_changes` on `pages`; the CSV gained `render_changes` last.
+  Playwright is the optional extra `sitecrawler[render]` (`uv lock` was
+  re-run); `--render` without it, or without Chromium, raises
+  `RenderUnavailableError` (a `ValueError`) before the first request.
+  Fixture: `tests/fixtures/site/js-injected.html`, linked from the index;
+  `tests/integration/test_render.py` and `test_web_render.py` (marker
+  `browser`) crawl it with and without `--render`. `list` mode has no
+  `--render` flag yet (the config supports it; only the CLI option is
+  missing).
 
 - `sitecrawler serve [crawl.db] [--port] [--no-open] [--crawls-dir]`: the
   Screaming-Frog-style UI. With no file it opens empty: URL bar, Start /
@@ -63,7 +98,7 @@ What exists now:
 - `sitecrawler crawl URL [-o pages.csv] [--db crawl.db [--resume]]`,
   `sitecrawler list urls.txt|- [--follow]`, `sitecrawler export crawl.db
   --format csv|xlsx|json`: see the Phase 1 notes in `docs/ROADMAP.md`.
-- `sitecrawler audit crawl.db`: runs 51 rules over a stored crawl, writes the
+- `sitecrawler audit crawl.db`: runs 53 rules over a stored crawl, writes the
   `issues` table and an indexability verdict per page, prints the fix list by
   severity. `sitecrawler issues crawl.db --rule ID` lists affected URLs.
 - Rules live in `src/sitecrawler/audit/rules/<category>.py` as classes with
@@ -80,8 +115,8 @@ What exists now:
   detail pane; vendored `htmx.min.js` (2.0.11), `tabulator.min.js`/`.css`
   (6.7.0). Rule explanations are rendered in-app at `/rules/<id>`, the
   full page per URL at `/page?url=`, built from `templates/detail/*`.
-- ~450 offline tests (8 of them headless Chromium, marker `browser`).
-  ADRs 0001-0007.
+- ~490 offline tests (18 of them headless Chromium, marker `browser`:
+  the UI e2e tests plus the rendered crawls). ADRs 0001-0008.
 
 Open:
 
@@ -94,11 +129,16 @@ Open:
   serve HTTPS (see the note under Phase 2 in the roadmap).
 - Dependabot's older uv can produce lockfile-downgrading PRs (#4 was closed
   for that); read the lock diff before merging.
-- Next piece of work: **Phase 5, JavaScript rendering**
-  (`docs/ROADMAP.md`). Playwright is already a dev dependency
-  and Chromium is installed in CI. The UI needs no new tab for it until
-  the rendered-vs-raw diff exists; `--render` can go into the Settings
-  panel (`StartRequest` in `web/app.py`).
+- Next piece of work: **merge #28, release v0.6.0, then Phase 6
+  (custom extraction and search)** per `docs/ROADMAP.md`. Phase 6 wants
+  to extract from the rendered HTML when `--render` is on: the rendered
+  DOM is not stored (ADR-0008), so extraction has to run inside
+  `Crawler._fetch_and_parse` / `_render` where the text is in hand, or
+  the bodies have to be stored behind a flag first.
+- Phase 5 left for later: blocking third-party hosts (analytics) in the
+  renderer (only resource types are blocked now); a `--render` flag on
+  `list`; storing raw and rendered HTML bodies; the `rendered` fixture in
+  `test_render.py` renders the whole site once per module, about 15 s.
 - Phase 4 left for later: a "Links" row-per-link view (the detail pane's
   Inlinks/Outlinks cover it), collapsing the sidebar, dark mode, and
   resuming a stopped crawl from the UI (the CLI's `--resume` works on the
@@ -121,7 +161,7 @@ Open:
 | Storage | SQLite, one file per crawl, via SQLAlchemy 2.0 (ADR-0004) |
 | HTTP | httpx + asyncio, redirects followed by hand, per-host throttle; hops that leave the crawl's hosts are not fetched (ADR-0003) |
 | HTML | lxml (+ cssselect) once custom extraction lands; BeautifulSoup today |
-| JS rendering | Playwright headless Chromium, Phase 4 |
+| JS rendering | Playwright async API inside the crawl loop, one Chromium, `render_workers` tabs; every parsable HTML page is rendered, rendered fields become the page, the diff is stored, the HTML bodies are not (ADR-0008) |
 | Issues engine | Rule classes discovered from `audit/rules/`; docs generated from them; issues table rebuilt per run; verdict stored on pages (ADR-0005) |
 | Rule overlap | One tag may appear under several rules when they ask for different actions; `page.non_indexable` and `canonical.not_self_referencing` are informational roll-ups |
 | Commits | Conventional Commits, squash-merge PRs, `CHANGELOG.md` entry per change |
@@ -138,6 +178,7 @@ Full rationale in `docs/adr/`.
 ```bash
 uv sync                                  # install into .venv (dev deps included)
 uv run sitecrawler crawl https://example.com --db example.db
+uv run sitecrawler crawl https://example.com --db example.db --render   # headless Chromium per page
 uv run sitecrawler audit example.db
 uv run sitecrawler issues example.db --rule title.missing
 uv run sitecrawler export example.db --format xlsx
@@ -222,6 +263,23 @@ test, then regenerate `rules.md`.
   whitespace removed when asserting on a path.
 - `pydantic.Field(5000, ge=1)` reads as "no default" to mypy without the
   plugin; write `Field(default=5000, ge=1)`.
+- **Playwright's async API is fine inside `asyncio.run` on the main
+  thread** (that is how `Crawler.run()` renders) as long as no sync
+  Playwright is open in the same process; the sync API is the one that
+  owns a loop. Keep the UI e2e module's `sync_playwright()` fixture
+  module-scoped for that reason.
+- Chromium requests `/favicon.ico` on every page; the fixture server
+  answers 404 and nothing records it. A `pytest-httpserver` `HTTPServer`
+  created by hand (`test_render.py::site_module`) is the way to keep one
+  rendered crawl for a whole module without the function-scoped
+  `httpserver` fixture clearing its handlers between tests.
+- `networkidle` never fires on a page that keeps polling, and a
+  `--render-selector` that never appears times out the same way; both are
+  reported as `render.failed`, not raised. Keep `render_timeout_seconds`
+  small in tests that exercise the failure path.
+- Ruff's B009 rewrites `getattr(x, "name")` to `x.name`, so a fake that
+  returns `object` must be typed as the real record or mypy fails after
+  `ruff --fix`.
 - **Never `gh pr merge --delete-branch` on a PR that other PRs are based
   on.** Deleting the base branch closed #22 and GitHub refused to reopen
   it or change its base; #26 is the same branch re-filed against `main`.
@@ -230,9 +288,11 @@ test, then regenerate `rules.md`.
 
 ## Where to look next
 
-- Phase 5 scope and acceptance: `docs/ROADMAP.md` under "Phase 5". It needs
-  a fixture page that injects its title, canonical and three links via JS,
-  a `--render` flag on `crawl`, and a rendered-vs-raw diff. `Crawler.arun()`
+- Phase 6 scope and acceptance: `docs/ROADMAP.md` under "Phase 6".
+  Extraction belongs in `parse/` (pure functions over HTML text) and runs
+  from `Crawler._fetch_and_parse`, which already has both the raw text and,
+  with `--render`, the rendered DOM in hand; results go in a new
+  `extractions` table (see `ARCHITECTURE.md` section 3). `Crawler.arun()`
   is the entry point for callers that already have an event loop;
   `CrawlSession` is how the UI drives it.
 - The web UI's read side: `web/rows.py` (`base_row`, `AuditIndex`,
