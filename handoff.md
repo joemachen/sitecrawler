@@ -1,9 +1,8 @@
 # Handoff: sitecrawler
 
 Read this first in a new session. It is the state of the project as of
-2026-10-22 (v0.7.0 released; Phase 7 implemented on `feat/sitemaps`, PR
-#34 open, v0.8.0 not yet released) and everything that is not obvious from the
-code.
+2026-10-22 (v0.8.0 released, Phase 8 not started) and everything that is
+not obvious from the code.
 
 ## What this is
 
@@ -77,9 +76,15 @@ are still not stored, and lxml + cssselect replaced BeautifulSoup (every
 existing parser test stayed green; `tests/unit/test_html.py` gained edge
 cases for `<br>`, comments, empty documents and XHTML prologues).
 
-**Phase 7 (XML sitemap audit and generation) is implemented** on
-`feat/sitemaps` (PR #34 against `main`), not yet merged
-or released as v0.8.0. ADR-0010 records the design calls: the per-page
+**Phase 7 (XML sitemap audit and generation) is complete and released as
+v0.8.0** (annotated tag on `main` at f5a7c53, 2026-10-22). One PR,
+`feat/sitemaps` (#34, squash-merged as 573408b), then
+`chore/release-v0.8.0` (#35) and `docs/handoff-v0.8.0`. A `/code-review`
+pass on #34 found and fixed: relative `<loc>` values not resolved against
+the sitemap URL, a URL listed twice in one file differing between the live
+session and the store, unbounded gzip inflation, the page selection living
+in `cli/`, the default base URL taken from `pages[0]`, and an uncaught
+`OSError` on `-o`. ADR-0010 records the design calls: the per-page
 findings are four audit rules in a `Sitemaps` category that compare the
 sitemap entries, normalised the crawl's way, with the pages and their
 indexability verdict; facts about the sitemap *files* (unreadable files,
@@ -262,14 +267,13 @@ Open:
   serve HTTPS (see the note under Phase 2 in the roadmap).
 - Dependabot's older uv can produce lockfile-downgrading PRs (#4 was closed
   for that); read the lock diff before merging.
-- Next steps: merge the Phase 7 PR (#34, `feat/sitemaps`) once CI is green and
-  Joe says so, then **release v0.8.0** with the #32 recipe: bump
-  `pyproject.toml`, `__init__.py` and `uv.lock` (`uv lock`), date the
-  CHANGELOG Unreleased block, PR, squash-merge, annotated tag on `main`,
-  then a handoff PR. After that, **Phase 8, internal linking analysis**
+- Next piece of work: **Phase 8, internal linking analysis**
   (`docs/ROADMAP.md`); `CrawlView.inlinks` and the `links` table are the
   starting point, and `sitemap.orphan` is the first rule to lean on inlinks
-  site-wide.
+  site-wide. The release recipe is #35: bump `pyproject.toml`,
+  `__init__.py` and `uv.lock` (`uv lock`), date the CHANGELOG Unreleased
+  block, mark the roadmap row Done, PR, squash-merge, annotated tag on
+  `main`, then a handoff PR.
 - Phase 7 left for later: the sitemap report is CLI-only (no grid of
   sitemap entries in the web UI; the Sitemaps tab is still per page);
   sitemap extensions (`<image:>`, `<video:>`, `<xhtml:link>` hreflang) are
@@ -300,12 +304,13 @@ Open:
   file). Summary counts are recomputed per `(seq, audit_rev)` over every
   filter of every tab; fine at 10k pages, not profiled beyond.
 - Merged branches `feat/render`, `chore/release-v0.6.0`,
-  `docs/handoff-v0.6.0`, `feat/extract`, `chore/release-v0.7.0` and
-  `docs/handoff-v0.7.0` may still exist on origin (Claude Code's sandbox
+  `docs/handoff-v0.6.0`, `feat/extract`, `chore/release-v0.7.0`,
+  `docs/handoff-v0.7.0`, `feat/sitemaps`, `chore/release-v0.8.0` and
+  `docs/handoff-v0.8.0` may still exist on origin (Claude Code's sandbox
   refuses `git push --delete`); delete them by hand if `git branch -r`
   still lists them. The local checkout also carries every merged Phase 3
-  and 4 branch plus a `.claude/worktrees/` entry for the Phase 5 session;
-  `git worktree prune` and `git branch -d` clean those up.
+  and 4 branch plus `.claude/worktrees/` entries for the Phase 5, 6 and 7
+  sessions; `git worktree prune` and `git branch -d` clean those up.
 - Dependabot will now also see fastapi/uvicorn/jinja2/playwright; the
   vendored htmx/Tabulator files are upgraded by hand (replace the three files
   under `src/sitecrawler/web/static/`).
