@@ -18,11 +18,11 @@ Exports (`sitecrawler export`) read from these tables; see [Exporting](export.md
 | Table | One row per | Notable columns |
 | --- | --- | --- |
 | `crawls` | crawl | `start_url`, `mode`, `config_json`, `version`, `started_at`, `finished_at`, `status` (`running`, `done`, or `stopped` when `--max-pages` cut it short or the crawl was stopped from the web UI), `pages_done` |
-| `pages` | URL ever queued | `state` (`pending` / `done`), `depth`, `found_on`, `outcome`, `status_code`, `final_url`, `content_type`, `size_bytes`, `fetch_ms`, `error`, `x_robots_tag`, `last_modified`, `headers_json`, `fetched_at` |
+| `pages` | URL ever queued | `state` (`pending` / `done`), `depth`, `found_on`, `outcome`, `status_code`, `final_url`, `content_type`, `size_bytes`, `fetch_ms`, `error`, `x_robots_tag`, `last_modified`, `headers_json`, `fetched_at`; written by `audit`: `indexable`, `indexability_reason`, `inlinks`, `link_depth`, `link_score` |
 | `redirect_hops` | redirect followed | `page_id`, `hop_no`, `from_url`, `to_url`, `status_code` |
 | `page_html` | fetched page | `title`, `meta_description`, `meta_robots`, `canonical`, `h1`, `h1s_json`, `h2s_json`, `lang`, `word_count`, `internal_links` |
 | `page_render` | page the crawl tried to render (`--render`) | `ok`, `render_ms`, `error`, raw and rendered `title`, `meta_description`, `meta_robots`, `canonical`, `h1`, `word_count`, `link_count`, `links_added_json`, `links_removed_json` |
-| `links` | anchor on a page | `page_id`, `dst_url`, `anchor_text`, `rel`, `nofollow`, `is_internal` |
+| `links` | anchor on a page | `page_id`, `dst_url`, `anchor_text`, `rel`, `nofollow`, `is_internal`, `position` (`header`, `nav`, `body`, `aside`, `footer`) |
 | `sitemaps` | sitemap file the crawl tried to read | `url`, `found_in` (`robots.txt`, `default` or the index that listed it), `kind` (`urlset`, `index`, empty when unusable), `status_code`, `error`, `url_count` |
 | `sitemap_urls` | URL in a sitemap | `sitemap_url`, `loc`, `lastmod`, `changefreq`, `priority` |
 

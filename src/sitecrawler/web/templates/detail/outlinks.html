@@ -1,15 +1,16 @@
 <h2>Outlinks <span class="muted">({{ detail.outlinks | length }})</span></h2>
 <table class="plain outlinks">
-  <thead><tr><th>To</th><th>Anchor</th><th>rel</th></tr></thead>
+  <thead><tr><th>To</th><th>Anchor</th><th>rel</th><th>Position</th></tr></thead>
   <tbody>
   {% for link in detail.outlinks %}
     <tr>
       <td>{% if link.crawled %}<a href="/page?url={{ link.href | urlencode }}" data-url="{{ link.href }}">{{ link.href }}</a>{% else %}{{ link.href }}{% endif %}</td>
       <td>{{ link.text }}</td>
       <td>{{ link.rel }}</td>
+      <td>{{ link.position }}</td>
     </tr>
   {% else %}
-    <tr><td colspan="3" class="muted">None</td></tr>
+    <tr><td colspan="4" class="muted">None</td></tr>
   {% endfor %}
   </tbody>
 </table>

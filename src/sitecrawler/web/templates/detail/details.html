@@ -10,6 +10,8 @@
   {{ field("Fetch time (ms)", page.fetch_ms) }}
   {{ field("Error", page.error) }}
   {{ field("Depth", page.depth) }}
+  {{ field("Click depth", ("unreachable" if detail.links.link_depth is none else detail.links.link_depth) if detail.links else none) }}
+  {{ field("Link Score", detail.links.link_score if detail.links else none) }}
   {{ field("Found on", page.found_on) }}
   {{ field("Listed in sitemaps", detail.sitemaps | map(attribute="sitemap_url") | join(", ")) }}
   {{ field("Sitemap lastmod", detail.sitemaps | map(attribute="lastmod") | select | join(", ")) }}

@@ -93,7 +93,7 @@ are computed from the page itself.
 | Pagination | Contains pagination, To non-200, Canonical to first page, Broken sequence |
 | Directives | Index, Noindex, Follow, Nofollow, None, Conflicting, Noindex but linked, Blocked but linked |
 | Hreflang | Contains hreflang, Invalid language code, Missing self reference, Missing x-default, Missing return link, To non-200, To non-canonical |
-| Links | No inlinks, Links to redirects, Has nofollow outlinks |
+| Links | No inlinks, One follow inlink or none, More than 3 clicks deep, Unreachable from the start page, Links to errors, Links to redirects, Generic anchor text, Nofollow internal links, Has nofollow outlinks, Over 300 links |
 | Sitemaps | In sitemap, Not in sitemap, Orphans (in sitemap, no inlinks), Non-indexable in sitemap, Noindex in sitemap, Indexable but not in sitemap, Listed more than once |
 | Issues | One row per rule that fired, most severe first; click a row for its URLs, click the rule id for why it matters and how to fix it |
 

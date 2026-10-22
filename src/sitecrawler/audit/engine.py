@@ -6,26 +6,20 @@ from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 
+from sitecrawler.audit.directives import NOINDEX_TOKENS, robots_directives
 from sitecrawler.audit.registry import load_rules
 from sitecrawler.audit.rule import Rule
 from sitecrawler.audit.view import CrawlView
-from sitecrawler.models import Indexability, Issue, Outcome, PageRecord
+from sitecrawler.models import Indexability, Issue, LinkMetrics, Outcome, PageRecord
 
-NOINDEX_TOKENS = frozenset({"noindex", "none"})
-
-
-def robots_directives(page: PageRecord) -> frozenset[str]:
-    """Lower-cased directive tokens from ``<meta name="robots">`` and ``X-Robots-Tag``."""
-    raw = f"{page.meta_robots},{page.headers.get('x-robots-tag', '')}"
-    tokens: set[str] = set()
-    for part in raw.replace(";", ",").split(","):
-        token = part.strip().lower()
-        if ":" in token:  # "googlebot: noindex" or "unavailable_after: ..."
-            agent, _, directive = token.partition(":")
-            token = directive.strip() if agent in {"googlebot", "*"} else ""
-        if token:
-            tokens.add(token)
-    return frozenset(tokens)
+__all__ = [
+    "NOINDEX_TOKENS",
+    "AuditResult",
+    "RuleCount",
+    "indexability",
+    "robots_directives",
+    "run_audit",
+]
 
 
 def indexability(page: PageRecord, crawl: CrawlView) -> Indexability:
@@ -67,6 +61,8 @@ class AuditResult:
     issues: list[Issue]
     verdicts: dict[str, Indexability]
     rules: Sequence[Rule] = field(default_factory=list)
+    links: dict[str, LinkMetrics] = field(default_factory=dict)
+    """Inlink counts, click depth and Link Score per URL (ADR-0011)."""
 
     def counts(self) -> list[RuleCount]:
         """Rules that fired, most severe first, then by count."""
@@ -83,4 +79,4 @@ def run_audit(crawl: CrawlView, rules: Sequence[Rule] | None = None) -> AuditRes
         issues.extend(rule.check(crawl))
     issues.sort(key=lambda i: (i.severity.rank, i.rule_id, i.url))
     verdicts = {p.url: indexability(p, crawl) for p in crawl.pages}
-    return AuditResult(issues, verdicts, rules)
+    return AuditResult(issues, verdicts, rules, dict(crawl.link_graph.metrics))

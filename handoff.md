@@ -1,7 +1,8 @@
 # Handoff: sitecrawler
 
 Read this first in a new session. It is the state of the project as of
-2026-10-22 (v0.8.0 released, Phase 8 not started) and everything that is
+2026-10-22 (v0.8.0 released; Phase 8 built on PR #38, not yet merged or
+released) and everything that is
 not obvious from the code.
 
 ## What this is
@@ -95,7 +96,72 @@ crawled page to hang on; generation is an export (`export/sitemap.py`) with
 behaviour change: `/sitemap.xml` is guessed only when robots.txt names no
 sitemap, so a site that declares its sitemaps no longer logs a spurious 404.
 
+**Phase 8 (internal linking analysis) is built and waiting on PR #38**
+(`feat/links`, against `main`, not yet merged; the next release is v0.9.0).
+One PR plus a review-fix commit. A `/code-review` pass found and fixed:
+`link.few_inlinks` firing on every page of a list-mode crawl (it is now
+silent when the crawl has no start page), `links report --top 0` printing
+every row, an unused `LinkGraph.metrics_for`, and a PageRank tolerance
+(1e-9) that 100 damped rounds could never reach (now 1e-6). ADR-0011
+records the design calls: the link graph is part of the audit index
+(`audit/graph.py`, reached as `CrawlView.link_graph`) because the rules
+read it and `audit` may not import `analysis`; nodes are every crawled
+page, follow edges are links between crawled pages minus `rel=nofollow`,
+page-wide `nofollow`/`none` and self-links, resolved through redirects to
+the landing page; PageRank (d=0.85, dangling rank spread evenly) is
+log-scaled 0-100; click depth is a BFS from the `found_on == "start"` page
+over every internal link (nofollow included); `audit` writes `inlinks`,
+`link_depth` and `link_score` onto `pages`; every anchor records its
+`position`. The fixture needed `Home` links on its hub, blog and product
+pages before the home page outranked the products cluster (with `/` linked
+from `/about` alone, PageRank put `/products` at 100 and `/` at 20).
+
 What exists now:
+
+- **Links.** `CrawlView.link_graph` is a `LinkGraph` (`audit/graph.py`)
+  with `metrics: dict[url, LinkMetrics(inlinks, follow_inlinks,
+  link_depth, link_score)]`, `follow_sources(url)`, `landing(page)`,
+  `highest()` / `lowest()`; `is_broken(target)` and
+  `redirects_elsewhere(crawl, target)` are the shared target classifiers.
+  `CrawlView.start_page` is the page with `found_on == "start"` (None in
+  list mode, so no click depth there). `robots_directives` moved to
+  `audit/directives.py` (with `page_nofollow`); `audit.engine` re-exports
+  it. `AuditResult.links` carries the metrics; `Store.set_link_metrics()`
+  writes them (`audit` and the session's final write both call it);
+  `LinkRow.position` / `LinkRef.position` is the nearest
+  `header`/`nav`/`footer`/`aside` ancestor or ARIA role, else `body`
+  (`parse/html.py::link_position`). Rules in `audit/rules/links.py`
+  (category `Links`): `link.to_error` (medium), `link.few_inlinks` (low:
+  indexable, not the start page, at most `FEW_INLINKS` = 1 follow inlink;
+  silent in list mode), `link.high_depth` (low: click depth over
+  `MAX_DEPTH` = 3), `link.generic_anchor` (low: `GENERIC_ANCHORS`, compared
+  without case or punctuation), `link.nofollow_internal` (low),
+  `link.too_many_outlinks` (low: over `MAX_OUTLINKS` = 300 anchors);
+  `link.to_redirect` stays in `redirects.py`. `analysis/links.py`:
+  `link_report()` (`LinkReport`: broken and redirecting `ProblemLink`s with
+  source, anchor and position, score extremes, unreachable count,
+  `summary()`) and `anchor_texts()`. CLI: `sitecrawler links report
+  crawl.db [--top 10]` (Rich table of the score extremes to stderr, then
+  `error\t<src>\t<href>\t<status>\t<anchor>` and
+  `redirect\t<src>\t<href>\t<final>\t<anchor>` lines to stdout) and
+  `sitecrawler links anchors crawl.db [URL]`
+  (`<target>\t<count>\t<text>`); `audit` prints one `Links:` line. Web:
+  the Links tab shows `link_score`, `unique_inlinks`, `follow_inlinks`,
+  `link_depth` with a filter per rule plus `unreachable`; Internal gained
+  `link_depth` / `link_score`; `AuditIndex.cells` and `NO_AUDIT` carry the
+  five new cells; `PageDetail.links` / `.anchors` feed `detail/inlinks.html`
+  (metrics, anchor texts, position column) and `detail/outlinks.html`.
+  Exports: `pages` ends with `inlinks`, `link_depth`, `link_score`; `links`
+  ends with `position`. Fixture: `audit/link-deep-1..3` (a chain four
+  clicks deep), `audit/generic-anchor`, `audit/nofollow-link`,
+  `audit/many-outlinks` (301 self-fragment anchors), `Home` links on the
+  hub (`<footer>`), blog index/posts and product pages (`<nav>` on the
+  products index). `TRIGGERS["link.few_inlinks"]` is computed from the
+  fixture HTML by `tests/conftest.py::follow_inlink_sources()`;
+  `tests/integration/test_links.py` holds both roadmap acceptance tests
+  (home 100, `/orphan` 0; every link to an error or redirect reported with
+  source and anchor, derived from the fixture files), the CLI, the stored
+  columns and the web cells. User guide: `docs/user-guide/links.md`.
 
 - **Sitemaps.** `parse/sitemap.py` returns `SitemapDoc(kind, entries)`
   where each `SitemapEntry(sitemap_url, loc, lastmod, changefreq,
@@ -236,9 +302,9 @@ What exists now:
 - `sitecrawler crawl URL [-o pages.csv] [--db crawl.db [--resume]]`,
   `sitecrawler list urls.txt|- [--follow]`, `sitecrawler export crawl.db
   --format csv|xlsx|json`: see the Phase 1 notes in `docs/ROADMAP.md`.
-- `sitecrawler audit crawl.db`: runs 57 rules over a stored crawl, writes the
-  `issues` table and an indexability verdict per page, prints the fix list by
-  severity. `sitecrawler issues crawl.db --rule ID` lists affected URLs.
+- `sitecrawler audit crawl.db`: runs 63 rules over a stored crawl, writes the
+  `issues` table, an indexability verdict and the link metrics per page, prints
+  the fix list by severity. `sitecrawler issues crawl.db --rule ID` lists affected URLs.
 - Rules live in `src/sitecrawler/audit/rules/<category>.py` as classes with
   `id`, `severity`, `category`, `summary`, `why`, `fix`; they are discovered
   automatically. `docs/user-guide/rules.md` is generated from them by
@@ -253,8 +319,8 @@ What exists now:
   detail pane; vendored `htmx.min.js` (2.0.11), `tabulator.min.js`/`.css`
   (6.7.0). Rule explanations are rendered in-app at `/rules/<id>`, the
   full page per URL at `/page?url=`, built from `templates/detail/*`.
-- 602 offline tests (19 of them headless Chromium, marker `browser`:
-  the UI e2e tests plus the rendered crawls). ADRs 0001-0010.
+- 656 offline tests (20 of them headless Chromium, marker `browser`:
+  the UI e2e tests plus the rendered crawls). ADRs 0001-0011.
 
 Open:
 
@@ -267,13 +333,25 @@ Open:
   serve HTTPS (see the note under Phase 2 in the roadmap).
 - Dependabot's older uv can produce lockfile-downgrading PRs (#4 was closed
   for that); read the lock diff before merging.
-- Next piece of work: **Phase 8, internal linking analysis**
-  (`docs/ROADMAP.md`); `CrawlView.inlinks` and the `links` table are the
-  starting point, and `sitemap.orphan` is the first rule to lean on inlinks
-  site-wide. The release recipe is #35: bump `pyproject.toml`,
+- Next steps: merge #38 once CI is green (`gh pr merge 38 --squash`),
+  then release v0.9.0 with the #35 recipe: bump `pyproject.toml`,
   `__init__.py` and `uv.lock` (`uv lock`), date the CHANGELOG Unreleased
   block, mark the roadmap row Done, PR, squash-merge, annotated tag on
-  `main`, then a handoff PR.
+  `main`, then a handoff PR. After that: **Phase 9, duplicate and
+  near-duplicate content** (`docs/ROADMAP.md`); `analysis/` is where the
+  clusters belong, next to `sitemaps.py` and `links.py`, and the HTML
+  bodies are still not stored (ADR-0009 names storing them behind a flag as
+  the obvious next step, which content hashing will want).
+- Phase 8 left for later: canonicals are ignored by the link graph (a
+  canonicalised page keeps its own node and score); no row-per-link grid in
+  the web UI (the detail pane and `links report` cover it); the rule
+  thresholds (`FEW_INLINKS`, `MAX_DEPTH`, `MAX_OUTLINKS`) are constants,
+  not options; PageRank is pure Python (about 0.9 s per 10k pages with
+  500k links, re-run on every live audit revision);
+  `Store.set_link_metrics` and `set_indexability` both update rows one ORM
+  object at a time (a shared cleanup); the Link Score says nothing about
+  external links. Crawl files written before 0.9 lack the new `pages` and
+  `links` columns and open with an error; re-crawl.
 - Phase 7 left for later: the sitemap report is CLI-only (no grid of
   sitemap entries in the web UI; the Sitemaps tab is still per page);
   sitemap extensions (`<image:>`, `<video:>`, `<xhtml:link>` hreflang) are
@@ -303,7 +381,8 @@ Open:
   resuming a stopped crawl from the UI (the CLI's `--resume` works on the
   file). Summary counts are recomputed per `(seq, audit_rev)` over every
   filter of every tab; fine at 10k pages, not profiled beyond.
-- Merged branches `feat/render`, `chore/release-v0.6.0`,
+- `feat/links` (#38) is unmerged; after the squash merge delete it like
+  the rest. Merged branches `feat/render`, `chore/release-v0.6.0`,
   `docs/handoff-v0.6.0`, `feat/extract`, `chore/release-v0.7.0`,
   `docs/handoff-v0.7.0`, `feat/sitemaps`, `chore/release-v0.8.0` and
   `docs/handoff-v0.8.0` may still exist on origin (Claude Code's sandbox
@@ -334,6 +413,7 @@ Open:
 | Tabs and filters | Data in `web/tabs.py`; a filter with a rule id is that rule; presentational filters (URL flags, status class) are computed columns, not rules; the Custom tab is the one tab built per crawl, from the extraction names in the rows |
 | Custom extraction | Runs in the crawl pass over the HTML in hand (rendered DOM under `--render`); bodies not stored; grammar `NAME=KIND[MODS]:EXPR` + TOML; columns `extract_<name>` / `search_<name>` (ADR-0009) |
 | Sitemaps | Per-page findings are audit rules (`sitemap.*`) over normalised entries and the indexability verdict; file-level facts are `sitemap report`, not issues; `sitemap generate` is an export, `lastmod` only with `--lastmod`, never `changefreq`/`priority`; `/sitemap.xml` guessed only when robots.txt names none (ADR-0010) |
+| Links | The link graph is part of the audit index (`audit/graph.py`, `CrawlView.link_graph`), not `analysis/`, because rules read it; Link Score is PageRank over the follow graph (nofollow, page-wide nofollow and self-links excluded, redirects resolved to the landing page, d=0.85) on a log scale 0-100; click depth is a BFS from the start page over every internal link; `audit` stores `inlinks`, `link_depth`, `link_score` on `pages`; `links report` / `links anchors` are the report (ADR-0011) |
 
 Full rationale in `docs/adr/`.
 
@@ -380,6 +460,19 @@ and a self canonical so it trips nothing else), a line in `TRIGGERS`, a unit
 test, then regenerate `rules.md`.
 
 ## Gotchas learned the hard way
+
+- **The Claude Code Bash tool drops any command whose heredoc runs past
+  about 100 lines** ("unexpected EOF while looking for matching quote");
+  nothing in that command runs, so a multi-file patch silently does nothing.
+  Keep inline heredocs short, or write the patch script to the scratchpad
+  and run it with `python`.
+- **Rich tables put `│` between cells.** A whitespace-squashed assertion on
+  CLI output must allow `\W+` between the values of one row.
+- **PageRank on the fixture needs the hubs to link home.** With the home
+  page linked from `/about` alone, a tight cluster (the four product pages)
+  outranks it. The `Home` links on the hub, blog and product pages are
+  what make the roadmap's "home page highest" acceptance true; keep them
+  when adding fixture pages.
 
 - **`localhost` is IPv6-first on this machine.** The test server binds to
   `127.0.0.1` explicitly via `httpserver_listen_address` in
@@ -482,13 +575,20 @@ test, then regenerate `rules.md`.
 
 ## Where to look next
 
-- Phase 8 scope and acceptance: `docs/ROADMAP.md` under "Phase 8".
-  `CrawlView.inlinks` / `inlinks_to()` is the inlink index every rule uses
-  today (built from `PageRecord.links`, internal targets only); the `links`
-  table has anchor text, `rel` and `is_internal` per anchor; `analysis/` is
-  where the link graph belongs, next to `analysis/sitemaps.py`.
-  `Crawler.arun()` is the entry point for callers that already have an
-  event loop; `CrawlSession` is how the UI drives it.
+- Phase 9 scope and acceptance: `docs/ROADMAP.md` under "Phase 9".
+  `analysis/` is where duplicate clusters belong, next to `sitemaps.py`
+  and `links.py`; `PageRecord.word_count` exists but the HTML bodies are
+  not stored (ADR-0009), so a content hash has to be computed in the crawl
+  pass (`Crawler._fetch_and_parse`, where the extractors run) or the bodies
+  stored first. `Crawler.arun()` is the entry point for callers that
+  already have an event loop; `CrawlSession` is how the UI drives it.
+- Links: `audit/graph.py` (`LinkGraph`, PageRank, click depth,
+  `is_broken`, `redirects_elsewhere`), `audit/directives.py`,
+  `audit/rules/links.py` (the six rules and their thresholds),
+  `analysis/links.py` (`LinkReport`, `anchor_texts`), `cli/links_cmd.py`,
+  `parse/html.py::link_position`. `tests/unit/audit/test_graph.py` is the
+  graph's spec in small examples; `tests/integration/test_links.py` the
+  acceptance against the fixture site.
 - Sitemaps: `parse/sitemap.py` (entries, gzip), `Crawler._seed_from_sitemaps`
   (files and entries), `audit/rules/sitemaps.py` (the four rules),
   `analysis/sitemaps.py` (`SitemapReport`), `export/sitemap.py`

@@ -10,6 +10,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
+from sitecrawler.audit.graph import LinkGraph
 from sitecrawler.crawl.urls import normalize, strip_www
 from sitecrawler.models import LinkRef, Outcome, PageRecord, SitemapEntry, SitemapFile
 
@@ -164,6 +165,16 @@ class CrawlView:
         """Internal links pointing at ``url``."""
         key = self.normalize(url)
         return self.inlinks.get(key, []) if key else []
+
+    @cached_property
+    def start_page(self) -> PageRecord | None:
+        """The page the crawl started from, or None in list mode."""
+        return next((p for p in self.pages if p.found_on == "start"), None)
+
+    @cached_property
+    def link_graph(self) -> LinkGraph:
+        """Inlink counts, click depth and Link Score for every page (ADR-0011)."""
+        return LinkGraph(self)
 
     def group_html_pages(self, key: Callable[[PageRecord], str]) -> dict[str, list[PageRecord]]:
         """HTML pages grouped by ``key(page)``; empty keys are dropped."""

@@ -8,7 +8,7 @@ from typing import Annotated
 import typer
 from rich.table import Table
 
-from sitecrawler.analysis import sitemap_report
+from sitecrawler.analysis import link_report, sitemap_report
 from sitecrawler.audit import CrawlView, load_rules, rule_by_id, run_audit
 from sitecrawler.cli._run import err, fail, require_crawl_db
 from sitecrawler.store import open_store
@@ -28,6 +28,7 @@ def audit(
         result = run_audit(crawl)
         stored = store.replace_issues(result.issues)
         store.set_indexability(result.verdicts)
+        store.set_link_metrics(result.links)
 
     table = Table(title=f"Issues in {db}", show_lines=False)
     table.add_column("Severity")
@@ -47,6 +48,7 @@ def audit(
         )
     if crawl.sitemap_files:
         err.print(f"{sitemap_report(crawl).summary()} Details: sitecrawler sitemap report {db}")
+    err.print(f"{link_report(crawl).summary()} Details: sitecrawler links report {db}")
     non_indexable = sum(1 for v in result.verdicts.values() if not v.indexable)
     err.print(
         f"[green]{stored} issues across {len(result.counts())} rules on "

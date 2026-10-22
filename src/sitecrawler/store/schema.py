@@ -67,6 +67,12 @@ class PageRow(Base):
     indexable: Mapped[bool | None] = mapped_column(default=None)
     """Set by ``audit``: can this page appear in search results?"""
     indexability_reason: Mapped[str] = mapped_column(default="")
+    inlinks: Mapped[int | None] = mapped_column(default=None)
+    """Set by ``audit``: distinct other pages linking here (ADR-0011)."""
+    link_depth: Mapped[int | None] = mapped_column(default=None)
+    """Set by ``audit``: fewest clicks from the start page; NULL when unreachable."""
+    link_score: Mapped[int | None] = mapped_column(default=None)
+    """Set by ``audit``: PageRank over the follow graph, 0-100."""
 
     html: Mapped[PageHtmlRow | None] = relationship(
         back_populates="page", cascade="all, delete-orphan", uselist=False
@@ -218,6 +224,8 @@ class LinkRow(Base):
     rel: Mapped[str] = mapped_column(default="")
     nofollow: Mapped[bool] = mapped_column(default=False)
     is_internal: Mapped[bool] = mapped_column(default=False)
+    position: Mapped[str] = mapped_column(default="")
+    """``header``, ``nav``, ``body``, ``aside`` or ``footer``."""
 
     page: Mapped[PageRow] = relationship(back_populates="links")
 

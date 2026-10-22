@@ -16,7 +16,7 @@ from sitecrawler.audit import CrawlView, load_rules, run_audit
 from sitecrawler.crawl import Crawler
 from sitecrawler.models import CrawlConfig
 from sitecrawler.store import open_store
-from tests.conftest import site_pages
+from tests.conftest import follow_inlink_sources, site_pages
 
 OLD_HTML = {
     "/",
@@ -109,6 +109,11 @@ TRIGGERS: dict[str, set[str]] = {
     "render.differs": set(),
     "render.failed": set(),
     "sitemap.orphan": {"/orphan"},
+    "link.to_error": {"/", "/audit"},
+    "link.high_depth": {"/audit/link-deep-3"},
+    "link.generic_anchor": {"/audit/generic-anchor"},
+    "link.nofollow_internal": {"/audit/nofollow-link"},
+    "link.too_many_outlinks": {"/audit/many-outlinks"},
     "sitemap.non_indexable": {
         "/about",
         "/blocked/secret",
@@ -155,6 +160,10 @@ NON_INDEXABLE: dict[str, str] = {
 TRIGGERS["page.non_indexable"] = set(NON_INDEXABLE)
 TRIGGERS["sitemap.missing"] = set(site_pages()) - set(NON_INDEXABLE) - IN_SITEMAP
 """Every indexable 200 page the sitemaps do not list; ``/blog/post-2`` is the roadmap's example."""
+WELL_LINKED = {path for path, sources in follow_inlink_sources().items() if len(sources) >= 2}
+TRIGGERS["link.few_inlinks"] = set(site_pages()) - set(NON_INDEXABLE) - {"/"} - WELL_LINKED
+"""Every indexable page (bar the start page) with at most one other page linking to it
+without nofollow: most of the audit fixtures, which only the hub links to."""
 
 
 @pytest.fixture

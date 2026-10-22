@@ -34,6 +34,13 @@ read, entries, and how many point at other hosts, were never crawled or are
 listed twice; `sitecrawler sitemap report` has the detail and the four
 `sitemap.*` rules are part of the fix list. See [Sitemaps](sitemaps.md).
 
+The last line is about links: how many internal links the crawl found,
+how many point at errors or redirects, how many pages the start page
+cannot reach, and the highest and lowest Link Score. `audit` also writes
+every page's inlink count, click depth and Link Score to the file;
+`sitecrawler links report` lists the individual links and the six
+`link.*` rules are part of the fix list. See [Internal linking](links.md).
+
 ## Indexability
 
 Every page gets a verdict: indexable, or not indexable with the first reason

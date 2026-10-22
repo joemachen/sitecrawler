@@ -11,6 +11,15 @@ from sitecrawler.models import HreflangRef, LinkRef, ParsedPage
 
 _NON_LINK_SCHEMES = ("#", "mailto:", "tel:", "javascript:")
 _NOISE = ("script", "style", "noscript")
+_SECTIONS = {"header": "header", "nav": "nav", "footer": "footer", "aside": "aside"}
+"""Sectioning elements that name a link's position."""
+_ROLES = {
+    "banner": "header",
+    "navigation": "nav",
+    "contentinfo": "footer",
+    "complementary": "aside",
+}
+"""ARIA roles that stand in for the elements above on templates built from ``<div>``."""
 _PARSER = lxml_html.HTMLParser(encoding="utf-8")
 _EMPTY = b"<html></html>"
 
@@ -45,6 +54,25 @@ def text_of(element: etree._Element) -> str:
 def _attr(element: etree._Element, name: str) -> str:
     value = element.get(name)
     return value if value is not None else ""
+
+
+def link_position(anchor: etree._Element) -> str:
+    """Where ``anchor`` sits: ``header``, ``nav``, ``footer``, ``aside`` or ``body``.
+
+    The nearest ``<header>``, ``<nav>``, ``<footer>`` or ``<aside>`` ancestor
+    (or an element carrying the matching ARIA role: ``banner``,
+    ``navigation``, ``contentinfo``, ``complementary``) names the position;
+    an anchor under none of them is ``body``. Nearest wins, so the main
+    menu inside ``<header><nav>`` reads ``nav``.
+    """
+    for ancestor in anchor.iterancestors():
+        tag = ancestor.tag if isinstance(ancestor.tag, str) else ""
+        if tag in _SECTIONS:
+            return _SECTIONS[tag]
+        role = _attr(ancestor, "role").strip().lower()
+        if role in _ROLES:
+            return _ROLES[role]
+    return "body"
 
 
 def _metas(doc: etree._Element, name: str) -> list[etree._Element]:
@@ -108,7 +136,14 @@ def parse_html(html: str, base_url: str) -> ParsedPage:
             continue
         absolute = urljoin(base_url, href)
         page.links.append(absolute)
-        page.anchors.append(LinkRef(absolute, text=text_of(anchor), rel=_attr(anchor, "rel")))
+        page.anchors.append(
+            LinkRef(
+                absolute,
+                text=text_of(anchor),
+                rel=_attr(anchor, "rel"),
+                position=link_position(anchor),
+            )
+        )
 
     etree.strip_elements(doc, *_NOISE, with_tail=False)
     page.word_count = len(text_of(doc).split())

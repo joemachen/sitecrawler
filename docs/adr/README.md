@@ -15,5 +15,6 @@ newcomer. Copy `0000-template.md`, number it, fill it in, link it from the PR.
 | [0008](0008-render-every-page-and-keep-the-diff.md) | `--render` renders every HTML page in one Chromium; rendered fields become the page, the diff is stored, not the DOM | Accepted |
 | [0009](0009-extract-in-the-crawl-pass.md) | Custom extractors and searches run in the crawl pass over the HTML in hand; bodies stay unstored; lxml + cssselect replace BeautifulSoup | Accepted |
 | [0010](0010-sitemap-audit-as-page-rules.md) | Sitemap findings are page rules over the normalised entries and the indexability verdict; file-level facts are a report; generation is an export with `lastmod` only on request | Accepted |
+| [0011](0011-link-graph-in-the-audit-index.md) | The link graph is part of the audit index (`audit/graph.py`); Link Score is log-scaled PageRank over the follow graph with redirects resolved; `audit` stores inlinks, click depth and score on `pages` | Accepted |
 
 Statuses: Proposed, Accepted, Superseded by ####, Deprecated.
