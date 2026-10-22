@@ -6,9 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
-Phase 4: live crawl UI (in progress).
+Phase 4: live crawl UI.
 
 ### Added
+
+- A detail pane under the grid: click a row for its URL Details, HTML,
+  Inlinks, Outlinks, Redirects, HTTP Headers, Hreflang and Issues; links
+  in the pane select that URL; **Open full page** keeps the `/page?url=`
+  view. `/detail/<section>?url=` serves the fragments.
 
 - A running crawl can be paused, resumed and stopped from another thread
   through `CrawlControl`; a stopped crawl marks its file `stopped` so the

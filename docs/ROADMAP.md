@@ -14,7 +14,7 @@ against `tests/fixtures/site/`, the user guide has a page for it, and
 | 1 | Core crawl and storage | v0.2.0 | Done (2026-10-21) |
 | 2 | Audit checks and issues engine | v0.3.0 | Done (2026-10-21) |
 | 3 | Local web UI | v0.4.0 | Done (2026-10-21) |
-| 4 | Live crawl UI | v0.5.0 | In progress |
+| 4 | Live crawl UI | v0.5.0 | Done (2026-10-21) |
 | 5 | JavaScript rendering | v0.6.0 | |
 | 6 | Custom extraction and search | v0.7.0 | |
 | 7 | XML sitemap audit and generation | v0.8.0 | |
@@ -147,10 +147,14 @@ the tabs fill, click through to any URL.
 
 Acceptance:
 
-- [ ] Starting a crawl of the fixture site from the UI ends with the page count and every rule-backed filter count equal to the audit test's numbers.
-- [ ] Stop mid-crawl leaves `crawls.status = stopped` and the UI shows the partial crawl.
-- [ ] A Playwright test drives URL, Start, a tab and filter, a row, the detail sub-tabs and a sidebar count.
-- [ ] `serve crawl.db` shows a stored, audited crawl with the same numbers as v0.4.0.
+- [x] Starting a crawl of the fixture site from the UI ends with the page count and every rule-backed filter count equal to the audit test's numbers (`tests/integration/test_web_live.py`).
+- [x] Stop mid-crawl leaves `crawls.status = stopped` and the UI shows the partial crawl (`test_web_live.py::test_stop_mid_crawl`, `tests/e2e/test_web_ui.py::test_stop_mid_crawl_from_the_ui`).
+- [x] A Playwright test drives URL, Start, a tab and filter, a row, the detail sub-tabs and a sidebar count (`tests/e2e/test_web_ui.py::test_live_crawl_from_the_ui`).
+- [x] `serve crawl.db` shows a stored, audited crawl with the same numbers as v0.4.0 (`tests/integration/test_web.py`, `test_web_tabs.py`).
+
+Design notes: ADR-0007. Tabs and filters are data in `web/tabs.py`; a
+filter backed by a rule is the rule, so the UI never disagrees with
+`audit`. The browser polls; nothing is pushed.
 
 ---
 

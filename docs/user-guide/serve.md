@@ -58,8 +58,12 @@ One page, three panes:
 - **Overview tree** on the right: every tab and filter with its count.
   Clicking a node selects that tab and filter. The summary above it shows
   pages, indexable, non-indexable and issue totals.
-- **Detail pane** at the bottom, for the selected URL (arrives with the
-  live crawl UI; the full page at `/page?url=` has everything today).
+- **Detail pane** at the bottom. Click a row and the pane shows that URL:
+  **URL Details** (response, timing, depth), **HTML** (title, metas,
+  headings, canonical, robots), **Inlinks**, **Outlinks**, **Redirects**,
+  **HTTP Headers**, **Hreflang** and **Issues**. A link in Inlinks or
+  Outlinks selects that URL in turn; **Open full page** shows everything
+  on one page you can bookmark.
 
 The address bar keeps `#tab/filter`, so a view can be bookmarked.
 

@@ -1,8 +1,8 @@
 # Handoff: sitecrawler
 
 Read this first in a new session. It is the state of the project as of
-2026-10-21 (night, after the v0.4.0 release) and everything that is not
-obvious from the code.
+2026-10-21 (late, Phase 4 PRs open) and everything that is not obvious
+from the code.
 
 ## What this is
 
@@ -33,8 +33,34 @@ Stacking worked: after each squash merge,
 changes no content (`git diff --stat <old-tip> <branch>` empty) does not
 need a fresh CI run; the earlier green run tested the same tree.
 
+**Phase 4 (live crawl UI, v0.5.0) is built; one of its five stacked PRs
+is merged.** #21 `feat/crawl-control` (CrawlControl + CrawlSession +
+ADR-0007 + roadmap renumber) is on `main` (squash 37d7e41, 2026-10-21).
+Still open, each based on the previous branch and already rebased onto
+that merge: #26 `feat/web-shell` (tabs.py, rows.py, the one-page shell;
+it replaces #22, see the gotcha below), #23 `feat/web-live`
+(start/pause/stop, polling, `serve` with no file), #24 `feat/web-detail`
+(detail pane, e2e, docs) and #25 `chore/release-v0.5.0`. Merge in that
+order with squash **without deleting the head branch**; after each merge
+rebase the next with `git rebase --onto origin/main <old-base-tip>
+<branch>`, `git push --force-with-lease`, `gh pr edit N --base main`, and
+rebase the ones after it onto their new bases the same way. Tag v0.5.0
+after the release PR lands, then delete the branches. The roadmap now
+calls the live UI Phase 4 and JS rendering Phase 5 (later phases shifted
+by one).
+
 What exists now:
 
+- `sitecrawler serve [crawl.db] [--port] [--no-open] [--crawls-dir]`: the
+  Screaming-Frog-style UI. With no file it opens empty: URL bar, Start /
+  Pause / Resume / Stop / Clear, Settings, progress; each crawl is written
+  to `crawls/<host>-<timestamp>.db` with its final audit. With a file it
+  opens read-only (an unaudited file is audited in memory). Tabs are data
+  in `web/tabs.py` (a rule-backed filter *is* the rule), rows are built in
+  `web/rows.py` (base cells once, audit cells per audit revision), the
+  browser polls `/api/crawl` and `/api/rows?since=&rev=` (ADR-0007).
+  `session.py` (`CrawlSession`) runs the crawl on a worker thread with an
+  audit thread; `crawl/control.py` is the pause/stop primitive.
 - `sitecrawler crawl URL [-o pages.csv] [--db crawl.db [--resume]]`,
   `sitecrawler list urls.txt|- [--follow]`, `sitecrawler export crawl.db
   --format csv|xlsx|json`: see the Phase 1 notes in `docs/ROADMAP.md`.
@@ -50,16 +76,13 @@ What exists now:
 - `CrawlView` (`audit/view.py`) is the index rules read: lookups by
   normalised URL, inlinks, groups, sitemap membership. Rules never fetch.
 - CI enforces 100% branch coverage on `audit/` as a separate step.
-- `sitecrawler serve crawl.db [--port 8765] [--no-open]`: FastAPI + Jinja2
-  + HTMX + Tabulator on 127.0.0.1. `web/data.py`
-  loads one `CrawlSnapshot` (pages/issues/redirects dumps from
-  `store/dump.py`, a `CrawlView`, `load_rules()`) and closes the file;
-  `web/app.py` has the routes; templates and the vendored `htmx.min.js`
-  (2.0.11), `tabulator.min.js`/`.css` (6.7.0) sit beside them. Grids are
-  client-side (sort, header filters, any-column search, CSV download of the
-  filtered rows). Rule explanations are rendered in-app at `/rules/<id>`.
-- 334 offline tests (5 of them headless Chromium, marker `browser`), ~99%
-  coverage. ADRs 0001-0006.
+- Web stack: FastAPI + Jinja2 + HTMX + Tabulator on 127.0.0.1; `web/app.py`
+  has the routes, `web/static/app.js` the one Tabulator grid, polling and
+  detail pane; vendored `htmx.min.js` (2.0.11), `tabulator.min.js`/`.css`
+  (6.7.0). Rule explanations are rendered in-app at `/rules/<id>`, the
+  full page per URL at `/page?url=`, built from `templates/detail/*`.
+- ~450 offline tests (8 of them headless Chromium, marker `browser`).
+  ADRs 0001-0007.
 
 Open:
 
@@ -72,11 +95,19 @@ Open:
   serve HTTPS (see the note under Phase 2 in the roadmap).
 - Dependabot's older uv can produce lockfile-downgrading PRs (#4 was closed
   for that); read the lock diff before merging.
-- Next piece of work: **Phase 4, JavaScript rendering** (`docs/ROADMAP.md`).
-  Playwright is already a dev dependency and Chromium is installed in CI,
-  which Phase 4 reuses. Merged branches `feat/web-serve`, `feat/web-issues`,
-  `feat/web-e2e`, `chore/release-v0.4.0`, `docs/handoff-v0.4.0` and
-  `docs/handoff-timing` still exist on origin; delete at leisure.
+- Next piece of work after the Phase 4 PRs merge: **Phase 5, JavaScript
+  rendering** (`docs/ROADMAP.md`). Playwright is already a dev dependency
+  and Chromium is installed in CI. The UI needs no new tab for it until
+  the rendered-vs-raw diff exists; `--render` can go into the Settings
+  panel (`StartRequest` in `web/app.py`).
+- Phase 4 left for later: a "Links" row-per-link view (the detail pane's
+  Inlinks/Outlinks cover it), collapsing the sidebar, dark mode, and
+  resuming a stopped crawl from the UI (the CLI's `--resume` works on the
+  file). Summary counts are recomputed per `(seq, audit_rev)` over every
+  filter of every tab; fine at 10k pages, not profiled beyond.
+- Merged branches `feat/web-serve`, `feat/web-issues`, `feat/web-e2e`,
+  `chore/release-v0.4.0`, `docs/handoff-v0.4.0`, `docs/handoff-timing`
+  still exist on origin; delete at leisure.
 - Dependabot will now also see fastapi/uvicorn/jinja2/playwright; the
   vendored htmx/Tabulator files are upgraded by hand (replace the three files
   under `src/sitecrawler/web/static/`).
@@ -95,7 +126,9 @@ Open:
 | Commits | Conventional Commits, squash-merge PRs, `CHANGELOG.md` entry per change |
 | List mode | URLs may span hosts; `--follow` stays within the listed hosts |
 | Resume | `pages.state` is the frontier; `max_pages` counts across runs; `crawls.status` is `stopped` when capped |
-| Web UI | One in-memory snapshot per `serve`, file closed; grids filter/export client-side; htmx and Tabulator vendored; rule pages rendered in-app (ADR-0006) |
+| Web UI | One page, Screaming Frog layout; grids filter/export client-side; htmx and Tabulator vendored; rule pages rendered in-app (ADR-0006) |
+| Live crawl | `CrawlSession` on a worker thread, audit thread with adaptive gap, file written as it goes and closed before `done`; browser polls, no websockets (ADR-0007) |
+| Tabs and filters | Data in `web/tabs.py`; a filter with a rule id is that rule; presentational filters (URL flags, status class) are computed columns, not rules |
 
 Full rationale in `docs/adr/`.
 
@@ -107,7 +140,8 @@ uv run sitecrawler crawl https://example.com --db example.db
 uv run sitecrawler audit example.db
 uv run sitecrawler issues example.db --rule title.missing
 uv run sitecrawler export example.db --format xlsx
-uv run sitecrawler serve example.db          # web UI on http://127.0.0.1:8765
+uv run sitecrawler serve                     # web UI on http://127.0.0.1:8765, crawl from the browser
+uv run sitecrawler serve example.db          # browse a stored crawl read-only
 uv run playwright install chromium           # once per machine, for tests/e2e/test_web_ui.py
 uv run ruff format . && uv run ruff check .
 uv run mypy
@@ -176,18 +210,35 @@ test, then regenerate `rules.md`.
   `'`), so a `data-columns='{{ columns | tojson }}'` attribute is fine and a
   test should look for `"url"`, not `&#34;url&#34;`.
 - Python scripts that rewrite files on this machine write CRLF; the repo is
-  LF. Convert before committing or the diff is every line.
+  LF. Convert before committing or the diff is every line
+  (`write_text(..., newline="\n")`).
+- **Playwright clicks and `<details>` menus**: an open Settings panel in
+  the top bar covers the Start button; the e2e tests close it before
+  clicking. The Tabulator search box matches every column, so select a
+  row by its `url` cell (`.tabulator-cell[tabulator-field="url"]`), not
+  by row text.
+- Rich wraps long paths mid-word in CLI output; compare with every
+  whitespace removed when asserting on a path.
+- `pydantic.Field(5000, ge=1)` reads as "no default" to mypy without the
+  plugin; write `Field(default=5000, ge=1)`.
+- **Never `gh pr merge --delete-branch` on a PR that other PRs are based
+  on.** Deleting the base branch closed #22 and GitHub refused to reopen
+  it or change its base; #26 is the same branch re-filed against `main`.
+  Merge stacked PRs with `gh pr merge N --squash`, rebase and retarget the
+  next PR, and delete branches only at the end.
 
 ## Where to look next
 
-- Phase 4 scope and acceptance: `docs/ROADMAP.md` under "Phase 4". It needs
+- Phase 5 scope and acceptance: `docs/ROADMAP.md` under "Phase 5". It needs
   a fixture page that injects its title, canonical and three links via JS,
   a `--render` flag on `crawl`, and a rendered-vs-raw diff. `Crawler.arun()`
-  is the entry point for callers that already have an event loop.
-- The web UI's read side: `web/data.py` (`CrawlSnapshot`, `load_snapshot`,
-  `to_rows`), `store/dump.py::dump_tables(store, names)`. A new tab is a
-  route in `web/app.py`, a template, and a `TABS` entry; a grid needs only
-  the `section.grid` markup from `pages.html` (see `static/app.js`).
+  is the entry point for callers that already have an event loop;
+  `CrawlSession` is how the UI drives it.
+- The web UI's read side: `web/rows.py` (`base_row`, `AuditIndex`,
+  `RowStore`), `web/tabs.py` (`TABS`). A new tab or filter is a spec; a new
+  column is a key in `base_row` (and `tests/unit/web/test_tabs.py` checks
+  every filter column is produced). `static/app.js` has the grid, polling
+  and detail pane in one file.
 - The fixture site is the contract for every feature; `tests/e2e/test_web_ui.py`
   and `tests/integration/test_web_tabs.py` assert the numbers
   `tests/integration/test_audit.py` already knows.

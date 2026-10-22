@@ -83,12 +83,6 @@
   }
 
   // --------------------------------------------------------------- grid
-  function pageLink(cell) {
-    var url = cell.getValue();
-    if (url === null || url === undefined || url === "") { return ""; }
-    return '<a href="/page?url=' + encodeURIComponent(url) + '" data-url="' + escapeHtml(url) + '">' + escapeHtml(url) + "</a>";
-  }
-
   function listCell(cell) {
     var value = cell.getValue();
     return Array.isArray(value) ? escapeHtml(value.join(", ")) : escapeHtml(value === null || value === undefined ? "" : value);
@@ -99,11 +93,7 @@
     if (name === "url" || name === "final_url" || name === "found_on" || name === "canonical" || name === "first_found_on") {
       spec.width = 360;
     }
-    if (name === "url" && current.tab !== "external") {
-      spec.formatter = pageLink;
-    } else {
-      spec.formatter = listCell;
-    }
+    spec.formatter = listCell;
     return spec;
   }
 
@@ -114,6 +104,7 @@
     columns: [],
     data: [],
     placeholder: "No rows",
+    selectableRows: 1,
   });
 
   function showCount(rows) {
@@ -284,6 +275,7 @@
         renderTree();
         if (loadedSource) { applyFilter(); }
       }
+      return loadDetail();
     });
   }
 
@@ -342,6 +334,57 @@
       return refreshRows();
     }).then(schedule).catch(showError);
   }
+
+  // --------------------------------------------------------------- detail
+  var detail = {
+    pane: document.querySelector("[data-detail]"),
+    body: document.querySelector("[data-detail-body]"),
+    url: document.querySelector("[data-detail-url]"),
+    open: document.querySelector("[data-detail-open]"),
+    subtabs: document.querySelector("[data-subtabs]"),
+    selected: null,
+    sub: "details",
+  };
+
+  function loadDetail() {
+    if (!detail.selected) { return Promise.resolve(); }
+    var url = "/detail/" + detail.sub + "?url=" + encodeURIComponent(detail.selected);
+    return fetch(url).then(function (r) { return r.text(); }).then(function (html) {
+      detail.body.innerHTML = html;
+    });
+  }
+
+  function selectUrl(url) {
+    detail.selected = url;
+    detail.url.textContent = url;
+    detail.pane.dataset.url = url;
+    detail.open.href = "/page?url=" + encodeURIComponent(url);
+    detail.open.hidden = false;
+    return loadDetail();
+  }
+
+  function selectSub(sub) {
+    detail.sub = sub;
+    Array.prototype.forEach.call(detail.subtabs.querySelectorAll("[data-sub]"), function (button) {
+      button.setAttribute("aria-selected", button.dataset.sub === sub ? "true" : "false");
+    });
+    return loadDetail();
+  }
+
+  detail.subtabs.addEventListener("click", function (event) {
+    var button = event.target.closest("[data-sub]");
+    if (button) { selectSub(button.dataset.sub); }
+  });
+  table.on("rowSelected", function (row) {
+    if (loadedSource === "pages") { selectUrl(row.getData().url); }
+  });
+  document.addEventListener("click", function (event) {
+    var link = event.target.closest("a[data-url]");
+    if (link && (detail.pane.contains(link) || el.issues.contains(link))) {
+      event.preventDefault();
+      selectUrl(link.dataset.url);
+    }
+  });
 
   function parseHash() {
     var parts = location.hash.replace(/^#/, "").split("/");

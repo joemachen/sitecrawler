@@ -12,6 +12,7 @@ pytest-playwright plugin's session fixtures.
 
 from __future__ import annotations
 
+import re
 import socket
 import threading
 import time
@@ -20,7 +21,7 @@ from pathlib import Path
 
 import pytest
 import uvicorn
-from playwright.sync_api import Browser, Page, expect, sync_playwright
+from playwright.sync_api import Browser, Locator, Page, expect, sync_playwright
 
 from sitecrawler.session import CrawlSession
 from sitecrawler.web import RowStore, Summary, create_app
@@ -63,6 +64,13 @@ def ui(audited_db: Path) -> Iterator[str]:
     yield f"http://127.0.0.1:{port}"
     server.should_exit = True
     thread.join(timeout=10)
+
+
+def url_cell(page: Page, url: str) -> Locator:
+    """The grid cell holding exactly ``url``."""
+    return page.locator(
+        '.tabulator-cell[tabulator-field="url"]', has_text=re.compile(f"^{re.escape(url)}$")
+    )
 
 
 @pytest.fixture
@@ -122,13 +130,97 @@ def test_issues_row_loads_its_urls_and_links_to_the_rule(page: Page, ui: str, si
     expect(page.locator("[data-count]")).to_have_attribute("data-count", "1")
 
 
-def test_page_detail_reached_from_the_grid_shows_inlinks(page: Page, ui: str, site: str) -> None:
+def test_row_click_fills_the_detail_pane_and_links_to_the_full_page(
+    page: Page, ui: str, site: str
+) -> None:
     page.goto(f"{ui}/#internal/all")
     page.fill("[data-grid-search]", f"{site}/missing")
-    page.locator(".tabulator-cell a", has_text=f"{site}/missing").first.click()
-    expect(page).to_have_url(
-        f"{ui}/page?url={site.replace(':', '%3A').replace('/', '%2F')}%2Fmissing"
+    url_cell(page, f"{site}/missing").click()
+    pane = page.locator("[data-detail]")
+    expect(pane).to_have_attribute("data-url", f"{site}/missing")
+    expect(pane.locator("[data-detail-url]")).to_have_text(f"{site}/missing")
+    expect(pane.locator("table.fields")).to_contain_text("404")
+
+    pane.locator('[data-sub="issues"]').click()
+    expect(pane.locator('table.issues tr[data-rule="response.4xx"]')).to_have_count(1)
+    pane.locator('[data-sub="inlinks"]').click()
+    expect(pane.locator(f'table.inlinks tr[data-src="{site}/"]')).to_have_count(1)
+
+    pane.locator(f'table.inlinks a[data-url="{site}/"]').click()  # follow an inlink in the pane
+    expect(pane).to_have_attribute("data-url", f"{site}/")
+
+    pane.locator("[data-detail-open]").click()
+    expect(page).to_have_url(f"{ui}/page?url={site.replace(':', '%3A').replace('/', '%2F')}%2F")
+    expect(page.locator("h1.url")).to_have_text(f"{site}/")
+
+
+@pytest.fixture
+def idle_ui(tmp_path: Path) -> Iterator[str]:
+    """Serve an empty session from a thread on a free loopback port."""
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    app = create_app(crawls_dir=tmp_path / "crawls")
+    server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning"))
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    deadline = time.monotonic() + 10
+    while not server.started:
+        assert time.monotonic() < deadline, "uvicorn did not start"
+        time.sleep(0.05)
+    yield f"http://127.0.0.1:{port}"
+    server.should_exit = True
+    thread.join(timeout=10)
+
+
+def test_live_crawl_from_the_ui(page: Page, idle_ui: str, site: str, summary: Summary) -> None:
+    page.goto(idle_ui)
+    app = page.locator(".app")
+    expect(app).to_have_attribute("data-status", "idle")
+    page.click("summary:has-text('Settings')")
+    page.fill('input[name="delay_seconds"]', "0")
+    page.fill('input[name="workers"]', "1")
+    page.click("summary:has-text('Settings')")  # close the panel again
+    page.fill("[data-url-input]", site)
+    page.click('[data-action="start"]')
+
+    expect(app).to_have_attribute("data-status", "running")
+    expect(app).to_have_attribute("data-status", "done", timeout=60_000)
+    counter = page.locator("[data-grid-count]")
+    expect(counter).to_have_attribute("data-rows", str(len(site_pages())))
+    expect(page.locator('[data-stat="pages"]')).to_have_text(str(len(site_pages())))
+
+    page.click('[data-tree] a[data-tab="titles"][data-filter="missing"]')
+    expect(counter).to_have_attribute("data-rows", str(summary.tabs["titles"]["missing"]))
+    url_cell(page, f"{site}/notitle").click()
+    pane = page.locator("[data-detail]")
+    pane.locator('[data-sub="issues"]').click()
+    expect(pane.locator('table.issues tr[data-rule="title.missing"]')).to_have_count(1)
+
+    page.click('[data-tree] a[data-tab="response_codes"][data-filter="4xx"]')
+    expect(counter).to_have_attribute("data-rows", "1")
+    expect(url_cell(page, f"{site}/missing")).to_have_count(1)
+
+    page.click('[data-tabstrip] [data-tab="issues"]')
+    expect(page.locator('tr[data-rule="response.4xx"] [data-count]')).to_have_text("1")
+
+
+def test_stop_mid_crawl_from_the_ui(page: Page, idle_ui: str, site: str) -> None:
+    page.goto(idle_ui)
+    page.click("summary:has-text('Settings')")
+    page.fill('input[name="delay_seconds"]', "0.3")
+    page.fill('input[name="workers"]', "1")
+    page.click("summary:has-text('Settings')")  # close the panel again
+    page.fill("[data-url-input]", site)
+    page.click('[data-action="start"]')
+    app = page.locator(".app")
+    expect(app).to_have_attribute("data-status", "running")
+    expect(page.locator("[data-grid-count]")).not_to_have_attribute(
+        "data-rows", "0", timeout=30_000
     )
-    expect(page.locator("h1.url")).to_have_text(f"{site}/missing")
-    expect(page.locator(f'table.inlinks tr[data-src="{site}/"]')).to_have_count(1)
-    expect(page.locator('table.issues tr[data-rule="response.4xx"]')).to_have_count(1)
+
+    page.click('[data-action="stop"]')
+    expect(app).to_have_attribute("data-status", "stopped", timeout=30_000)
+    rows = int(page.locator("[data-grid-count]").get_attribute("data-rows") or "0")
+    assert 0 < rows < len(site_pages())
+    expect(page.locator('[data-action="start"]')).to_be_enabled()

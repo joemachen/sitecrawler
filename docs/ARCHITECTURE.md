@@ -37,7 +37,7 @@ that pass between stages are typed records from `sitecrawler.models`.
                sitemap diff
 ```
 
-**Status (Phase 4 in progress):** `crawl/`, `parse/`, `store/`, `export/`,
+**Status (after Phase 4):** `crawl/`, `parse/`, `store/`, `export/`,
 `audit/` (51 rules), `cli/`, `session.py` and `web/` exist. `session.py`
 (`CrawlSession`, ADR-0007) runs a crawl on a worker thread with pause and
 stop, audits it as pages arrive and writes the result to the file at the
@@ -163,7 +163,7 @@ class Rule(Protocol):
 | A new custom extractor syntax | Implement `Extractor` in `parse/extraction/` | ✔ |
 | A new export format | Implement `Writer` in `export/` | ✔ |
 | An external data source | Implement `Enricher` in `integrations/`; it receives URLs, returns columns | ✔ |
-| A new UI tab | Add a route + template under `web/` reading from the store | ✔ |
+| A new UI tab or filter | Add a `TabSpec` / `FilterSpec` in `web/tabs.py`; a new column is one key in `rows.base_row` | ✔ |
 
 ---
 
