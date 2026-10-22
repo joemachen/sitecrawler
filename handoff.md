@@ -1,8 +1,8 @@
 # Handoff: sitecrawler
 
 Read this first in a new session. It is the state of the project as of
-2026-10-21 (late, Phase 4 PRs open) and everything that is not obvious
-from the code.
+2026-10-21 (v0.5.0 released, Phase 5 not started) and everything that is
+not obvious from the code.
 
 ## What this is
 
@@ -33,21 +33,20 @@ Stacking worked: after each squash merge,
 changes no content (`git diff --stat <old-tip> <branch>` empty) does not
 need a fresh CI run; the earlier green run tested the same tree.
 
-**Phase 4 (live crawl UI, v0.5.0) is built; one of its five stacked PRs
-is merged.** #21 `feat/crawl-control` (CrawlControl + CrawlSession +
-ADR-0007 + roadmap renumber) is on `main` (squash 37d7e41, 2026-10-21).
-Still open, each based on the previous branch and already rebased onto
-that merge: #26 `feat/web-shell` (tabs.py, rows.py, the one-page shell;
-it replaces #22, see the gotcha below), #23 `feat/web-live`
-(start/pause/stop, polling, `serve` with no file), #24 `feat/web-detail`
-(detail pane, e2e, docs) and #25 `chore/release-v0.5.0`. Merge in that
-order with squash **without deleting the head branch**; after each merge
-rebase the next with `git rebase --onto origin/main <old-base-tip>
-<branch>`, `git push --force-with-lease`, `gh pr edit N --base main`, and
-rebase the ones after it onto their new bases the same way. Tag v0.5.0
-after the release PR lands, then delete the branches. The roadmap now
-calls the live UI Phase 4 and JS rendering Phase 5 (later phases shifted
-by one).
+**Phase 4 (live crawl UI) is complete and released as v0.5.0** (annotated
+tag on `main` at 0faa950, 2026-10-21). It landed as five stacked PRs,
+squash-merged in order: #21 `feat/crawl-control` (CrawlControl +
+CrawlSession + ADR-0007 + roadmap renumber), #26 `feat/web-shell`
+(tabs.py, rows.py, the one-page shell; it replaced #22, see the gotcha
+below), #23 `feat/web-live` (start/pause/stop, polling, `serve` with no
+file), #24 `feat/web-detail` (detail pane, e2e, docs) and #25
+`chore/release-v0.5.0`. The train took the same recipe as Phase 3: after
+each squash merge, `git rebase --onto origin/main <old-base-tip> <branch>`
+for the next branch (and each later branch onto its new base),
+`git push --force-with-lease`, `gh pr edit N --base main`. Every rebase
+produced a byte-identical tree, so no merge waited for a fresh CI run.
+The roadmap calls the live UI Phase 4 and JS rendering Phase 5 (later
+phases shifted by one).
 
 What exists now:
 
@@ -95,8 +94,8 @@ Open:
   serve HTTPS (see the note under Phase 2 in the roadmap).
 - Dependabot's older uv can produce lockfile-downgrading PRs (#4 was closed
   for that); read the lock diff before merging.
-- Next piece of work after the Phase 4 PRs merge: **Phase 5, JavaScript
-  rendering** (`docs/ROADMAP.md`). Playwright is already a dev dependency
+- Next piece of work: **Phase 5, JavaScript rendering**
+  (`docs/ROADMAP.md`). Playwright is already a dev dependency
   and Chromium is installed in CI. The UI needs no new tab for it until
   the rendered-vs-raw diff exists; `--render` can go into the Settings
   panel (`StartRequest` in `web/app.py`).
@@ -105,9 +104,11 @@ Open:
   resuming a stopped crawl from the UI (the CLI's `--resume` works on the
   file). Summary counts are recomputed per `(seq, audit_rev)` over every
   filter of every tab; fine at 10k pages, not profiled beyond.
-- Merged branches `feat/web-serve`, `feat/web-issues`, `feat/web-e2e`,
-  `chore/release-v0.4.0`, `docs/handoff-v0.4.0`, `docs/handoff-timing`
-  still exist on origin; delete at leisure.
+- Merged Phase 4 branches `feat/web-shell`, `feat/web-live`,
+  `feat/web-detail`, `chore/release-v0.5.0` and the older
+  `docs/handoff-timing` may still exist on origin (Claude Code's sandbox
+  refuses `git push --delete`); delete them by hand if `git branch -r`
+  still lists them. The other pre-v0.5.0 branches are gone.
 - Dependabot will now also see fastapi/uvicorn/jinja2/playwright; the
   vendored htmx/Tabulator files are upgraded by hand (replace the three files
   under `src/sitecrawler/web/static/`).
