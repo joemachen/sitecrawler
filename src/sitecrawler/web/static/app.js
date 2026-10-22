@@ -6,7 +6,12 @@
 
   var specs = JSON.parse(document.getElementById("tab-specs").textContent);
   var tabsById = {};
-  specs.forEach(function (tab) { tabsById[tab.id] = tab; });
+  function indexSpecs() {
+    tabsById = {};
+    specs.forEach(function (tab) { tabsById[tab.id] = tab; });
+  }
+  indexSpecs();
+  var selected = false;
 
   var pages = [];
   var external = [];
@@ -88,8 +93,9 @@
     return Array.isArray(value) ? escapeHtml(value.join(", ")) : escapeHtml(value === null || value === undefined ? "" : value);
   }
 
-  function column(name) {
-    var spec = { title: name, field: name, headerFilter: "input", headerFilterLiveFilter: true };
+  function column(tab, name) {
+    var title = (tab.titles && tab.titles[name]) || name;
+    var spec = { title: title, field: name, headerFilter: "input", headerFilterLiveFilter: true };
     if (name === "url" || name === "final_url" || name === "found_on" || name === "canonical" || name === "first_found_on") {
       spec.width = 360;
     }
@@ -125,6 +131,7 @@
   // ---------------------------------------------------------------- tabs
   function selectTab(tabId, filterId) {
     var tab = tabsById[tabId] || specs[0];
+    selected = true;
     current.tab = tab.id;
     current.filter = filterSpec(tab, filterId || "all").id;
     Array.prototype.forEach.call(el.strip.querySelectorAll("[data-tab]"), function (button) {
@@ -137,7 +144,7 @@
     el.search.disabled = isIssues;
     el.download.disabled = isIssues;
     if (!isIssues) {
-      table.setColumns(tab.columns.map(column));
+      table.setColumns(tab.columns.map(function (name) { return column(tab, name); }));
       if (loadedSource !== tab.source) {
         loadedSource = tab.source;
         table.replaceData(sourceRows(tab)).then(applyFilter);
@@ -172,6 +179,28 @@
       var total = countFor(tab.id, "all");
       return "<details" + open + '><summary><span class="label">' + escapeHtml(tab.label) + '</span><span class="num">' + (total === null ? "" : total) + "</span></summary><ul>" + items + "</ul></details>";
     }).join("");
+  }
+
+  // The Custom tab's columns depend on the crawl's extractors, so the specs
+  // are re-read with every refresh and the tab re-pointed when they change.
+  function stable(value) {
+    if (Array.isArray(value)) { return "[" + value.map(stable).join(",") + "]"; }
+    if (value && typeof value === "object") {
+      return "{" + Object.keys(value).sort().map(function (k) { return JSON.stringify(k) + ":" + stable(value[k]); }).join(",") + "}";
+    }
+    return JSON.stringify(value);
+  }
+
+  function applySpecs(next) {
+    if (stable(next) === stable(specs)) { return; }
+    var before = tabsById[current.tab];
+    specs = next;
+    indexSpecs();
+    // Re-point the grid only once a tab has been chosen (the first poll runs
+    // before the hash is read) and only if that tab's own spec changed.
+    if (selected && tabsById[current.tab] && stable(before) !== stable(tabsById[current.tab])) {
+      selectTab(current.tab, current.filter);
+    }
   }
 
   function renderSummary() {
@@ -275,6 +304,9 @@
         renderTree();
         if (loadedSource) { applyFilter(); }
       }
+      return fetchJson("/api/tabs");
+    }).then(function (next) {
+      applySpecs(next);
       return loadDetail();
     });
   }
@@ -315,6 +347,10 @@
     document.querySelector("[data-error]").textContent = String(err.message || err);
   }
 
+  function lines(text) {
+    return String(text || "").split(/\r?\n/).map(function (line) { return line.trim(); }).filter(Boolean);
+  }
+
   function startCrawl() {
     var data = new FormData(form);
     var body = {
@@ -327,6 +363,8 @@
       respect_robots: data.get("respect_robots") === "on",
       keep_query: data.get("keep_query") === "on",
       render: data.get("render") === "on",
+      extract: lines(data.get("extract")),
+      search: lines(data.get("search")),
     };
     return post("/api/crawl/start", body).then(function (c) {
       seq = 0; rev = 0; pages = []; external = []; summary = null;

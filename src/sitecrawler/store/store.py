@@ -22,6 +22,7 @@ from sitecrawler.crawl.urls import normalize, same_site
 from sitecrawler.models import (
     CrawlConfig,
     CrawlInfo,
+    Extraction,
     HreflangRef,
     Indexability,
     Issue,
@@ -37,6 +38,7 @@ from sitecrawler.models import (
 from sitecrawler.store.schema import (
     Base,
     CrawlRow,
+    ExtractionRow,
     HreflangRow,
     IssueRow,
     LinkRow,
@@ -223,6 +225,12 @@ class Store:
             )
             page.render = _render_row(record)
             page.hreflang = [HreflangRow(lang=h.lang, href=h.href) for h in record.hreflang]
+            page.extractions = [
+                ExtractionRow(
+                    name=e.name, kind=e.kind, count=e.count, values_json=json.dumps(list(e.values))
+                )
+                for e in record.extractions
+            ]
             src_host = urlparse(record.url).netloc
             page.links = [
                 LinkRow(
@@ -343,6 +351,20 @@ class Store:
             ).all()
         return dict(rows)
 
+    def extraction_names(self) -> list[tuple[str, str]]:
+        """Every ``(name, kind)`` the crawl extracted or searched for, in first-seen order."""
+        with Session(self.engine) as session:
+            rows = session.execute(
+                select(ExtractionRow.name, ExtractionRow.kind)
+                .group_by(ExtractionRow.name, ExtractionRow.kind)
+                .order_by(func.min(ExtractionRow.id))
+            ).all()
+        return [(name, kind) for name, kind in rows]
+
+    def extraction_columns(self) -> list[str]:
+        """The ``extract_<name>`` / ``search_<name>`` columns of this crawl, in first-seen order."""
+        return [Extraction(name, kind).column for name, kind in self.extraction_names()]
+
     def seen_urls(self) -> frozenset[str]:
         """Every URL in the pages table, fetched or not."""
         with Session(self.engine) as session:
@@ -396,8 +418,23 @@ class Store:
                 )
             ):
                 hreflang[page_id].append(HreflangRef(lang, href))
+            extractions: dict[int, list[Extraction]] = defaultdict(list)
+            for page_id, name, kind, count, values_json in session.execute(
+                select(
+                    ExtractionRow.page_id,
+                    ExtractionRow.name,
+                    ExtractionRow.kind,
+                    ExtractionRow.count,
+                    ExtractionRow.values_json,
+                ).order_by(ExtractionRow.page_id, ExtractionRow.id)
+            ):
+                extractions[page_id].append(
+                    Extraction(name, kind, tuple(json.loads(values_json)), count)
+                )
             for row in rows:
-                yield _to_record(row, hops[row.id], links[row.id], hreflang[row.id])
+                yield _to_record(
+                    row, hops[row.id], links[row.id], hreflang[row.id], extractions[row.id]
+                )
 
     # ------------------------------------------------------------- helpers
     def _crawl_id(self) -> int:
@@ -486,6 +523,7 @@ def _to_record(
     hops: Sequence[RedirectHop],
     links: Sequence[LinkRef],
     hreflang: Sequence[HreflangRef],
+    extractions: Sequence[Extraction] = (),
 ) -> PageRecord:
     html = row.html
     headers: dict[str, str] = json.loads(row.headers_json)
@@ -523,4 +561,5 @@ def _to_record(
         render=render_diff_from_row(row.render),
         render_ms=row.render.render_ms if row.render else 0,
         render_error=row.render.error if row.render else "",
+        extractions=tuple(extractions),
     )

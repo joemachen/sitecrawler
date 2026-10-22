@@ -1,40 +1,55 @@
-"""HTML parsing into a :class:`~sitecrawler.models.ParsedPage`."""
+"""HTML parsing into a :class:`~sitecrawler.models.ParsedPage`, on lxml."""
 
 from __future__ import annotations
 
-import re
 from urllib.parse import urljoin
 
-from bs4 import BeautifulSoup, Tag
+from lxml import etree
+from lxml import html as lxml_html
 
 from sitecrawler.models import HreflangRef, LinkRef, ParsedPage
 
-_DESCRIPTION = re.compile("^description$", re.IGNORECASE)
-_ROBOTS = re.compile("^robots$", re.IGNORECASE)
 _NON_LINK_SCHEMES = ("#", "mailto:", "tel:", "javascript:")
+_NOISE = ("script", "style", "noscript")
+_PARSER = lxml_html.HTMLParser(encoding="utf-8")
+_EMPTY = b"<html></html>"
 
 
 def _squash(text: str) -> str:
     return " ".join(text.split())
 
 
-def _attr(tag: Tag, name: str) -> str:
-    """Return a string attribute, flattening bs4's list-valued attributes."""
-    value = tag.get(name)
-    if value is None:
-        return ""
-    if isinstance(value, str):
-        return value
-    return " ".join(value)
+def parse_document(html: str) -> etree._Element:
+    """Parse ``html`` into an lxml tree and return its ``<html>`` root.
+
+    Fragments are wrapped in ``<html><body>``; an empty or whitespace-only
+    document gives an empty ``<html>``. The text is encoded to UTF-8 bytes
+    first because lxml refuses ``str`` input that carries an XML encoding
+    declaration, which XHTML pages do.
+    """
+    try:
+        return lxml_html.document_fromstring(html.encode("utf-8"), parser=_PARSER)
+    except etree.ParserError:  # "Document is empty"
+        return lxml_html.document_fromstring(_EMPTY, parser=_PARSER)
 
 
-def _meta_content(soup: BeautifulSoup, name: re.Pattern[str]) -> str:
-    tag = soup.find("meta", attrs={"name": name})
-    return _squash(_attr(tag, "content")) if isinstance(tag, Tag) else ""
+def text_of(element: etree._Element) -> str:
+    """Visible text of ``element``: text nodes joined with a space, whitespace squashed.
+
+    Comments are skipped; ``<br>`` and nested tags separate words, so
+    ``<h1>Hello<br>World</h1>`` reads ``Hello World``.
+    """
+    return _squash(" ".join(t if isinstance(t, str) else t.decode() for t in element.itertext()))
 
 
-def _headings(soup: BeautifulSoup, level: str) -> list[str]:
-    return [_squash(h.get_text(" ")) for h in soup.find_all(level) if isinstance(h, Tag)]
+def _attr(element: etree._Element, name: str) -> str:
+    value = element.get(name)
+    return value if value is not None else ""
+
+
+def _metas(doc: etree._Element, name: str) -> list[etree._Element]:
+    """Every ``<meta name=...>`` whose name matches ``name``, ignoring case."""
+    return [m for m in doc.iter("meta") if _attr(m, "name").strip().lower() == name]
 
 
 def parse_html(html: str, base_url: str) -> ParsedPage:
@@ -44,34 +59,39 @@ def parse_html(html: str, base_url: str) -> ParsedPage:
         html: The document text.
         base_url: URL the document was served from; relative links resolve against it.
     """
-    soup = BeautifulSoup(html, "lxml")
+    doc = parse_document(html)
     page = ParsedPage()
 
-    if soup.title is not None and soup.title.string:
-        page.title = _squash(soup.title.string)
+    titles = list(doc.iter("title"))
+    page.title_count = len(titles)
+    if titles:
+        page.title = text_of(titles[0])
 
-    page.meta_description = _meta_content(soup, _DESCRIPTION)
-    page.meta_robots = _meta_content(soup, _ROBOTS)
+    descriptions = _metas(doc, "description")
+    page.meta_description_count = len(descriptions)
+    if descriptions:
+        page.meta_description = _squash(_attr(descriptions[0], "content"))
+    robots = _metas(doc, "robots")
+    if robots:
+        page.meta_robots = _squash(_attr(robots[0], "content"))
 
-    root = soup.find("html")
-    if isinstance(root, Tag):
-        page.lang = _attr(root, "lang").strip()
+    page.lang = _attr(doc, "lang").strip()
 
-    page.h1s = _headings(soup, "h1")
-    page.h2s = _headings(soup, "h2")
+    page.h1s = [text_of(h) for h in doc.iter("h1")]
+    page.h2s = [text_of(h) for h in doc.iter("h2")]
     page.h1 = page.h1s[0] if page.h1s else ""
-    page.title_count = len(soup.find_all("title"))
-    page.meta_description_count = len(soup.find_all("meta", attrs={"name": _DESCRIPTION}))
 
-    og_url = soup.find("meta", attrs={"property": "og:url"})
-    if isinstance(og_url, Tag) and _attr(og_url, "content").strip():
-        page.og_url = urljoin(base_url, _attr(og_url, "content").strip())
+    for meta in doc.iter("meta"):
+        content = _attr(meta, "content").strip()
+        if _attr(meta, "property") == "og:url" and content:
+            page.og_url = urljoin(base_url, content)
+            break
 
-    for link in soup.find_all("link", href=True):
-        rels = _attr(link, "rel").lower().split()
+    for link in doc.iter("link"):
         href = _attr(link, "href").strip()
         if not href:
             continue
+        rels = _attr(link, "rel").lower().split()
         absolute = urljoin(base_url, href)
         if "canonical" in rels and not page.canonical:
             page.canonical = absolute
@@ -82,17 +102,14 @@ def parse_html(html: str, base_url: str) -> ParsedPage:
         if "next" in rels and not page.rel_next:
             page.rel_next = absolute
 
-    for anchor in soup.find_all("a", href=True):
+    for anchor in doc.iter("a"):
         href = _attr(anchor, "href").strip()
         if not href or href.startswith(_NON_LINK_SCHEMES):
             continue
         absolute = urljoin(base_url, href)
         page.links.append(absolute)
-        page.anchors.append(
-            LinkRef(absolute, text=_squash(anchor.get_text(" ")), rel=_attr(anchor, "rel"))
-        )
+        page.anchors.append(LinkRef(absolute, text=text_of(anchor), rel=_attr(anchor, "rel")))
 
-    for noise in soup(["script", "style", "noscript"]):
-        noise.decompose()
-    page.word_count = len(soup.get_text(" ").split())
+    etree.strip_elements(doc, *_NOISE, with_tail=False)
+    page.word_count = len(text_of(doc).split())
     return page

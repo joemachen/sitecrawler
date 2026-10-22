@@ -55,7 +55,10 @@ One page, three panes:
 - **Tabs and grid** in the middle. Each tab is a column set over the crawled
   pages; the dropdown beside it narrows the grid to one filter, and the
   search box matches any column. Click a URL to open its detail page.
-  **Export CSV** writes the rows currently shown, filters applied.
+  **Export CSV** writes the rows currently shown, filters applied. The
+  **Custom** tab has one column per `--extract` and `--search` of the crawl
+  (see [Custom extraction and search](extract.md)); Settings has **Extract**
+  and **Search** boxes, one entry per line, for crawls started here.
 - **Overview tree** on the right: every tab and filter with its count.
   Clicking a node selects that tab and filter. The summary above it shows
   pages, indexable, non-indexable and issue totals.

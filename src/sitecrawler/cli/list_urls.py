@@ -8,7 +8,7 @@ from typing import Annotated
 
 import typer
 
-from sitecrawler.cli._run import fail, run_crawl
+from sitecrawler.cli._run import extraction_config, fail, run_crawl
 from sitecrawler.crawl.urls import parse_url_list
 from sitecrawler.models import CrawlConfig
 
@@ -43,8 +43,29 @@ def list_urls(
         int, typer.Option(help="Report redirect_loop after this many hops.")
     ] = 10,
     no_http2: Annotated[bool, typer.Option("--no-http2", help="Use HTTP/1.1 only.")] = False,
+    extract: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--extract",
+            help="Custom extractor NAME=css:SELECTOR, NAME=xpath:EXPR or NAME=regex:PATTERN; "
+            "repeatable. Modifiers go in brackets: css[attr=src,all]:img.",
+        ),
+    ] = None,
+    extract_file: Annotated[
+        Path | None,
+        typer.Option("--extract-file", help="TOML file with [extract] and [search] tables."),
+    ] = None,
+    search: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--search",
+            help="Flag pages whose HTML matches this regex (case-insensitive); "
+            "NAME=PATTERN names the column. Repeatable.",
+        ),
+    ] = None,
 ) -> None:
     """Fetch exactly the URLs in SOURCE (no link following unless --follow)."""
+    extractors, searches = extraction_config(extract or [], extract_file, search or [])
     if source == "-":
         text = sys.stdin.read()
     else:
@@ -68,5 +89,7 @@ def list_urls(
         respect_robots=not ignore_robots,
         max_redirects=max_redirects,
         http2=not no_http2,
+        extract=extractors,
+        search=searches,
     )
     run_crawl(config, db=db, resume=resume, output=output)

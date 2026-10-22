@@ -13,5 +13,6 @@ newcomer. Copy `0000-template.md`, number it, fill it in, link it from the PR.
 | [0006](0006-web-ui-snapshot-and-client-grids.md) | Web UI serves an in-memory snapshot; grids filter client-side; assets vendored | Accepted |
 | [0007](0007-live-crawl-session.md) | The crawl runs inside `serve` as a session on its own thread; the browser polls | Accepted |
 | [0008](0008-render-every-page-and-keep-the-diff.md) | `--render` renders every HTML page in one Chromium; rendered fields become the page, the diff is stored, not the DOM | Accepted |
+| [0009](0009-extract-in-the-crawl-pass.md) | Custom extractors and searches run in the crawl pass over the HTML in hand; bodies stay unstored; lxml + cssselect replace BeautifulSoup | Accepted |
 
 Statuses: Proposed, Accepted, Superseded by ####, Deprecated.

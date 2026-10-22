@@ -83,6 +83,9 @@ class PageRow(Base):
     hreflang: Mapped[list[HreflangRow]] = relationship(
         back_populates="page", cascade="all, delete-orphan", order_by="HreflangRow.id"
     )
+    extractions: Mapped[list[ExtractionRow]] = relationship(
+        back_populates="page", cascade="all, delete-orphan", order_by="ExtractionRow.id"
+    )
 
 
 class RedirectHopRow(Base):
@@ -167,6 +170,25 @@ class HreflangRow(Base):
     href: Mapped[str]
 
     page: Mapped[PageRow] = relationship(back_populates="hreflang")
+
+
+class ExtractionRow(Base):
+    """What one custom extractor or search found on ``page``; one row per name per parsed page."""
+
+    __tablename__ = "extractions"
+    __table_args__ = (Index("ix_extractions_name", "name"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    page_id: Mapped[int] = mapped_column(ForeignKey("pages.id"))
+    name: Mapped[str]
+    kind: Mapped[str]
+    """``css``, ``xpath``, ``regex`` or ``search``."""
+    count: Mapped[int] = mapped_column(default=0)
+    """Matches on the page; 0 means the extractor or search found nothing."""
+    values_json: Mapped[str] = mapped_column(default="[]")
+    """The kept values (first, or all) as a JSON list of strings."""
+
+    page: Mapped[PageRow] = relationship(back_populates="extractions")
 
 
 class IssueRow(Base):

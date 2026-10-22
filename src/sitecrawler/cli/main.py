@@ -10,7 +10,7 @@ import typer
 from rich.logging import RichHandler
 
 from sitecrawler import __version__
-from sitecrawler.cli._run import err, run_crawl
+from sitecrawler.cli._run import err, extraction_config, run_crawl
 from sitecrawler.cli.audit_cmd import audit, issues
 from sitecrawler.cli.export_cmd import export
 from sitecrawler.cli.list_urls import list_urls
@@ -96,8 +96,29 @@ def crawl(
     render_timeout: Annotated[
         float, typer.Option(help="Seconds before a render is given up (with --render).")
     ] = 30.0,
+    extract: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--extract",
+            help="Custom extractor NAME=css:SELECTOR, NAME=xpath:EXPR or NAME=regex:PATTERN; "
+            "repeatable. Modifiers go in brackets: css[attr=src,all]:img.",
+        ),
+    ] = None,
+    extract_file: Annotated[
+        Path | None,
+        typer.Option("--extract-file", help="TOML file with [extract] and [search] tables."),
+    ] = None,
+    search: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--search",
+            help="Flag pages whose HTML matches this regex (case-insensitive); "
+            "NAME=PATTERN names the column. Repeatable.",
+        ),
+    ] = None,
 ) -> None:
     """Spider a site from URL and write every page found to a CSV."""
+    extractors, searches = extraction_config(extract or [], extract_file, search or [])
     config = CrawlConfig(
         start_url=url,
         max_pages=max_pages,
@@ -114,6 +135,8 @@ def crawl(
         render_wait=render_wait,
         render_selector=render_selector,
         render_timeout_seconds=render_timeout,
+        extract=extractors,
+        search=searches,
     )
     run_crawl(config, db=db, resume=resume, output=output)
 

@@ -22,7 +22,7 @@ from sitecrawler.audit.view import Inlink
 from sitecrawler.crawl.urls import normalize, same_site
 from sitecrawler.models import Issue, Outcome, PageRecord, Severity
 from sitecrawler.session import CrawlSession, SessionState
-from sitecrawler.web.tabs import TABS, Row, matches
+from sitecrawler.web.tabs import Row, TabSpec, matches, with_custom
 
 URL_LONG = 115
 """URLs longer than this get the ``long`` flag on the URL tab."""
@@ -106,7 +106,7 @@ def base_row(
     internal = [link for link in record.links if same_site(urlparse(link.href).netloc, page_host)]
     directives = " ".join(sorted(robots_directives(record)))
     kind = _canonical_kind(record, keep_query=keep_query)
-    return {
+    row: Row = {
         "url": record.url,
         "status": record.status,
         "status_code": record.status_code,
@@ -167,6 +167,10 @@ def base_row(
         "raw_title": record.render.raw_title if record.render else "",
         "raw_canonical": record.render.raw_canonical if record.render else "",
     }
+    for extraction in record.extractions:
+        row[extraction.column] = extraction.cell
+        row[extraction.count_column] = extraction.count
+    return row
 
 
 def external_rows(records: Iterable[PageRecord]) -> list[Row]:
@@ -313,6 +317,8 @@ class RowStore:
         self._sitemap_size = -1
         self._summary: Summary | None = None
         self._external: tuple[int, list[Row]] | None = None
+        self._extractions: dict[str, str] = {}
+        """Extractor and search names seen so far, to their kind, in first-seen order."""
 
     # ----------------------------------------------------------------- sync
     def sync(self) -> SessionState:
@@ -330,6 +336,8 @@ class RowStore:
                         base_row(record, sitemap=self._sitemap, keep_query=keep_query)
                     )
                     self._by_url[record.url] = record
+                    for extraction in record.extractions:
+                        self._extractions.setdefault(extraction.name, extraction.kind)
             audit = self.session.audit()
             if audit.rev != self._rev and audit.result is not None and audit.view is not None:
                 index = AuditIndex(audit.rev, audit.result, audit.view)
@@ -374,6 +382,12 @@ class RowStore:
                 return RowsPage(len(self._base), self._rev, self.all_rows(), full=True)
             return RowsPage(len(self._base), self._rev, new, patches)
 
+    def tabs(self) -> tuple[TabSpec, ...]:
+        """The tab strip, with the Custom tab's columns for this crawl's extractors."""
+        with self._lock:
+            self.sync()
+            return with_custom(list(self._extractions.items()))
+
     def all_rows(self) -> list[Row]:
         """Every page row with its current audit cells."""
         with self._lock:
@@ -401,7 +415,7 @@ class RowStore:
             rows = self.all_rows()
             external = self.external()
             tabs: dict[str, dict[str, int]] = {}
-            for tab in TABS:
+            for tab in self.tabs():
                 source = (
                     rows if tab.source == "pages" else external if tab.source == "external" else []
                 )

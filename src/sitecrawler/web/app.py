@@ -15,9 +15,10 @@ from pydantic import BaseModel, Field
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from sitecrawler.models import CrawlConfig
+from sitecrawler.parse import parse_extractor, parse_searches
 from sitecrawler.session import CrawlSession, SessionBusyError
 from sitecrawler.web.rows import RowStore
-from sitecrawler.web.tabs import TABS, to_json
+from sitecrawler.web.tabs import to_json
 
 _HERE = Path(__file__).parent
 
@@ -65,6 +66,7 @@ DETAIL_SUBS: tuple[tuple[str, str], ...] = (
     ("redirects", "Redirects"),
     ("headers", "HTTP Headers"),
     ("hreflang", "Hreflang"),
+    ("custom", "Custom"),
     ("issues", "Issues"),
 )
 """The detail pane's sub-tabs: (fragment name, label)."""
@@ -73,7 +75,8 @@ DETAIL_SUBS: tuple[tuple[str, str], ...] = (
 @router.get("/", response_class=HTMLResponse)
 def index(request: Request) -> HTMLResponse:
     """The app shell: tab strip, grid, detail pane and sidebar, filled by JavaScript."""
-    return _render(request, "index.html", tabs=TABS, specs=to_json(), detail_subs=DETAIL_SUBS)
+    tabs = _rows(request).tabs()
+    return _render(request, "index.html", tabs=tabs, specs=to_json(tabs), detail_subs=DETAIL_SUBS)
 
 
 @router.get("/detail/{sub}", response_class=HTMLResponse)
@@ -147,6 +150,12 @@ def api_summary(request: Request) -> JSONResponse:
     return JSONResponse(_rows(request).summary().to_json())
 
 
+@router.get("/api/tabs")
+def api_tabs(request: Request) -> JSONResponse:
+    """The tab specs, with the Custom tab's columns for the loaded crawl's extractors."""
+    return JSONResponse(to_json(_rows(request).tabs()))
+
+
 @router.get("/api/issues")
 def api_issues(request: Request) -> JSONResponse:
     """Every finding as JSON rows: url, rule_id, severity, message."""
@@ -166,9 +175,17 @@ class StartRequest(BaseModel):
     respect_robots: bool = True
     render: bool = False
     """Load every HTML page in headless Chromium as well; needs Playwright installed."""
+    extract: list[str] = Field(default_factory=list)
+    """Custom extractors in the command-line form, ``NAME=KIND[MODIFIERS]:EXPRESSION``."""
+    search: list[str] = Field(default_factory=list)
+    """Custom searches, ``[NAME=]PATTERN``."""
 
     def to_config(self) -> CrawlConfig:
-        """The crawl config these options describe."""
+        """The crawl config these options describe.
+
+        Raises:
+            ValueError: an extractor or search that does not parse.
+        """
         return CrawlConfig(
             start_url=self.url.strip(),
             max_pages=self.max_pages,
@@ -179,6 +196,8 @@ class StartRequest(BaseModel):
             keep_query=self.keep_query,
             respect_robots=self.respect_robots,
             render=self.render,
+            extract=tuple(parse_extractor(text) for text in self.extract if text.strip()),
+            search=parse_searches([text for text in self.search if text.strip()]),
         )
 
 

@@ -32,6 +32,8 @@ stripped by default so `/faq?faq=shipping` and `/faq` are one page.
 | `--keep-query` | off | Treat different query strings as different pages (tracking parameters are still dropped) |
 | `--ignore-robots` | off | Crawl pages robots.txt disallows. Use only on sites you own. |
 | `--render` | off | Also load every HTML page in headless Chromium and parse the rendered DOM; see [JavaScript rendering](render.md) for `--render-workers`, `--render-wait`, `--render-selector` and `--render-timeout` |
+| `--extract` | none | Custom extractor `NAME=css:SELECTOR`, `NAME=xpath:EXPR` or `NAME=regex:PATTERN`, repeatable; see [Custom extraction and search](extract.md) for modifiers and `--extract-file` |
+| `--search` | none | Flag pages whose HTML matches a regex (case-insensitive), `[NAME=]PATTERN`, repeatable; see [Custom extraction and search](extract.md) |
 | `-v, --verbose` | off | Debug logging |
 
 To fetch a fixed set of URLs instead, see [List mode](list-mode.md).
@@ -73,6 +75,7 @@ uv run sitecrawler crawl https://example.com -o pages.csv 2> crawl.log
 | `fetch_ms` | Request time in milliseconds, including redirects |
 | `error` | Error detail, if any. For `redirect_loop` this is the chain, e.g. `redirect loop: /a -> /b -> /a` |
 | `render_changes` | With `--render`: what JavaScript changed (`title, canonical, links +3`), or why the page could not be rendered. Empty otherwise |
+| `extract_<name>`, `search_<name>` | One column per `--extract` and `--search`, after the fixed columns: the extracted value (matches joined with ` \| `), or `True`/`False` for a search. Empty on pages that are not HTML |
 
 ## Redirects
 

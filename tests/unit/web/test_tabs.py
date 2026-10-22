@@ -89,3 +89,56 @@ def test_json_specs_carry_everything_the_browser_needs() -> None:
 def test_tab_by_id() -> None:
     assert tab_by_id("h1") is not None
     assert tab_by_id("nope") is None
+
+
+def test_custom_tab_is_built_from_the_extraction_names() -> None:
+    from sitecrawler.models import Extraction
+    from sitecrawler.web.tabs import CUSTOM, custom_tab, with_custom
+
+    assert tab_by_id(CUSTOM) == custom_tab()
+    tab = custom_tab([("price", "css"), ("ga", "search")])
+    assert tab.columns == ("url", "extract_price", "search_ga", "status_code", "indexable")
+    assert tab.titles == {"extract_price": "price", "search_ga": "ga"}
+    assert [f.id for f in tab.filters] == ["all", "has:price", "not:price", "has:ga", "not:ga"]
+    tabs = with_custom([("price", "css")])
+    assert [t.id for t in tabs] == [t.id for t in TABS]
+    assert next(t for t in tabs if t.id == CUSTOM).columns[1] == "extract_price"
+
+    found = base_row(
+        page(
+            "/",
+            extractions=(Extraction("price", "css", ("$1",), 1), Extraction("ga", "search", (), 0)),
+        )
+    )
+    missing = base_row(
+        page(
+            "/x",
+            extractions=(Extraction("price", "css", (), 0), Extraction("ga", "search", ("G",), 1)),
+        )
+    )
+    not_html = base_row(page("/pdf", content_type="application/pdf"))
+    by_id = {f.id: f for f in tab.filters}
+    assert (found["extract_price"], found["extract_price:n"], found["search_ga"]) == (
+        "$1",
+        1,
+        False,
+    )
+    assert [matches(found, by_id[i]) for i in ("has:price", "not:price", "has:ga", "not:ga")] == [
+        True,
+        False,
+        False,
+        True,
+    ]
+    assert [matches(missing, by_id[i]) for i in ("has:price", "not:price", "has:ga", "not:ga")] == [
+        False,
+        True,
+        True,
+        False,
+    ]
+    assert not any(
+        matches(not_html, by_id[i]) for i in ("has:price", "not:price", "has:ga", "not:ga")
+    )
+    for column in tab.columns:
+        assert column in {**found, **NO_AUDIT}
+    spec = next(d for d in to_json(tabs) if d["id"] == CUSTOM)
+    assert spec["titles"] == {"extract_price": "price"}

@@ -21,6 +21,7 @@ nav:
   - User guide:
       - Crawling a site: user-guide/crawl.md
       - JavaScript rendering: user-guide/render.md
+      - Custom extraction and search: user-guide/extract.md
       - Storage: user-guide/storage.md
       - List mode: user-guide/list-mode.md
       - Exporting: user-guide/export.md
@@ -41,6 +42,7 @@ nav:
           - 0006 Web UI snapshot and grids: adr/0006-web-ui-snapshot-and-client-grids.md
           - 0007 Live crawl session: adr/0007-live-crawl-session.md
           - 0008 Render every page, keep the diff: adr/0008-render-every-page-and-keep-the-diff.md
+          - 0009 Extract in the crawl pass: adr/0009-extract-in-the-crawl-pass.md
   - API reference: reference.md
 
 markdown_extensions:

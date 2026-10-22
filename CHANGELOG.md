@@ -6,6 +6,39 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+Phase 6: custom extraction and custom search.
+
+### Added
+
+- `sitecrawler crawl --extract NAME=KIND:EXPRESSION` (and the same on
+  `list`): custom extractors that run on every parsable HTML page, with
+  `css`, `xpath` and `regex` kinds and the modifiers `text` (default),
+  `html`, `attr=NAME`, `all` and `first` in brackets after the kind, e.g.
+  `images=css[attr=src,all]:img`. `--extract-file extract.toml` loads any
+  number of extractors and searches from one file. A bad selector,
+  expression or pattern, or a name used twice, exits 2 before the first
+  request.
+- `--search [NAME=]PATTERN`: a case-insensitive regex every HTML page is
+  checked for, giving a `True`/`False` column per page; the crawl summary
+  prints how many pages contain it and how many do not.
+- Results are stored in a new `extractions` table (`name`, `kind`, `count`,
+  kept values) and read back as `PageRecord.extractions`. With `--render`
+  they come from the rendered DOM (ADR-0009).
+- Exports: one `extract_<name>` / `search_<name>` column per name after the
+  fixed columns of the CSV and the `pages` table, plus an `extractions`
+  table in XLSX and JSON.
+- Web UI: a **Custom** tab (one column per extractor and search, found /
+  not-found and contains / does-not-contain filters), a **Custom** detail
+  section, **Extract** and **Search** boxes in Settings, and `/api/tabs`.
+- Fixture product pages under `/products/` with a price, a SKU and (on two
+  of three) a Google Analytics tag; `tests/integration/test_extract.py`.
+
+### Changed
+
+- The HTML parser is now lxml with cssselect instead of BeautifulSoup; the
+  parsed fields are unchanged (`<br>` and nested tags still separate words,
+  comments and `<noscript>` are not text).
+
 ## [0.6.0] - 2026-10-21
 
 Phase 5: JavaScript rendering.

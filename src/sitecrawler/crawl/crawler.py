@@ -24,7 +24,13 @@ from sitecrawler.models import (
     QueueItem,
     ResumeState,
 )
-from sitecrawler.parse import diff_rendered, link_header_rels, parse_html, parse_sitemap
+from sitecrawler.parse import (
+    compile_extractors,
+    diff_rendered,
+    link_header_rels,
+    parse_html,
+    parse_sitemap,
+)
 
 log = logging.getLogger(__name__)
 
@@ -61,6 +67,10 @@ class Crawler:
     headless Chromium after its raw fetch; the record then carries the
     rendered fields and a :class:`~sitecrawler.models.RenderDiff` against
     the raw ones. Playwright must be installed, or construction fails.
+
+    With ``config.extract`` or ``config.search`` set, every parsable HTML page
+    also carries the custom extraction and search results, computed from the
+    same text the page record was parsed from (ADR-0009).
     """
 
     def __init__(
@@ -74,8 +84,9 @@ class Crawler:
         """Validate the start URL or seed list and prepare (but do not start) the crawl.
 
         Raises:
-            ValueError: a bad start URL or seed, ``resume`` without a sink, or
-                rendering requested without Playwright installed.
+            ValueError: a bad start URL or seed, ``resume`` without a sink,
+                rendering requested without Playwright installed, or an
+                extractor or search that does not compile.
         """
         if resume and sink is None:
             msg = "resume=True needs a sink to resume from"
@@ -128,6 +139,7 @@ class Crawler:
                 block=config.render_block,
                 throttle=self.fetcher.throttle,
             )
+        self.extractors = compile_extractors(config.extract, config.search)
 
     @staticmethod
     def _validate_seeds(config: CrawlConfig) -> tuple[str, ...]:
@@ -245,11 +257,14 @@ class Crawler:
             return record, []
 
         page = parse_html(result.text, result.final_url)
+        html = result.text
         # A redirect source is never audited as HTML (its content belongs to the
         # target, which is rendered on its own), so rendering it would spend a
         # browser load for nothing.
         if self.renderer is not None and not redirected:
-            page = await self._render(record, result, page)
+            page, html = await self._render(record, result, page)
+        if self.extractors:
+            record.extractions = self.extractors.run(html)
         record.title = page.title
         record.meta_description = page.meta_description
         record.h1 = page.h1
@@ -278,25 +293,30 @@ class Crawler:
         )
         return record, page.links if self.config.follow_links else []
 
-    async def _render(self, record: PageRecord, result: FetchResult, raw: ParsedPage) -> ParsedPage:
-        """Render the page and return what to parse it from: the DOM, or ``raw`` on failure."""
+    async def _render(
+        self, record: PageRecord, result: FetchResult, raw: ParsedPage
+    ) -> tuple[ParsedPage, str]:
+        """Render the page and return the parsed DOM with its HTML.
+
+        On failure the raw parse and the raw HTML come back unchanged.
+        """
         if self.renderer is None:  # pragma: no cover - callers check first
-            return raw
+            return raw, result.text
         rendered = await self.renderer.render(result.final_url)
         record.render_ms = rendered.elapsed_ms
         if not rendered.ok:
             record.render_error = rendered.error
             log.warning("could not render %s: %s", record.url, rendered.error)
-            return raw
+            return raw, result.text
         landed = rendered.final_url or result.final_url
         if not self.frontier.in_scope(urlparse(landed).netloc):
             # The DOM is another site's page; the HTTP redirect check above never saw it.
             record.render_error = f"JavaScript redirected off-site to {landed}"
             log.warning("could not render %s: %s", record.url, record.render_error)
-            return raw
+            return raw, result.text
         page = parse_html(rendered.html, landed)
         record.render = diff_rendered(raw, page)
-        return page
+        return page, rendered.html
 
     def _normalize(self, url: str) -> str | None:
         return normalize(url, keep_query=self.config.keep_query, scheme=self.scheme)

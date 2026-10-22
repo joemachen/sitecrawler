@@ -34,7 +34,14 @@ from sitecrawler.audit.rule import Rule
 from sitecrawler.crawl import CrawlControl, Crawler
 from sitecrawler.crawl.crawler import ProgressCallback
 from sitecrawler.crawl.sink import CrawlSink
-from sitecrawler.models import CrawlConfig, PageRecord, QueueItem, ResumeState
+from sitecrawler.models import (
+    CrawlConfig,
+    ExtractorSpec,
+    PageRecord,
+    QueueItem,
+    ResumeState,
+    SearchSpec,
+)
 from sitecrawler.store import Store, open_store
 
 log = logging.getLogger(__name__)
@@ -166,8 +173,19 @@ def _config_from_json(start_url: str, config_json: str) -> CrawlConfig:
     tuple_fields = {f.name for f in fields(CrawlConfig) if str(f.type).startswith("tuple")}
     for name in tuple_fields & kwargs.keys():
         kwargs[name] = tuple(kwargs[name])
+    # Nested specs come back as dicts; rebuild the dataclasses (unknown keys dropped).
+    if "extract" in kwargs:
+        kwargs["extract"] = tuple(_spec(ExtractorSpec, item) for item in kwargs["extract"])
+    if "search" in kwargs:
+        kwargs["search"] = tuple(_spec(SearchSpec, item) for item in kwargs["search"])
     kwargs.setdefault("start_url", start_url)
     return CrawlConfig(**kwargs)
+
+
+def _spec[T: (ExtractorSpec, SearchSpec)](cls: type[T], data: dict[str, Any]) -> T:
+    # Any: one entry of the asdict() list stored in config_json.
+    names = {f.name for f in fields(cls)}
+    return cls(**{k: v for k, v in data.items() if k in names})
 
 
 class CrawlSession:

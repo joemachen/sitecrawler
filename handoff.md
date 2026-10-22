@@ -1,8 +1,9 @@
 # Handoff: sitecrawler
 
 Read this first in a new session. It is the state of the project as of
-2026-10-21 (v0.6.0 released, Phase 6 not started) and everything that is
-not obvious from the code.
+2026-10-22 (v0.6.0 released; Phase 6 implemented on PR #31, awaiting
+merge and the v0.7.0 release) and everything that is not obvious from the
+code.
 
 ## What this is
 
@@ -63,7 +64,62 @@ heuristic), the rendered fields become the page record and rendered-only
 links feed the frontier, the raw values are kept in a `RenderDiff` stored
 in `page_render`, and the two HTML bodies are not stored.
 
+**Phase 6 (custom extraction and custom search) is implemented** on one
+PR, `feat/extract` (#31), branched from `main` after v0.6.0. It is not
+released: v0.7.0 waits for Joe's go-ahead. ADR-0009 records the design
+call: extractors run inside `Crawler._fetch_and_parse` over the text the
+page was parsed from (the rendered DOM under `--render`), the HTML bodies
+are still not stored, and lxml + cssselect replaced BeautifulSoup (every
+existing parser test stayed green; `tests/unit/test_html.py` gained edge
+cases for `<br>`, comments, empty documents and XHTML prologues).
+
 What exists now:
+
+- `sitecrawler crawl URL --extract NAME=KIND[MODS]:EXPR ... --search
+  [NAME=]PATTERN ... --extract-file extract.toml` (and the same three
+  options on `list`). Kinds `css`, `xpath`, `regex`; modifiers `text`,
+  `html`, `attr=NAME`, `all`, `first` in brackets after the kind
+  (`images=css[attr=src,all]:img`). Searches are case-insensitive regexes
+  over the HTML source; unnamed ones are `search`, `search2`, ... Grammar,
+  TOML loader (`[extract.NAME]` tables with `css`/`xpath`/`regex`, `mode`,
+  `attr`, `all`; `[search]`; or a plain string in the CLI form) and the
+  runner live in `parse/extract.py`; `compile_extractors()` returns an
+  `ExtractorSet` the crawler builds in `__init__`, so a bad selector,
+  expression or pattern, or a name used twice, fails before the first
+  request (exit 2 from the CLI, 400 from the web UI). `CrawlConfig.extract`
+  / `.search` hold `ExtractorSpec` / `SearchSpec` tuples;
+  `session._config_from_json` rebuilds them from `config_json`.
+  Results: `PageRecord.extractions`, a tuple of `Extraction(name, kind,
+  values, count)` in config order, one per extractor and search on every
+  parsable HTML page (redirect sources included, since they carry the
+  target's content), none on non-HTML pages. Values are the first match or,
+  with `all`, every match; `count` is always the total. Empty text, empty
+  attributes and comment nodes are not matches. Stored in the
+  `extractions` table (`ExtractionRow`: `name`, `kind`, `count`,
+  `values_json`); `Store.extraction_names()` / `.extraction_columns()`
+  give the names in first-seen order. Columns are `extract_<name>` and
+  `search_<name>` (a search cell is True/False, None on non-HTML pages) so
+  they can never shadow a built-in column: appended to the CSV
+  (`write_csv(..., extra_columns=)`), to the `pages` dump, and a new
+  `extractions` export table (`url, name, kind, count, value`) is last in
+  `EXPORT_TABLES`. The crawl summary prints one line per search with the
+  contain / do-not-contain counts.
+  Web: a **Custom** tab whose columns and filter pairs (`has:<name>`,
+  `not:<name>`) are built by `web/tabs.py::custom_tab()` from the names
+  `RowStore` has seen (`RowStore.tabs()`, `with_custom()`); `TabSpec.titles`
+  gives the grid header the bare extractor name; `/api/tabs` serves the
+  specs and `app.js` re-reads them on every refresh so a live crawl's
+  columns appear as its first page lands. `StartRequest.extract` /
+  `.search` take lists of CLI-form strings (Settings has **Extract** and
+  **Search** textareas, one per line); a **Custom** detail section
+  (`templates/detail/custom.html`). Fixture: `tests/fixtures/site/products/`
+  (hub linked from the home page, three products with `.price`, `data-sku`
+  and, on widget and gadget only, a GA tag `G-7F3K9Q2M1X` loaded from a
+  local `/gtag.js` so Chromium never leaves the fixture server);
+  `tests/integration/test_extract.py` covers the library, the CLI (flags,
+  TOML file, list mode, errors), exports, the web tab and, under the
+  `browser` marker, extraction from the rendered DOM. User guide:
+  `docs/user-guide/extract.md`.
 
 - `sitecrawler crawl URL --render [--render-workers 2] [--render-wait
   networkidle|load|domcontentloaded] [--render-selector CSS]
@@ -126,8 +182,8 @@ What exists now:
   detail pane; vendored `htmx.min.js` (2.0.11), `tabulator.min.js`/`.css`
   (6.7.0). Rule explanations are rendered in-app at `/rules/<id>`, the
   full page per URL at `/page?url=`, built from `templates/detail/*`.
-- ~490 offline tests (18 of them headless Chromium, marker `browser`:
-  the UI e2e tests plus the rendered crawls). ADRs 0001-0008.
+- ~560 offline tests (19 of them headless Chromium, marker `browser`:
+  the UI e2e tests plus the rendered crawls). ADRs 0001-0009.
 
 Open:
 
@@ -140,27 +196,30 @@ Open:
   serve HTTPS (see the note under Phase 2 in the roadmap).
 - Dependabot's older uv can produce lockfile-downgrading PRs (#4 was closed
   for that); read the lock diff before merging.
-- Next piece of work: **Phase 6, custom extraction and custom search**
-  (`docs/ROADMAP.md`): `--extract name=css:|xpath:|regex:` (repeatable,
-  also from a TOML file), `--search PATTERN`, an `extractions` table shown
-  as Pages columns and in exports, fixture product pages with a price, a
-  SKU and a GA tag. First design call, worth an ADR: extraction wants the
-  rendered HTML when `--render` is on, but the rendered DOM is not stored
-  (ADR-0008), so extractors either run inside `Crawler._fetch_and_parse` /
-  `_render` where the text is in hand, or the bodies are stored behind a
-  flag first. This is also where lxml + cssselect replace BeautifulSoup
-  (decided, see the table below).
+- Next: merge #31 once CI is green (squash, like #28), then ask Joe
+  before releasing **v0.7.0** (the release recipe is #29: bump
+  `pyproject.toml` and `__init__.py`, move the CHANGELOG Unreleased block
+  under the version, PR, merge, annotated tag). After that, **Phase 7, XML
+  sitemap audit and generation** in `docs/ROADMAP.md`.
+- Phase 6 left for later: storing raw and rendered HTML bodies behind a
+  flag so extractors can be re-run on a finished crawl (ADR-0009 names it
+  as the obvious next step; today a changed extractor means crawling
+  again, and `list` mode is the cheap way to redo a few pages); the UI's
+  Extract and Search boxes are one spec per line with no editor or
+  validation beyond the 400 on Start; the e2e Playwright tests do not open
+  the Custom tab (the integration tests cover `/api/tabs`, rows and
+  filters; `app.js` was checked by hand in the browser).
 - Phase 5 left for later: blocking third-party hosts (analytics) in the
   renderer (only resource types are blocked now); a `--render` flag on
-  `list`; storing raw and rendered HTML bodies; the `rendered` fixture in
-  `test_render.py` renders the whole site once per module, about 15 s.
+  `list`; the `rendered` fixture in `test_render.py` renders the whole site
+  once per module, about 15 s.
 - Phase 4 left for later: a "Links" row-per-link view (the detail pane's
   Inlinks/Outlinks cover it), collapsing the sidebar, dark mode, and
   resuming a stopped crawl from the UI (the CLI's `--resume` works on the
   file). Summary counts are recomputed per `(seq, audit_rev)` over every
   filter of every tab; fine at 10k pages, not profiled beyond.
-- Merged branches `feat/render`, `chore/release-v0.6.0` and
-  `docs/handoff-v0.6.0` may still exist on origin (Claude Code's sandbox
+- Merged branches `feat/render`, `chore/release-v0.6.0`,
+  `docs/handoff-v0.6.0` and (once merged) `feat/extract` may still exist on origin (Claude Code's sandbox
   refuses `git push --delete`); delete them by hand if `git branch -r`
   still lists them. The local checkout also carries every merged Phase 3
   and 4 branch plus a `.claude/worktrees/` entry for the Phase 5 session;
@@ -176,7 +235,7 @@ Open:
 | Interface | CLI first; local web UI (FastAPI + Jinja2 + HTMX + Tabulator) in Phase 3 |
 | Storage | SQLite, one file per crawl, via SQLAlchemy 2.0 (ADR-0004) |
 | HTTP | httpx + asyncio, redirects followed by hand, per-host throttle; hops that leave the crawl's hosts are not fetched (ADR-0003) |
-| HTML | lxml (+ cssselect) once custom extraction lands; BeautifulSoup today |
+| HTML | lxml + cssselect (since Phase 6; BeautifulSoup is gone). One `parse_document()` in `parse/html.py` serves the page fields and the extractors |
 | JS rendering | Playwright async API inside the crawl loop, one Chromium, `render_workers` tabs; every parsable HTML page is rendered, rendered fields become the page, the diff is stored, the HTML bodies are not (ADR-0008) |
 | Issues engine | Rule classes discovered from `audit/rules/`; docs generated from them; issues table rebuilt per run; verdict stored on pages (ADR-0005) |
 | Rule overlap | One tag may appear under several rules when they ask for different actions; `page.non_indexable` and `canonical.not_self_referencing` are informational roll-ups |
@@ -185,7 +244,8 @@ Open:
 | Resume | `pages.state` is the frontier; `max_pages` counts across runs; `crawls.status` is `stopped` when capped |
 | Web UI | One page, Screaming Frog layout; grids filter/export client-side; htmx and Tabulator vendored; rule pages rendered in-app (ADR-0006) |
 | Live crawl | `CrawlSession` on a worker thread, audit thread with adaptive gap, file written as it goes and closed before `done`; browser polls, no websockets (ADR-0007) |
-| Tabs and filters | Data in `web/tabs.py`; a filter with a rule id is that rule; presentational filters (URL flags, status class) are computed columns, not rules |
+| Tabs and filters | Data in `web/tabs.py`; a filter with a rule id is that rule; presentational filters (URL flags, status class) are computed columns, not rules; the Custom tab is the one tab built per crawl, from the extraction names in the rows |
+| Custom extraction | Runs in the crawl pass over the HTML in hand (rendered DOM under `--render`); bodies not stored; grammar `NAME=KIND[MODS]:EXPR` + TOML; columns `extract_<name>` / `search_<name>` (ADR-0009) |
 
 Full rationale in `docs/adr/`.
 
@@ -195,6 +255,7 @@ Full rationale in `docs/adr/`.
 uv sync                                  # install into .venv (dev deps included)
 uv run sitecrawler crawl https://example.com --db example.db
 uv run sitecrawler crawl https://example.com --db example.db --render   # headless Chromium per page
+uv run sitecrawler crawl https://example.com --db example.db --extract "price=css:.price" --search "ga=G-[A-Z0-9]{6,}"
 uv run sitecrawler audit example.db
 uv run sitecrawler issues example.db --rule title.missing
 uv run sitecrawler export example.db --format xlsx
@@ -296,6 +357,20 @@ test, then regenerate `rules.md`.
 - Ruff's B009 rewrites `getattr(x, "name")` to `x.name`, so a fake that
   returns `object` must be typed as the real record or mypy fails after
   `ruff --fix`.
+- lxml refuses a `str` that starts with an XML encoding declaration
+  (XHTML pages); `parse_document()` encodes to UTF-8 bytes and parses with
+  `HTMLParser(encoding="utf-8")`. An empty or blank document raises
+  `ParserError`, caught there too. `lxml.html.fromstring` returns a
+  different root for fragments than for documents; always use
+  `document_fromstring`, which wraps fragments in `<html><body>`.
+- lxml-stubs type `document_fromstring` as `_Element`, which has no
+  `cssselect`/`text_content`; use `lxml.cssselect.CSSSelector(expr)(doc)`
+  and `itertext()` instead, and `itertext()` is typed `str | bytes`.
+- A fixture page must never load anything from a real host: Chromium
+  follows `<script src>` under `--render`, so the product pages load their
+  GA snippet from the fixture server's own `/gtag.js` (a 404, harmless).
+- Attribute values extracted with `attr=` or `/@href` come back as written
+  in the page (relative), not resolved against the URL.
 - **Never `gh pr merge --delete-branch` on a PR that other PRs are based
   on.** Deleting the base branch closed #22 and GitHub refused to reopen
   it or change its base; #26 is the same branch re-filed against `main`.
@@ -304,13 +379,14 @@ test, then regenerate `rules.md`.
 
 ## Where to look next
 
-- Phase 6 scope and acceptance: `docs/ROADMAP.md` under "Phase 6".
-  Extraction belongs in `parse/` (pure functions over HTML text) and runs
-  from `Crawler._fetch_and_parse`, which already has both the raw text and,
-  with `--render`, the rendered DOM in hand; results go in a new
-  `extractions` table (see `ARCHITECTURE.md` section 3). `Crawler.arun()`
-  is the entry point for callers that already have an event loop;
-  `CrawlSession` is how the UI drives it.
+- Phase 7 scope and acceptance: `docs/ROADMAP.md` under "Phase 7". Sitemap
+  parsing is `parse/sitemap.py` (locs only today), sitemap membership is
+  `CrawlView.in_sitemap`, and the stored URLs are `sitemap_urls`.
+  `Crawler.arun()` is the entry point for callers that already have an
+  event loop; `CrawlSession` is how the UI drives it.
+- Custom extraction: `parse/extract.py` (grammar, TOML, `ExtractorSet`),
+  `Crawler._fetch_and_parse` (where it runs), `store/dump.py::_pages` and
+  `web/tabs.py::custom_tab` (where the per-crawl columns come from).
 - The web UI's read side: `web/rows.py` (`base_row`, `AuditIndex`,
   `RowStore`), `web/tabs.py` (`TABS`). A new tab or filter is a spec; a new
   column is a key in `base_row` (and `tests/unit/web/test_tabs.py` checks

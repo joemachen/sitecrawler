@@ -28,3 +28,31 @@ def test_write_csv_round_trip(tmp_path: Path) -> None:
     assert rows[2]["status"] == "error"
     assert rows[2]["error"] == "boom"
     assert rows[3]["status"] == "redirect_loop"
+
+
+def test_extraction_columns_follow_the_fixed_ones(tmp_path: Path) -> None:
+    from sitecrawler.models import Extraction
+
+    records = [
+        PageRecord(
+            url="https://x/a",
+            outcome=Outcome.FETCHED,
+            depth=0,
+            found_on="start",
+            status_code=200,
+            extractions=(
+                Extraction("price", "css", ("$1", "$2"), 2),
+                Extraction("ga", "search", ("G-1",), 1),
+                Extraction("stray", "css", ("x",), 1),
+            ),
+        ),
+        PageRecord(url="https://x/b", outcome=Outcome.ERROR, depth=1, found_on="https://x/a"),
+    ]
+    out = tmp_path / "pages.csv"
+    assert write_csv(records, out, extra_columns=["extract_price", "search_ga", "url"]) == 2
+    with out.open(newline="", encoding="utf-8") as fh:
+        reader = csv.DictReader(fh)
+        rows = list(reader)
+        assert reader.fieldnames == [*CSV_FIELDS, "extract_price", "search_ga"]
+    assert (rows[0]["extract_price"], rows[0]["search_ga"]) == ("$1 | $2", "True")
+    assert (rows[1]["extract_price"], rows[1]["search_ga"]) == ("", "")

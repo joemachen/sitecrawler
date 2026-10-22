@@ -22,6 +22,8 @@
           <label><input type="checkbox" name="respect_robots" checked> Respect robots.txt</label>
           <label><input type="checkbox" name="keep_query"> Keep query strings</label>
           <label title="Loads every HTML page in headless Chromium after the raw fetch and compares the two. Needs Playwright and Chromium installed."><input type="checkbox" name="render"> Render JavaScript</label>
+          <label class="wide" title="One per line: NAME=css:SELECTOR, NAME=xpath:EXPRESSION or NAME=regex:PATTERN. Modifiers in brackets after the kind: css[attr=src,all]:img">Extract <textarea name="extract" rows="2" placeholder="price=css:.price&#10;sku=xpath://*[@data-sku]/@data-sku"></textarea></label>
+          <label class="wide" title="One regex per line, matched case-insensitively against the HTML; NAME=PATTERN names the column">Search <textarea name="search" rows="1" placeholder="ga=G-[A-Z0-9]+"></textarea></label>
         </div>
       </details>
     </form>

@@ -190,8 +190,19 @@ Design notes: ADR-0008. Playwright is the optional extra `sitecrawler[render]`;
 
 Acceptance:
 
-- [ ] Extracting price via CSS, SKU via XPath and GA tag via regex from fixture product pages yields expected values.
-- [ ] `--search` lists pages missing the GA tag.
+- [x] Extracting price via CSS, SKU via XPath and GA tag via regex from fixture product pages yields expected values (`tests/fixtures/site/products/`, `tests/integration/test_extract.py::test_price_sku_and_ga_tag_come_off_the_product_pages`).
+- [x] `--search` lists pages missing the GA tag (`test_extract.py::test_search_lists_the_pages_missing_the_ga_tag`; the CLI summary prints the contain / do-not-contain counts).
+
+Design notes: ADR-0009. Extractors run inside the crawl over the HTML in hand
+(the rendered DOM under `--render`); the bodies are still not stored, so
+changing an extractor means crawling again. The grammar is
+`NAME=KIND[MODIFIERS]:EXPRESSION` on the command line and the same keys in
+TOML; columns are `extract_<name>` and `search_<name>`. The UI's **Custom** tab
+builds its columns from the stored results, so a crawl file opened read-only
+shows them without its configuration. lxml + cssselect replaced BeautifulSoup
+here. Left for later: storing HTML bodies behind a flag for re-extraction, a
+`--render` flag on `list`, and extractors in the UI as anything richer than
+one spec per line.
 
 ---
 
