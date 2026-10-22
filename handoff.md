@@ -2,7 +2,7 @@
 
 Read this first in a new session. It is the state of the project as of
 2026-10-22 (v0.7.0 released; Phase 7 implemented on `feat/sitemaps`, PR
-open, v0.8.0 not yet released) and everything that is not obvious from the
+#34 open, v0.8.0 not yet released) and everything that is not obvious from the
 code.
 
 ## What this is
@@ -78,7 +78,7 @@ existing parser test stayed green; `tests/unit/test_html.py` gained edge
 cases for `<br>`, comments, empty documents and XHTML prologues).
 
 **Phase 7 (XML sitemap audit and generation) is implemented** on
-`feat/sitemaps` (one PR against `main`; see the PR list), not yet merged
+`feat/sitemaps` (PR #34 against `main`), not yet merged
 or released as v0.8.0. ADR-0010 records the design calls: the per-page
 findings are four audit rules in a `Sitemaps` category that compare the
 sitemap entries, normalised the crawl's way, with the pages and their
@@ -262,7 +262,7 @@ Open:
   serve HTTPS (see the note under Phase 2 in the roadmap).
 - Dependabot's older uv can produce lockfile-downgrading PRs (#4 was closed
   for that); read the lock diff before merging.
-- Next steps: merge the Phase 7 PR (`feat/sitemaps`) once CI is green and
+- Next steps: merge the Phase 7 PR (#34, `feat/sitemaps`) once CI is green and
   Joe says so, then **release v0.8.0** with the #32 recipe: bump
   `pyproject.toml`, `__init__.py` and `uv.lock` (`uv lock`), date the
   CHANGELOG Unreleased block, PR, squash-merge, annotated tag on `main`,
