@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-22
+
 Phase 7: XML sitemap audit and generation.
 
 ### Added
