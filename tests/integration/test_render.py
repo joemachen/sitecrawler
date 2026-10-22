@@ -18,7 +18,7 @@ from werkzeug.wrappers import Request, Response
 
 from sitecrawler.audit import CrawlView, run_audit
 from sitecrawler.cli.main import app
-from sitecrawler.crawl import Crawler
+from sitecrawler.crawl import Crawler, Renderer
 from sitecrawler.models import CrawlConfig, PageRecord
 from sitecrawler.store import open_store
 from tests.conftest import serve_site, site_pages
@@ -177,6 +177,35 @@ def test_render_that_gets_an_http_error_keeps_the_raw_parse(
     assert page.render is None
     assert page.render_error == "render returned HTTP 503"
     assert page.render_ms > 0
+
+
+def test_transient_network_error_is_retried_once(
+    site: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A ``net::ERR_*`` failure on the browser's first attempt must not become render.failed.
+
+    The failure is provoked from inside the browser: the renderer's own request
+    filter aborts the first document request, which Chromium reports as
+    ``net::ERR_FAILED``, the same class of error as a reset socket.
+    """
+    aborted: list[str] = []
+    original = Renderer.should_block
+
+    def abort_first_document(self: Renderer, resource_type: str) -> bool:
+        if resource_type == "document" and not aborted:
+            aborted.append(resource_type)
+            return True
+        return original(self, resource_type)
+
+    monkeypatch.setattr(Renderer, "should_block", abort_first_document)
+    config = CrawlConfig(
+        seed_urls=(f"{site}/js-injected",), follow_links=False, delay_seconds=0, render=True
+    )
+    (page,) = Crawler(config).run()
+    assert aborted == ["document"], "the first attempt was aborted, the retry went through"
+    assert page.render_error == ""
+    assert page.render is not None
+    assert page.title == RENDERED_TITLE
 
 
 def test_cli_render_stores_the_diff_and_audit_reports_it(site: str, tmp_path: Path) -> None:

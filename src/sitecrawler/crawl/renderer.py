@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import importlib.util
+import logging
 import time
 from types import TracebackType
 from typing import TYPE_CHECKING, Literal, cast
@@ -22,11 +23,18 @@ from sitecrawler.models import RenderResult
 if TYPE_CHECKING:
     from playwright.async_api import Browser, BrowserContext, Playwright, Route
 
+log = logging.getLogger(__name__)
+
 WaitStrategy = Literal["load", "domcontentloaded", "networkidle"]
 """When a navigation counts as finished: Playwright's ``wait_until`` events."""
 
 WAIT_STRATEGIES: tuple[str, ...] = ("load", "domcontentloaded", "networkidle")
 """The values ``wait`` accepts."""
+
+RETRIES = 1
+"""Extra attempts after a ``net::ERR_*`` navigation failure (a transient socket error)."""
+
+RETRY_DELAY_SECONDS = 0.5
 
 INSTALL_HINT = (
     "JavaScript rendering needs Playwright and Chromium: "
@@ -182,53 +190,62 @@ class Renderer:
 
         timeout_ms = self.timeout_seconds * 1000
         async with self._slots:
-            if self.throttle is not None:
-                await self.throttle.acquire(urlparse(url).netloc.lower())
             started = time.monotonic()
-            page: Page | None = None
-            try:
-                page = await self._context.new_page()
-                response = await page.goto(url, wait_until=self.wait, timeout=timeout_ms)
-                status = response.status if response is not None else None
-                if status is not None and status >= 400:
+            for attempt in range(1, RETRIES + 2):
+                if self.throttle is not None:
+                    await self.throttle.acquire(urlparse(url).netloc.lower())
+                page: Page | None = None
+                try:
+                    page = await self._context.new_page()
+                    response = await page.goto(url, wait_until=self.wait, timeout=timeout_ms)
+                    status = response.status if response is not None else None
+                    if status is not None and status >= 400:
+                        return RenderResult(
+                            url=url,
+                            ok=False,
+                            status_code=status,
+                            elapsed_ms=_elapsed(started),
+                            error=f"render returned HTTP {status}",
+                        )
+                    if self.selector:
+                        await page.wait_for_selector(self.selector, timeout=timeout_ms)
+                    html = await page.content()
+                    return RenderResult(
+                        url=url,
+                        ok=True,
+                        html=html,
+                        final_url=page.url,
+                        status_code=status,
+                        elapsed_ms=_elapsed(started),
+                    )
+                except TimeoutError:
+                    waited = f"{self.wait}" + (f" and {self.selector!r}" if self.selector else "")
+                    timed_out = (
+                        f"render timed out after {self.timeout_seconds:g}s waiting for {waited}"
+                    )
+                    return RenderResult(
+                        url=url, ok=False, elapsed_ms=_elapsed(started), error=timed_out
+                    )
+                except Error as exc:
+                    # Covers a page that could not load and a browser that has gone away.
+                    reason = str(exc).splitlines()[0][:200]
+                    if "net::ERR_" in reason and attempt <= RETRIES:
+                        # A socket-level failure (reset, buffer space, empty response) is
+                        # usually transient; one more try avoids a false render.failed.
+                        log.info("retrying render of %s after %s", url, reason)
+                        await asyncio.sleep(RETRY_DELAY_SECONDS)
+                        continue
                     return RenderResult(
                         url=url,
                         ok=False,
-                        status_code=status,
                         elapsed_ms=_elapsed(started),
-                        error=f"render returned HTTP {status}",
+                        error=f"render failed: {reason}",
                     )
-                if self.selector:
-                    await page.wait_for_selector(self.selector, timeout=timeout_ms)
-                html = await page.content()
-                return RenderResult(
-                    url=url,
-                    ok=True,
-                    html=html,
-                    final_url=page.url,
-                    status_code=status,
-                    elapsed_ms=_elapsed(started),
-                )
-            except TimeoutError:
-                waited = f"{self.wait}" + (f" and {self.selector!r}" if self.selector else "")
-                return RenderResult(
-                    url=url,
-                    ok=False,
-                    elapsed_ms=_elapsed(started),
-                    error=f"render timed out after {self.timeout_seconds:g}s waiting for {waited}",
-                )
-            except Error as exc:
-                # Covers a page that could not load and a browser that has gone away.
-                return RenderResult(
-                    url=url,
-                    ok=False,
-                    elapsed_ms=_elapsed(started),
-                    error=f"render failed: {str(exc).splitlines()[0][:200]}",
-                )
-            finally:
-                if page is not None:
-                    with contextlib.suppress(Error):  # the browser may already be gone
-                        await page.close()
+                finally:
+                    if page is not None:
+                        with contextlib.suppress(Error):  # the browser may already be gone
+                            await page.close()
+        raise AssertionError("unreachable: the last attempt always returns")  # pragma: no cover
 
 
 def _elapsed(started: float) -> int:

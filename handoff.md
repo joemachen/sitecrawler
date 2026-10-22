@@ -71,7 +71,9 @@ What exists now:
   the DOM to `parse_html` and `diff_rendered` (`parse/render_diff.py`).
   A failed render keeps the raw parse and sets `record.render_error`; an
   HTTP status of 400 or above on the browser's request, a download, a lost
-  browser and a JavaScript redirect off-site all count as failures.
+  browser and a JavaScript redirect off-site all count as failures; a
+  `net::ERR_*` navigation error (transient socket trouble, seen as
+  `ERR_NO_BUFFER_SPACE` on the Windows CI runner) is retried once first.
   Redirect sources are not rendered (their fields are the target's, and
   the target is rendered when it is crawled). Fixture for `render.failed`:
   `/audit/render-download`, served with `Content-Disposition: attachment`
