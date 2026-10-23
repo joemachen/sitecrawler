@@ -8,11 +8,12 @@ from pathlib import Path
 import typer
 from rich.console import Console
 
+from sitecrawler.audit import CrawlView
 from sitecrawler.crawl import Crawler
 from sitecrawler.export import write_csv
 from sitecrawler.models import CrawlConfig, ExtractorSpec, Outcome, PageRecord, SearchSpec
 from sitecrawler.parse import compile_extractors, load_extract_toml, parse_extractor, parse_searches
-from sitecrawler.store import open_store
+from sitecrawler.store import missing_tables, open_store
 
 err = Console(stderr=True)
 
@@ -30,6 +31,22 @@ def require_crawl_db(path: Path) -> None:
     header = path.read_bytes()[:16] if path.stat().st_size else b""
     if not header.startswith(b"SQLite format 3"):
         fail(f"{path} is not a SQLite database")
+    if missing := missing_tables(path):
+        fail(
+            f"{path} was written by an older sitecrawler (no {', '.join(missing)} table); "
+            "re-crawl it"
+        )
+
+
+def load_view(db: Path) -> CrawlView:
+    """The stored crawl at ``db`` as a view; exits 2 when it cannot be read."""
+    require_crawl_db(db)
+    with open_store(db) as store:
+        try:
+            return CrawlView.from_store(store)
+        except ValueError as exc:
+            fail(str(exc))
+            raise  # unreachable: fail() exits
 
 
 def extraction_config(

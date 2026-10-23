@@ -345,6 +345,69 @@ class Fingerprint:
         return f"{self.simhash:016x}"
 
 
+StructuredFormat = Literal["json-ld", "microdata", "rdfa"]
+"""Which syntax a structured data item was written in."""
+
+type StructuredValue = str | StructuredNode
+"""One value of a property: text (numbers and booleans included) or a nested node."""
+
+type StructuredNode = dict[str, list[StructuredValue]]
+"""A normalised item: every key maps to a list of values, whatever the syntax (ADR-0013).
+
+``@type`` holds the type names and ``@id`` the identifier, if any. schema.org
+names are bare (``Product``, ``offers``); a name from any other vocabulary
+keeps its full IRI, so a bare name always means schema.org."""
+
+
+@dataclass(slots=True, frozen=True)
+class StructuredItem:
+    """One top-level item of structured data on a page (ADR-0013)."""
+
+    format: StructuredFormat
+    data: StructuredNode
+    line: int = 0
+    """Source line of the ``<script>`` or element the item came from; 0 when unknown."""
+
+    @property
+    def types(self) -> tuple[str, ...]:
+        """The item's ``@type`` names, in the order written."""
+        return tuple(t for t in self.data.get("@type", ()) if isinstance(t, str))
+
+
+@dataclass(slots=True, frozen=True)
+class StructuredError:
+    """A JSON-LD block that is not valid JSON."""
+
+    message: str
+    """The parser's complaint with its position on the page, e.g. ``Expecting ',' delimiter
+    (line 12, column 5)``."""
+    line: int = 0
+    """Page line the error is on."""
+
+
+@dataclass(slots=True, frozen=True)
+class StructuredData:
+    """Every structured data item on a page and every JSON-LD block that failed to parse."""
+
+    items: tuple[StructuredItem, ...] = ()
+    errors: tuple[StructuredError, ...] = ()
+
+    @property
+    def types(self) -> tuple[str, ...]:
+        """The top-level types on the page, first-seen order, each once."""
+        return tuple(dict.fromkeys(t for item in self.items for t in item.types))
+
+    @property
+    def formats(self) -> tuple[StructuredFormat, ...]:
+        """The syntaxes used on the page, first-seen order, each once."""
+        return tuple(dict.fromkeys(item.format for item in self.items))
+
+    @property
+    def empty(self) -> bool:
+        """True when the page has no items and no broken blocks."""
+        return not self.items and not self.errors
+
+
 @dataclass(slots=True, frozen=True)
 class FetchResult:
     """Raw outcome of one HTTP request. No parsing has happened yet."""
@@ -480,6 +543,8 @@ class ParsedPage:
     rel_next: str = ""
     fingerprint: Fingerprint | None = None
     """Content hash and SimHash of the main text; set by the parser."""
+    structured: StructuredData | None = None
+    """JSON-LD, microdata and RDFa items; set by the parser."""
 
 
 @dataclass(slots=True)
@@ -531,6 +596,8 @@ class PageRecord:
     """Custom extraction and search results, in config order; empty unless the page was parsed."""
     fingerprint: Fingerprint | None = None
     """Content hash and SimHash of the main text (ADR-0012); None unless the page was parsed."""
+    structured: StructuredData | None = None
+    """JSON-LD, microdata and RDFa items (ADR-0013); None unless the page was parsed."""
 
     @property
     def rendered(self) -> bool:

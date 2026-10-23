@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>A kettle with complete product structured data</title>
+  <meta name="description" content="Unique words for schema-product: JSON-LD Product with a priced offer, a rating and a review, so it earns a product snippet.">
+  <link rel="canonical" href="/audit/schema-product">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    "name": "Copper kettle",
+    "url": "/audit/schema-product",
+    "sku": "KET-1",
+    "brand": {"@type": "Brand", "name": "Acme"},
+    "offers": {
+      "@type": "Offer",
+      "price": "39.00",
+      "priceCurrency": "USD",
+      "availability": "https://schema.org/InStock"
+    },
+    "aggregateRating": {"@type": "AggregateRating", "ratingValue": "4.6", "reviewCount": "12"},
+    "review": {
+      "@type": "Review",
+      "author": {"@type": "Person", "name": "Ann"},
+      "reviewRating": {"@type": "Rating", "ratingValue": "5"}
+    }
+  }
+  </script>
+</head>
+<body>
+  <h1>Copper kettle</h1>
+  <h2>Details</h2>
+  <p>Fixture page with structured data that passes every check. It boils water.</p>
+</body>
+</html>

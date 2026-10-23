@@ -1,0 +1,31 @@
+{% set data = detail.page.structured %}
+<h2>Structured data</h2>
+{% if data is none %}
+<p class="muted" data-structured="unparsed">This page was not parsed as HTML, so it has no structured data.</p>
+{% else %}
+<h3>Problems <span class="muted">({{ detail.schema_findings | length }})</span></h3>
+<table class="plain schema-findings">
+  <thead><tr><th>Rule</th><th>Type</th><th>Property</th><th>Message</th></tr></thead>
+  <tbody>
+  {% for row in detail.schema_findings %}
+    <tr data-finding="{{ row.rule_id }}">
+      <td><a href="/rules/{{ row.rule_id }}">{{ row.rule_id }}</a></td>
+      <td>{{ row.type }}</td>
+      <td>{{ row.path }}</td>
+      <td>{{ row.message }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="4" class="muted">No problems found{{ " (no audit yet)" if detail.indexable is none else "" }}.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+<h3>Items <span class="muted">({{ data.items | length }})</span></h3>
+{% for item in data.items %}
+<section class="structured-item" data-item="{{ item.format }}">
+  <p><strong>{{ item.types | join(", ") or "untyped" }}</strong> <span class="muted">{{ item.format }}, line {{ item.line }}</span></p>
+  <pre>{{ item.data | pretty_json }}</pre>
+</section>
+{% else %}
+<p class="muted" data-structured="none">No JSON-LD, microdata or RDFa on this page.</p>
+{% endfor %}
+{% endif %}

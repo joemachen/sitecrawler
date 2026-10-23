@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import json
 import logging
+import sqlite3
 from collections import defaultdict
 from collections.abc import Iterator, Mapping, Sequence
+from contextlib import closing
 from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
 from types import TracebackType
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlparse
 
 from sqlalchemy import Engine, create_engine, delete, event, func, select
@@ -38,6 +40,10 @@ from sitecrawler.models import (
     Severity,
     SitemapEntry,
     SitemapFile,
+    StructuredData,
+    StructuredError,
+    StructuredFormat,
+    StructuredItem,
 )
 from sitecrawler.store.schema import (
     Base,
@@ -52,6 +58,7 @@ from sitecrawler.store.schema import (
     RedirectHopRow,
     SitemapRow,
     SitemapUrlRow,
+    StructuredRow,
 )
 
 log = logging.getLogger(__name__)
@@ -68,6 +75,23 @@ def _set_pragmas(dbapi_connection: Any, _record: Any) -> None:
     cursor.execute("PRAGMA synchronous=NORMAL")
     cursor.execute("PRAGMA foreign_keys=ON")
     cursor.close()
+
+
+def missing_tables(path: Path) -> list[str]:
+    """Tables this version writes that the crawl file at ``path`` lacks.
+
+    Empty for a current file and for one that is not a crawl yet. Opening a
+    file creates missing tables, so an older crawl would otherwise read as one
+    that found nothing (no structured data, say) rather than one never looked
+    at; callers refuse it instead. Missing columns fail on their own.
+    """
+    with closing(sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)) as conn:
+        names = {
+            row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
+    if "pages" not in names:
+        return []
+    return sorted(set(Base.metadata.tables) - names)
 
 
 def open_store(path: Path | str) -> Store:
@@ -271,6 +295,7 @@ class Store:
                 )
                 for e in record.extractions
             ]
+            page.structured = _structured_rows(record.structured)
             src_host = urlparse(record.url).netloc
             page.links = [
                 LinkRow(
@@ -508,9 +533,30 @@ class Store:
                 extractions[page_id].append(
                     Extraction(name, kind, tuple(json.loads(values_json)), count)
                 )
+            structured: dict[int, list[StructuredRow]] = defaultdict(list)
+            for page_id, fmt, types, data_json, error, line in session.execute(
+                select(
+                    StructuredRow.page_id,
+                    StructuredRow.format,
+                    StructuredRow.types,
+                    StructuredRow.data_json,
+                    StructuredRow.error,
+                    StructuredRow.line,
+                ).order_by(StructuredRow.page_id, StructuredRow.id)
+            ):
+                structured[page_id].append(
+                    StructuredRow(
+                        format=fmt, types=types, data_json=data_json, error=error, line=line
+                    )
+                )
             for row in rows:
                 yield _to_record(
-                    row, hops[row.id], links[row.id], hreflang[row.id], extractions[row.id]
+                    row,
+                    hops[row.id],
+                    links[row.id],
+                    hreflang[row.id],
+                    extractions[row.id],
+                    structured[row.id],
                 )
 
     # ------------------------------------------------------------- helpers
@@ -602,12 +648,44 @@ def fingerprint_from_row(html: PageHtmlRow | None) -> Fingerprint | None:
     return Fingerprint(html.content_hash, int(html.simhash or "0", 16), html.content_words or 0)
 
 
+def _structured_rows(data: StructuredData | None) -> list[StructuredRow]:
+    if data is None:
+        return []
+    rows = [
+        StructuredRow(
+            format=item.format,
+            types=" ".join(item.types),
+            data_json=json.dumps(item.data),
+            line=item.line,
+        )
+        for item in data.items
+    ]
+    rows += [StructuredRow(format="json-ld", error=e.message, line=e.line) for e in data.errors]
+    return rows
+
+
+def structured_from_rows(
+    html: PageHtmlRow | None, rows: Sequence[StructuredRow]
+) -> StructuredData | None:
+    """The :class:`~sitecrawler.models.StructuredData` stored for a page, if it was parsed."""
+    if fingerprint_from_row(html) is None:
+        return None
+    items = tuple(
+        StructuredItem(cast("StructuredFormat", row.format), json.loads(row.data_json), row.line)
+        for row in rows
+        if row.data_json is not None
+    )
+    errors = tuple(StructuredError(row.error, row.line) for row in rows if row.error is not None)
+    return StructuredData(items, errors)
+
+
 def _to_record(
     row: PageRow,
     hops: Sequence[RedirectHop],
     links: Sequence[LinkRef],
     hreflang: Sequence[HreflangRef],
     extractions: Sequence[Extraction] = (),
+    structured: Sequence[StructuredRow] = (),
 ) -> PageRecord:
     html = row.html
     headers: dict[str, str] = json.loads(row.headers_json)
@@ -647,4 +725,5 @@ def _to_record(
         render_ms=row.render.render_ms if row.render else 0,
         render_error=row.render.error if row.render else "",
         extractions=tuple(extractions),
+        structured=structured_from_rows(html, structured),
     )

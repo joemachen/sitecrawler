@@ -17,5 +17,6 @@ newcomer. Copy `0000-template.md`, number it, fill it in, link it from the PR.
 | [0010](0010-sitemap-audit-as-page-rules.md) | Sitemap findings are page rules over the normalised entries and the indexability verdict; file-level facts are a report; generation is an export with `lastmod` only on request | Accepted |
 | [0011](0011-link-graph-in-the-audit-index.md) | The link graph is part of the audit index (`audit/graph.py`); Link Score is log-scaled PageRank over the follow graph with redirects resolved; `audit` stores inlinks, click depth and score on `pages` | Accepted |
 | [0012](0012-content-fingerprints-in-the-crawl-pass.md) | Content hash and SimHash are computed in the crawl pass over the main text (boilerplate stripped) and stored on `page_html`; clustering is an audit index (`audit/duplicates.py`); the content rules flag indexable members only | Accepted |
+| [0013](0013-structured-data-parsed-in-house.md) | JSON-LD, microdata and RDFa Lite are parsed in-house over the crawl's tree into one normalised shape and stored per item; checks use a bundled, reduced schema.org vocabulary and a hand-kept table of Google's rich-result requirements; extruct is not used | Accepted |
 
 Statuses: Proposed, Accepted, Superseded by ####, Deprecated.

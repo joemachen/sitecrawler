@@ -309,14 +309,28 @@ be recomputed without a crawl.
 
 ## Phase 10: Structured data validation
 
-- Extract JSON-LD, microdata and RDFa (`extruct`).
+- Extract JSON-LD, microdata and RDFa (planned with `extruct`; parsed in-house instead, ADR-0013).
 - Validate types and properties against the schema.org vocabulary (bundled JSON-LD, updated by a script).
-- Google rich-result rules per type (Product, Article, BreadcrumbList, FAQPage, Organization, LocalBusiness, Recipe, Event, VideoObject, ...): required vs. recommended properties.
+- Google rich-result rules per type (Product, Article, BreadcrumbList, FAQPage, Organization, LocalBusiness, Recipe, Event, VideoObject, ...): required vs. recommended properties. FAQPage dropped: Google retired FAQ rich results on 2026-05-07.
 - Reports: invalid JSON, unknown types/properties, missing required fields, multiple conflicting entities.
 
 Acceptance:
 
-- [ ] Fixture product page with a missing `offers.price` is flagged; a complete one passes.
+- [x] Fixture product page with a missing `offers.price` is flagged; a complete one passes (`tests/integration/test_structured.py::test_a_product_missing_offers_price_is_flagged_and_a_complete_one_passes`: `audit/schema-no-price` is the one `schema.missing_required` page, `audit/schema-product` trips no `schema.*` rule).
+
+Design notes: ADR-0013. `parse/structured.py` reads JSON-LD, microdata
+and RDFa Lite from the tree `parse_html` already has (the rendered DOM
+under `--render`) into one normalised item shape, stored per item in
+`structured_data`. `audit/structured.py` checks the items against a
+bundled, reduced schema.org vocabulary (`src/sitecrawler/data/schemaorg.json`,
+`scripts/update_schemaorg.py`) and the hand-kept rich-result table in
+`audit/richresults.py`, reached as `CrawlView.structured`; six `schema.*`
+rules in a `Structured data` category; `analysis/structured.py` holds the
+report (`sitecrawler schema report [--kind KIND]`, one `Structured data:`
+line under `audit`). Left for later: property values are not checked
+against their ranges; rich-result needs are checked on top-level items
+only; microdata `itemref`, full RDFa and JSON-LD expansion are not
+supported.
 
 ---
 

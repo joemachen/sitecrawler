@@ -31,6 +31,7 @@ def test_export_xlsx_has_a_sheet_per_table(crawled_db: Path) -> None:
             "sitemaps",
             "sitemap_urls",
             "extractions",
+            "structured_data",
         ]
         pages = list(workbook["pages"].iter_rows(values_only=True))
         assert pages[0][0] == "url"

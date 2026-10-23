@@ -520,6 +520,56 @@ The page is indexable and the sitemap lists it, but no other page on the site li
 
 **Fix:** Link to the page from a relevant page, a category page or the navigation; if nothing should link to it, it probably should not be in the sitemap either.
 
+## Structured data
+
+### `schema.conflicting`
+
+**Structured data items describe the same thing with different values** (severity: medium)
+
+When two items of one type name the same entity (the same @id or url), typically a theme's microdata and a plugin's JSON-LD, and disagree on a property such as the name or price, search engines have to guess which is right, and may use neither.
+
+**Fix:** Keep one source of structured data per entity, or make both say the same thing. Removing the older markup is usually simplest.
+
+### `schema.invalid_json`
+
+**JSON-LD block is not valid JSON** (severity: high)
+
+A JSON-LD block with a syntax error, such as a missing comma, a trailing comma or an unescaped quote, is thrown away whole: none of the items in it count, so the page loses every rich result the block was meant to earn. The message gives the parser's complaint and the page line.
+
+**Fix:** Fix the syntax at the line given. Generate the block with a JSON encoder (json_encode, JSON.stringify) rather than by pasting strings into a template.
+
+### `schema.missing_recommended`
+
+**Structured data lacks properties Google recommends for its rich result** (severity: low)
+
+Recommended properties are not needed for eligibility, but they decide how much the rich result shows (ratings, availability, dates, author) and whether it is chosen over a competitor's.
+
+**Fix:** Add the properties listed in the message where the page has the information.
+
+### `schema.missing_required`
+
+**Structured data lacks a property Google requires for its rich result** (severity: high)
+
+Google only shows a rich result (product price and rating, event dates, recipe card, breadcrumb trail, video thumbnail) when the item has every required property; without one the item is ineligible. Checked for Product, Article, BreadcrumbList, Organization, LocalBusiness, Recipe, Event and VideoObject and their subtypes. A nested requirement such as offers.price applies to every offer.
+
+**Fix:** Add the property named in the message, with a real value from the page. Check the result in Google's Rich Results Test.
+
+### `schema.unknown_property`
+
+**Structured data uses a property its type does not have** (severity: low)
+
+A property that is misspelt (authr) or belongs to another type (price on a Product rather than its Offer) is ignored, so whatever it was meant to say is lost. Inherited properties count: name is fine on every type.
+
+**Fix:** Check the type's page on schema.org for the right property, or move the value onto the nested item it belongs to.
+
+### `schema.unknown_type`
+
+**Structured data uses a type that is not in schema.org** (severity: medium)
+
+A misspelt or invented type (Prodcut, BlogPost) means nothing to search engines, so the item and everything in it is ignored. Types from other vocabularies, written with their full IRI, are not checked.
+
+**Fix:** Use the schema.org type name exactly as it is spelt on schema.org, including its capitals.
+
 ## Titles
 
 ### `title.duplicate`

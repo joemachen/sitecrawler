@@ -12,6 +12,7 @@ from urllib.parse import urlparse
 
 from sitecrawler.audit.duplicates import DuplicateIndex
 from sitecrawler.audit.graph import LinkGraph
+from sitecrawler.audit.structured import StructuredIndex
 from sitecrawler.crawl.urls import normalize, strip_www
 from sitecrawler.models import LinkRef, Outcome, PageRecord, SitemapEntry, SitemapFile
 
@@ -181,6 +182,11 @@ class CrawlView:
     def duplicates(self) -> DuplicateIndex:
         """Exact groups and near clusters over the fingerprinted pages (ADR-0012)."""
         return DuplicateIndex(self)
+
+    @cached_property
+    def structured(self) -> StructuredIndex:
+        """Structured data findings per parsed HTML page (ADR-0013)."""
+        return StructuredIndex(self)
 
     def group_html_pages(self, key: Callable[[PageRecord], str]) -> dict[str, list[PageRecord]]:
         """HTML pages grouped by ``key(page)``; empty keys are dropped."""

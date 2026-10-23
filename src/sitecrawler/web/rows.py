@@ -44,6 +44,7 @@ NO_AUDIT: Row = {
     "exact_duplicates": 0,
     "near_duplicates": 0,
     "duplicate_of": "",
+    "schema_problems": 0,
 }
 """Audit cells of a page the audit has not seen yet."""
 
@@ -114,6 +115,7 @@ def base_row(
     internal = [link for link in record.links if same_site(urlparse(link.href).netloc, page_host)]
     directives = " ".join(sorted(robots_directives(record)))
     kind = _canonical_kind(record, keep_query=keep_query)
+    structured = record.structured
     row: Row = {
         "url": record.url,
         "status": record.status,
@@ -176,6 +178,9 @@ def base_row(
         "raw_canonical": record.render.raw_canonical if record.render else "",
         "content_words": record.fingerprint.words if record.fingerprint else None,
         "content_hash": record.fingerprint.content_hash if record.fingerprint else "",
+        "structured_types": ", ".join(structured.types) if structured else "",
+        "structured_items": len(structured.items) if structured else None,
+        "structured_formats": ", ".join(structured.formats) if structured else "",
     }
     for extraction in record.extractions:
         row[extraction.column] = extraction.cell
@@ -264,6 +269,7 @@ class AuditIndex:
             else exact.representative
             if exact and exact.representative != url
             else "",
+            "schema_problems": len(self.view.structured.findings_for(url)),
         }
 
 
@@ -329,6 +335,8 @@ class PageDetail:
     duplicates: list[Row] = field(default_factory=list)
     """``url``, ``kind`` (``exact`` or ``near``), ``distance`` (SimHash bits), ``status``
     for every other page in this page's duplicate group or near cluster."""
+    schema_findings: list[Row] = field(default_factory=list)
+    """``rule_id``, ``type``, ``path``, ``message`` per structured data finding on this page."""
 
 
 class RowStore:
@@ -552,6 +560,7 @@ class RowStore:
             inlinks = self._index.view.inlinks_to(page.url) if self._index else []
             anchors = Counter(i.link.text for i in inlinks)
             duplicates = _duplicate_rows(self._index.view, page) if self._index else []
+            schema = self._index.view.structured.findings_for(page.url) if self._index else []
             return PageDetail(
                 page=page,
                 indexable=indexable if isinstance(indexable, bool) else None,
@@ -572,6 +581,15 @@ class RowStore:
                 links=self._index.view.link_graph.metrics.get(page.url) if self._index else None,
                 anchors=sorted(anchors.items(), key=lambda kv: (-kv[1], kv[0])),
                 duplicates=duplicates,
+                schema_findings=[
+                    {
+                        "rule_id": f"schema.{f.kind}",
+                        "type": f.type,
+                        "path": f.path,
+                        "message": f.message,
+                    }
+                    for f in schema
+                ],
             )
 
 

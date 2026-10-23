@@ -378,6 +378,30 @@ TABS: tuple[TabSpec, ...] = (
         ),
     ),
     TabSpec(
+        "structured",
+        "Structured Data",
+        (
+            "url",
+            "structured_types",
+            "structured_items",
+            "structured_formats",
+            "schema_problems",
+            "status_code",
+            "indexable",
+        ),
+        (
+            ALL,
+            _F("has_structured", "With structured data", "structured_items", "gt", 0),
+            _F("no_structured", "Without structured data", "structured_items", "eq", 0),
+            _R("invalid_json", "Invalid JSON-LD", "schema.invalid_json"),
+            _R("missing_required", "Missing required", "schema.missing_required"),
+            _R("unknown_type", "Unknown type", "schema.unknown_type"),
+            _R("conflicting", "Conflicting items", "schema.conflicting"),
+            _R("unknown_property", "Unknown property", "schema.unknown_property"),
+            _R("missing_recommended", "Missing recommended", "schema.missing_recommended"),
+        ),
+    ),
+    TabSpec(
         "links",
         "Links",
         (

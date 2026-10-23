@@ -92,6 +92,9 @@ class PageRow(Base):
     extractions: Mapped[list[ExtractionRow]] = relationship(
         back_populates="page", cascade="all, delete-orphan", order_by="ExtractionRow.id"
     )
+    structured: Mapped[list[StructuredRow]] = relationship(
+        back_populates="page", cascade="all, delete-orphan", order_by="StructuredRow.id"
+    )
 
 
 class RedirectHopRow(Base):
@@ -201,6 +204,31 @@ class ExtractionRow(Base):
     """The kept values (first, or all) as a JSON list of strings."""
 
     page: Mapped[PageRow] = relationship(back_populates="extractions")
+
+
+class StructuredRow(Base):
+    """One structured data item on ``page``, or one JSON-LD block that failed to parse (ADR-0013).
+
+    A parsed page with no structured data has no rows; ``page_html.content_hash``
+    tells it apart from a page that was never parsed.
+    """
+
+    __tablename__ = "structured_data"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    page_id: Mapped[int] = mapped_column(ForeignKey("pages.id"))
+    format: Mapped[str]
+    """``json-ld``, ``microdata`` or ``rdfa``."""
+    types: Mapped[str] = mapped_column(default="")
+    """The item's ``@type`` names, space-separated; empty on an error row."""
+    data_json: Mapped[str | None] = mapped_column(default=None)
+    """The normalised item as JSON; NULL on an error row."""
+    error: Mapped[str | None] = mapped_column(default=None)
+    """Why the JSON-LD block did not parse; NULL on an item row."""
+    line: Mapped[int] = mapped_column(default=0)
+    """Page line of the item or the error."""
+
+    page: Mapped[PageRow] = relationship(back_populates="structured")
 
 
 class IssueRow(Base):
