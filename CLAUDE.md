@@ -10,6 +10,8 @@ uv run playwright install chromium   # once; headless browser for tests/e2e/test
 uv run sitecrawler crawl URL -o out.csv
 uv run sitecrawler crawl URL --db crawl.db && uv run sitecrawler audit crawl.db
 uv run sitecrawler serve crawl.db    # local web UI on http://127.0.0.1:8765
+uv run sitecrawler desktop           # same UI in a native window (pywebview)
+uv run pyinstaller --noconfirm packaging/sitecrawler.spec   # dist/sitecrawler.exe
 uv run ruff format . && uv run ruff check --fix .
 uv run mypy
 uv run pytest                        # unit + integration + e2e, all offline
@@ -28,6 +30,7 @@ uv run pre-commit run --all-files
 - `src/sitecrawler/store/` SQLite persistence.
 - `src/sitecrawler/export/` CSV/XLSX/JSON writers.
 - `src/sitecrawler/web/` FastAPI app, Jinja2 templates and vendored htmx/Tabulator over one stored crawl (`serve`). Never holds logic the CLI cannot reach.
+- `packaging/` PyInstaller spec and entry script for the standalone exe.
 - `tests/fixtures/site/` static site every rule must have a trigger page in.
 
 ## Conventions

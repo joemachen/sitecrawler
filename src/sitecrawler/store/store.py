@@ -94,6 +94,25 @@ def missing_tables(path: Path) -> list[str]:
     return sorted(set(Base.metadata.tables) - names)
 
 
+def crawl_file_problem(path: Path) -> str | None:
+    """Why ``path`` cannot be opened as a stored crawl, or None when it can.
+
+    Does not open the file as a store, so a wrong path is never turned into
+    an empty crawl file.
+    """
+    if not path.is_file():
+        return f"{path} is not a file"
+    header = path.read_bytes()[:16] if path.stat().st_size else b""
+    if not header.startswith(b"SQLite format 3"):
+        return f"{path} is not a SQLite database"
+    if missing := missing_tables(path):
+        return (
+            f"{path} was written by an older sitecrawler (no {', '.join(missing)} table); "
+            "re-crawl it"
+        )
+    return None
+
+
 def open_store(path: Path | str) -> Store:
     """Open (creating if needed) the crawl database at ``path``.
 

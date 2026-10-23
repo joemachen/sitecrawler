@@ -32,6 +32,7 @@ nav:
       - Duplicate content: user-guide/duplicates.md
       - Structured data: user-guide/structured-data.md
       - Browsing a crawl: user-guide/serve.md
+      - Desktop app: user-guide/desktop.md
   - Project:
       - Development process: DEVELOPMENT.md
       - Architecture: ARCHITECTURE.md
@@ -51,6 +52,7 @@ nav:
           - 0011 Link graph in the audit index: adr/0011-link-graph-in-the-audit-index.md
           - 0012 Content fingerprints in the crawl pass: adr/0012-content-fingerprints-in-the-crawl-pass.md
           - 0013 Structured data parsed in-house: adr/0013-structured-data-parsed-in-house.md
+          - 0014 Desktop window and exe: adr/0014-desktop-window-pywebview-pyinstaller.md
   - API reference: reference.md
 
 markdown_extensions:

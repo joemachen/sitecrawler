@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- A standalone Windows desktop app: `dist/sitecrawler.exe`, built with
+  `uv run pyinstaller --noconfirm packaging/sitecrawler.spec`. It is the web
+  UI in its own window (pywebview over Edge WebView2), with no browser,
+  Python or uv needed. Crawls are saved to `crawls\` next to the exe; drop
+  a `.db` on the exe to open it read-only (ADR-0014).
+- `sitecrawler desktop [DB] [--crawls-dir DIR]`: the same window from a
+  checkout. pywebview is the new `desktop` extra.
+- `store.crawl_file_problem(path)`: the check `require_crawl_db` used,
+  moved into the store so the exe can use it without the CLI.
+
+### Fixed
+
+- The Settings panel showed while closed in Edge WebView2; `app.css` now
+  hides a closed panel's body explicitly.
+
 ## [1.0.0] - 2026-10-23
 
 Phase 10: structured data validation.

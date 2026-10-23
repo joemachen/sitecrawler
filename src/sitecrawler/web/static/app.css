@@ -78,6 +78,8 @@ header .db { margin-left: auto; max-width: 24rem; font-family: ui-monospace, mon
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   white-space: nowrap;
 }
+/* display: grid above would otherwise show the body while closed in Edge WebView2 (the desktop window). */
+.settings:not([open]) .settings-body { display: none; }
 .settings-body label { display: flex; justify-content: space-between; gap: 1rem; align-items: center; }
 .settings-body input[type="number"] { width: 6rem; padding: 0.2rem 0.4rem; border: 1px solid var(--line); border-radius: 4px; }
 .settings-body label.wide { align-items: flex-start; }

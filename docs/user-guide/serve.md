@@ -6,7 +6,8 @@ uv run sitecrawler serve
 
 `serve` opens the local web UI at `http://127.0.0.1:8765` in your browser.
 It only ever listens on loopback and has no login: it is a tool for your
-own machine, not a service. Stop it with Ctrl+C.
+own machine, not a service. Stop it with Ctrl+C. To use the same UI in its
+own window instead of a browser, see the [desktop app](desktop.md).
 
 | Option | Meaning |
 | --- | --- |

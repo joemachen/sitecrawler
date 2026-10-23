@@ -236,6 +236,10 @@ Coverage gate: 85% overall, 100% for `audit/` rules.
   the release PR merges (the recipe is in `handoff.md`). There is no release
   workflow yet: `uv build` makes the wheel, and `uv tool install .` or
   `pipx install .` installs it from the checkout.
+- The Windows desktop exe is built by hand, on Windows:
+  `uv run pyinstaller --noconfirm packaging/sitecrawler.spec` writes
+  `dist/sitecrawler.exe` (ADR-0014). Launch it once and start a short crawl
+  before attaching it to a release.
 
 ---
 
