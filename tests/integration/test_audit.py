@@ -140,6 +140,13 @@ TRIGGERS: dict[str, set[str]] = {
         "/audit/h1-dup-2",
     },
     "content.near_duplicate": {"/audit/dup-near-1", "/audit/dup-near-2"},
+    # /audit/schema-product is complete and trips none of these.
+    "schema.invalid_json": {"/audit/schema-invalid-json"},
+    "schema.missing_required": {"/audit/schema-no-price"},
+    "schema.unknown_type": {"/audit/schema-unknown"},
+    "schema.conflicting": {"/audit/schema-conflict"},
+    "schema.unknown_property": {"/audit/schema-unknown"},
+    "schema.missing_recommended": {"/audit/schema-article"},
 }
 
 IN_SITEMAP = {

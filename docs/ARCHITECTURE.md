@@ -37,12 +37,15 @@ that pass between stages are typed records from `sitecrawler.models`.
                sitemap diff
 ```
 
-**Status (after Phase 9):** `crawl/` (with the Playwright `Renderer`,
-ADR-0008), `parse/` (including the content fingerprint, ADR-0012),
-`store/`, `export/` (including the sitemap writer, ADR-0010), `audit/`
-(66 rules, plus the link graph index in `audit/graph.py`, ADR-0011, and
-the duplicate index in `audit/duplicates.py`, ADR-0012), `analysis/` (the
-sitemap-versus-crawl report, the link report and the duplicate report),
+**Status (after Phase 10):** `crawl/` (with the Playwright `Renderer`,
+ADR-0008), `parse/` (including the content fingerprint, ADR-0012, and the
+JSON-LD/microdata/RDFa reader, ADR-0013), `store/`, `export/` (including
+the sitemap writer, ADR-0010), `audit/` (72 rules, plus the link graph
+index in `audit/graph.py`, ADR-0011, the duplicate index in
+`audit/duplicates.py`, ADR-0012, and the structured data index in
+`audit/structured.py` with the rich-result table in `audit/richresults.py`,
+ADR-0013), `analysis/` (the sitemap-versus-crawl report and the link,
+duplicate and structured data reports),
 `cli/`, `session.py` and `web/` exist. `session.py`
 (`CrawlSession`, ADR-0007) runs a crawl on a worker thread with pause and
 stop, audits it as pages arrive and writes the result to the file at the
@@ -102,7 +105,7 @@ set of tables in SQLite:
 | `links` | Every anchor: src page, dst URL, anchor text, rel, nofollow, position (nav/body/footer), is_internal. |
 | `hreflang` | page_id, lang, href. |
 | `pagination` | page_id, rel (prev/next), href. |
-| `structured_data` | page_id, format (jsonld/microdata/rdfa), type, raw JSON. |
+| `structured_data` | One row per item: page_id, format (`json-ld`/`microdata`/`rdfa`), types, the normalised item as JSON, page line; or one row per JSON-LD block that failed to parse, with the error (Phase 10, ADR-0013). |
 | `extractions` | page_id, name, kind (`css`/`xpath`/`regex`/`search`), match count, kept value(s) as JSON. Custom extraction and search output (Phase 6, ADR-0009). |
 | `sitemaps` | Every sitemap or index the crawl tried to read: where it was found, kind, status, entry count, why it was unusable (Phase 7, ADR-0010). |
 | `sitemap_urls` | Every URL from every sitemap, with which sitemap it came from and its `lastmod`, `changefreq`, `priority`. |

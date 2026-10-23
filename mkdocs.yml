@@ -30,6 +30,7 @@ nav:
       - Sitemaps: user-guide/sitemaps.md
       - Internal linking: user-guide/links.md
       - Duplicate content: user-guide/duplicates.md
+      - Structured data: user-guide/structured-data.md
       - Browsing a crawl: user-guide/serve.md
   - Project:
       - Development process: DEVELOPMENT.md
@@ -49,6 +50,7 @@ nav:
           - 0010 Sitemap audit as page rules: adr/0010-sitemap-audit-as-page-rules.md
           - 0011 Link graph in the audit index: adr/0011-link-graph-in-the-audit-index.md
           - 0012 Content fingerprints in the crawl pass: adr/0012-content-fingerprints-in-the-crawl-pass.md
+          - 0013 Structured data parsed in-house: adr/0013-structured-data-parsed-in-house.md
   - API reference: reference.md
 
 markdown_extensions:

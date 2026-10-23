@@ -6,6 +6,49 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+Phase 10: structured data validation.
+
+### Added
+
+- Every parsed HTML page's structured data is read during the crawl:
+  JSON-LD blocks, microdata and RDFa Lite, normalised to one shape
+  (schema.org names bare, other vocabularies kept as IRIs) and stored per
+  item in a new `structured_data` table, with one row per JSON-LD block
+  that fails to parse. Under `--render` the rendered DOM is read. Parsed
+  in-house rather than with extruct (ADR-0013).
+- A bundled, reduced schema.org vocabulary
+  (`src/sitecrawler/data/schemaorg.json`: types with parents, properties
+  with domains), refreshed by `scripts/update_schemaorg.py`.
+- Google rich-result requirements for Product, Article, BreadcrumbList,
+  Organization, LocalBusiness, Recipe, Event and VideoObject (and their
+  subtypes) in `audit/richresults.py`. FAQPage is left out: Google retired
+  FAQ rich results on 2026-05-07.
+- Six audit rules in a new `Structured data` category:
+  `schema.invalid_json` (high), `schema.missing_required` (high: e.g. an
+  offer without a price), `schema.unknown_type` (medium),
+  `schema.conflicting` (medium: two items for the same `@id` or `url`
+  disagreeing), `schema.unknown_property` (low) and
+  `schema.missing_recommended` (low).
+- `sitecrawler schema report crawl.db [--kind KIND]`: one line per finding
+  with its type and property path, and a table of the types found. `audit`
+  prints the same as one `Structured data:` summary line.
+- Web UI: a **Structured Data** tab (types, item count, syntaxes, problem
+  count) with a filter per rule plus *With* / *Without structured data*,
+  and a **Structured Data** section in the detail pane with each item as
+  JSON and its problems.
+- Exports: a `structured_data` sheet (`url, line, format, types, error,
+  json`), and `structured_types` at the end of the `pages` sheet.
+- Fixture: `audit/schema-product` (complete), `schema-no-price`,
+  `schema-invalid-json`, `schema-unknown` (microdata), `schema-article`
+  (RDFa Lite) and `schema-conflict`, linked from the audit hub under
+  *Structured data*; `tests/integration/test_structured.py` holds the
+  roadmap acceptance test.
+
+### Changed
+
+- Crawl files written before this release have no `structured_data` table
+  and open with an error; re-crawl.
+
 ## [0.10.0] - 2026-10-22
 
 Phase 9: duplicate and near-duplicate content.

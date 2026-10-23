@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -23,6 +24,8 @@ from sitecrawler.web.tabs import to_json
 _HERE = Path(__file__).parent
 
 templates = Jinja2Templates(directory=_HERE / "templates")
+templates.env.filters["pretty_json"] = lambda value: json.dumps(value, indent=2, ensure_ascii=False)
+"""Indented JSON with the characters as written; autoescaping makes it safe in HTML."""
 router = APIRouter()
 
 
@@ -61,6 +64,7 @@ DETAIL_SUBS: tuple[tuple[str, str], ...] = (
     ("details", "URL Details"),
     ("html", "HTML"),
     ("content", "Content"),
+    ("structured", "Structured Data"),
     ("render", "Rendering"),
     ("inlinks", "Inlinks"),
     ("outlinks", "Outlinks"),

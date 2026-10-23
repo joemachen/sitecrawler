@@ -26,6 +26,7 @@ from sitecrawler.store.schema import (
     RedirectHopRow,
     SitemapRow,
     SitemapUrlRow,
+    StructuredRow,
 )
 from sitecrawler.store.store import render_diff_from_row
 
@@ -44,6 +45,7 @@ EXPORT_TABLES: tuple[str, ...] = (
     "sitemaps",
     "sitemap_urls",
     "extractions",
+    "structured_data",
 )
 """Names (and order) of the tables every export contains."""
 
@@ -90,6 +92,7 @@ PAGE_COLUMNS: tuple[str, ...] = (
     "content_words",
     "content_hash",
     "simhash",
+    "structured_types",
 )
 """Column names of the ``pages`` dump, in order.
 
@@ -147,6 +150,7 @@ def _page_row(page: PageRow) -> tuple[Cell, ...]:
         html.content_words if html else None,
         html.content_hash if html else None,
         html.simhash if html else None,
+        " ".join(dict.fromkeys(t for s in page.structured for t in s.types.split())),
     )
 
 
@@ -168,6 +172,7 @@ def _pages(session: Session) -> TableDump:
             selectinload(PageRow.html),
             selectinload(PageRow.render),
             selectinload(PageRow.extractions),
+            selectinload(PageRow.structured),
         )
     ).all()
     names = _extraction_names(session)
@@ -193,6 +198,19 @@ def _extractions(session: Session) -> TableDump:
         "extractions",
         ("url", "name", "kind", "count", "value"),
         [(url, e.name, e.kind, e.count, " | ".join(json.loads(e.values_json))) for url, e in found],
+    )
+
+
+def _structured_data(session: Session) -> TableDump:
+    found = session.execute(
+        select(PageRow.url, StructuredRow)
+        .join(StructuredRow, StructuredRow.page_id == PageRow.id)
+        .order_by(PageRow.url, StructuredRow.id)
+    ).all()
+    return TableDump(
+        "structured_data",
+        ("url", "line", "format", "types", "error", "json"),
+        [(url, s.line, s.format, s.types, s.error, s.data_json) for url, s in found],
     )
 
 
@@ -286,6 +304,7 @@ _LOADERS: dict[str, Callable[[Session], TableDump]] = {
     "sitemaps": _sitemaps,
     "sitemap_urls": _sitemap_urls,
     "extractions": _extractions,
+    "structured_data": _structured_data,
 }
 
 

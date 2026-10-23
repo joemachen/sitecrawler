@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>A teapot whose product offer has no price</title>
+  <meta name="description" content="Unique words for schema-no-price: JSON-LD Product whose offer gives a currency and availability but never says what it costs.">
+  <link rel="canonical" href="/audit/schema-no-price">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    "name": "Stoneware teapot",
+    "offers": {
+      "@type": "Offer",
+      "priceCurrency": "USD",
+      "availability": "https://schema.org/InStock"
+    },
+    "aggregateRating": {"@type": "AggregateRating", "ratingValue": "4.1", "reviewCount": "3"},
+    "review": {
+      "@type": "Review",
+      "author": {"@type": "Person", "name": "Bo"},
+      "reviewRating": {"@type": "Rating", "ratingValue": "4"}
+    }
+  }
+  </script>
+</head>
+<body>
+  <h1>Stoneware teapot</h1>
+  <h2>Details</h2>
+  <p>Fixture page for one audit rule: the offer is missing offers.price.</p>
+</body>
+</html>

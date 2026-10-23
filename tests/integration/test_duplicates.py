@@ -101,8 +101,9 @@ def test_fingerprints_are_stored_and_exported(crawled_db: Path, site: str) -> No
     with open_store(crawled_db) as store:
         pages = next(t for t in dump_tables(store, ("pages",)) if t.name == "pages")
         crawl = CrawlView.from_store(store)
-    assert pages.columns[-3:] == ("content_words", "content_hash", "simhash")
-    assert PAGE_COLUMNS[-3:] == ("content_words", "content_hash", "simhash")
+    fingerprint = ("content_words", "content_hash", "simhash")  # structured_types follows
+    assert pages.columns[-4:-1] == fingerprint
+    assert PAGE_COLUMNS[-4:-1] == fingerprint
     by_url = {row[0]: dict(zip(pages.columns, row, strict=True)) for row in pages.rows}
     one = by_url[f"{site}/audit/dup-exact-1"]
     two = by_url[f"{site}/audit/dup-exact-2"]

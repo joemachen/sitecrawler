@@ -48,6 +48,12 @@ text; `sitecrawler duplicates report` lists the groups and the three
 `content.*` rules are part of the fix list. See
 [Duplicate content](duplicates.md).
 
+Then one line on structured data: how many pages carry JSON-LD, microdata
+or RDFa items (and how many pages use each syntax), how many types, and how
+many pages have each kind of problem; `sitecrawler schema report` lists
+every finding with its type and property and the six `schema.*` rules are
+part of the fix list. See [Structured data](structured-data.md).
+
 ## Indexability
 
 Every page gets a verdict: indexable, or not indexable with the first reason

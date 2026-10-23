@@ -13,12 +13,14 @@ from sitecrawler.parse.headers import link_header_rels
 from sitecrawler.parse.html import parse_html
 from sitecrawler.parse.render_diff import diff_rendered
 from sitecrawler.parse.sitemap import SitemapDoc, parse_sitemap
+from sitecrawler.parse.structured import extract_structured
 
 __all__ = [
     "ExtractorSet",
     "SitemapDoc",
     "compile_extractors",
     "diff_rendered",
+    "extract_structured",
     "fingerprint",
     "fingerprint_text",
     "hamming",
