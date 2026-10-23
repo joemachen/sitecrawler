@@ -231,6 +231,10 @@
   };
   var app = document.querySelector(".app");
   var form = document.getElementById("crawl-form");
+  var folder = {
+    input: document.querySelector("[data-crawls-dir]"),
+    browse: document.querySelector("[data-browse]"),
+  };
   var pollTimer = null;
 
   function formatElapsed(seconds) {
@@ -253,6 +257,7 @@
     var dbNode = document.querySelector("[data-db]");
     dbNode.textContent = c.db ? c.db.split(/[\\/]/).pop() : "";
     dbNode.title = c.db || "";
+    if (document.activeElement !== folder.input) { folder.input.value = c.crawls_dir; }
     var ro = document.querySelector("[data-read-only]");
     if (ro) { ro.hidden = !c.read_only; }
     var enabled = ENABLED[c.status] || [];
@@ -373,6 +378,43 @@
       return refreshRows();
     }).then(schedule).catch(showError);
   }
+
+  // --------------------------------------------------------------- crawl folder
+  function setCrawlsDir(path) {
+    if (path === crawl.crawls_dir) { return Promise.resolve(); }
+    return post("/api/crawls-dir", { path: path }).then(applyCrawl).catch(function (err) {
+      folder.input.value = crawl.crawls_dir || folder.input.defaultValue;
+      showError(err);
+    });
+  }
+
+  folder.input.addEventListener("keydown", function (event) {
+    if (event.key !== "Enter") { return; }
+    event.preventDefault();  // Enter would otherwise submit the form and start a crawl
+    setCrawlsDir(folder.input.value.trim());
+  });
+  folder.input.addEventListener("change", function () {
+    setCrawlsDir(folder.input.value.trim());
+  });
+
+  // Browse is a native folder picker, so it only exists in the desktop window,
+  // where pywebview exposes sitecrawler.web.desktop.DesktopApi as window.pywebview.api.
+  function enableBrowse() {
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.choose_folder) {
+      folder.browse.hidden = false;
+    }
+  }
+  window.addEventListener("pywebviewready", enableBrowse);
+  enableBrowse();
+  folder.browse.addEventListener("click", function () {
+    window.pywebview.api.choose_folder(folder.input.value).then(function (path) {
+      if (path) {
+        folder.input.value = path;
+        return setCrawlsDir(path);
+      }
+      return null;
+    }).catch(showError);
+  });
 
   // --------------------------------------------------------------- detail
   var detail = {

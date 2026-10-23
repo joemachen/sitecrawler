@@ -298,6 +298,28 @@ class CrawlSession:
         return session
 
     # ------------------------------------------------------------- control
+    def set_crawls_dir(self, path: Path) -> Path:
+        """Write crawls started from now on under ``path``; a running crawl keeps its file.
+
+        The folder is created if needed, so a path that cannot be a folder is
+        refused here rather than when the next crawl starts.
+
+        Returns:
+            The folder as an absolute path.
+
+        Raises:
+            ValueError: ``path`` is empty or cannot be created as a folder.
+        """
+        if not str(path).strip() or str(path) == ".":
+            raise ValueError("choose a folder for new crawls")
+        folder = path.expanduser().resolve()
+        try:
+            folder.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise ValueError(f"cannot use {folder} for crawls: {exc.strerror or exc}") from exc
+        self.crawls_dir = folder
+        return folder
+
     def start(self, config: CrawlConfig) -> SessionState:
         """Start crawling ``config`` into a new file under ``crawls_dir``.
 

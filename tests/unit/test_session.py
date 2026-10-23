@@ -298,3 +298,38 @@ def test_db_name_sanitises_the_host(session: CrawlSession) -> None:
     wait_until(session, settled)
     assert state.db is not None
     assert state.db.name.startswith("127.0.0.1_5000-")
+
+
+def test_new_crawls_go_to_the_chosen_folder(session: CrawlSession, tmp_path: Path) -> None:
+    chosen = session.set_crawls_dir(tmp_path / "elsewhere" / "crawls")
+    assert chosen == (tmp_path / "elsewhere" / "crawls").resolve()
+    assert chosen.is_dir()  # created up front, before any crawl
+
+    state = session.start(CONFIG)
+    wait_until(session, settled)
+    assert state.db is not None
+    assert state.db.parent == chosen
+
+
+def test_running_crawl_keeps_its_file_when_the_folder_changes(tmp_path: Path) -> None:
+    session = _session(tmp_path, pages=50, delay=0.01)
+    try:
+        state = session.start(CONFIG)
+        session.set_crawls_dir(tmp_path / "next")
+        wait_until(session, settled)
+        assert state.db is not None
+        assert state.db.parent == tmp_path / "crawls"
+        assert session.state().db == state.db
+    finally:
+        session.close()
+
+
+@pytest.mark.parametrize("make_path", [lambda d: Path(), lambda d: d / "file.txt" / "sub"])
+def test_unusable_crawl_folders_are_refused(
+    session: CrawlSession, tmp_path: Path, make_path: Callable[[Path], Path]
+) -> None:
+    (tmp_path / "file.txt").write_text("not a folder", encoding="utf-8")
+    before = session.crawls_dir
+    with pytest.raises(ValueError, match=r"folder|cannot use"):
+        session.set_crawls_dir(make_path(tmp_path))
+    assert session.crawls_dir == before

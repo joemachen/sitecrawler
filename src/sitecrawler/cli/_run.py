@@ -13,7 +13,7 @@ from sitecrawler.crawl import Crawler
 from sitecrawler.export import write_csv
 from sitecrawler.models import CrawlConfig, ExtractorSpec, Outcome, PageRecord, SearchSpec
 from sitecrawler.parse import compile_extractors, load_extract_toml, parse_extractor, parse_searches
-from sitecrawler.store import missing_tables, open_store
+from sitecrawler.store import crawl_file_problem, open_store
 
 err = Console(stderr=True)
 
@@ -26,16 +26,8 @@ def fail(message: str) -> None:
 
 def require_crawl_db(path: Path) -> None:
     """Exit 2 unless ``path`` is an existing SQLite file (does not open it)."""
-    if not path.is_file():
-        fail(f"{path} is not a file")
-    header = path.read_bytes()[:16] if path.stat().st_size else b""
-    if not header.startswith(b"SQLite format 3"):
-        fail(f"{path} is not a SQLite database")
-    if missing := missing_tables(path):
-        fail(
-            f"{path} was written by an older sitecrawler (no {', '.join(missing)} table); "
-            "re-crawl it"
-        )
+    if problem := crawl_file_problem(path):
+        fail(problem)
 
 
 def load_view(db: Path) -> CrawlView:

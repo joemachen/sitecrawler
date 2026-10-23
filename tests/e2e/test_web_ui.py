@@ -226,3 +226,26 @@ def test_stop_mid_crawl_from_the_ui(page: Page, idle_ui: str, site: str) -> None
     rows = int(page.locator("[data-grid-count]").get_attribute("data-rows") or "0")
     assert 0 < rows < len(site_pages())
     expect(page.locator('[data-action="start"]')).to_be_enabled()
+
+
+def test_crawl_folder_setting(page: Page, idle_ui: str, tmp_path: Path) -> None:
+    page.goto(idle_ui)
+    page.click("summary:has-text('Settings')")
+    folder = page.locator("[data-crawls-dir]")
+    expect(folder).to_have_value(str(tmp_path / "crawls"))
+    expect(page.locator("[data-browse]")).to_be_hidden()  # a browser has no folder picker
+
+    chosen = tmp_path / "chosen"
+    folder.fill(str(chosen))
+    folder.press("Enter")  # sets the folder; must not submit the form and start a crawl
+    expect(page.locator(".app")).to_have_attribute("data-status", "idle")
+    page.wait_for_function(
+        "path => fetch('/api/crawl').then(r => r.json()).then(c => c.crawls_dir === path)",
+        arg=str(chosen.resolve()),
+    )
+    assert chosen.is_dir()
+
+    folder.fill(str(tmp_path / "crawls" / "x\0bad"))
+    folder.press("Enter")
+    expect(page.locator("[data-error]")).not_to_be_empty()
+    expect(folder).to_have_value(str(chosen.resolve()))

@@ -6,7 +6,8 @@ uv run sitecrawler serve
 
 `serve` opens the local web UI at `http://127.0.0.1:8765` in your browser.
 It only ever listens on loopback and has no login: it is a tool for your
-own machine, not a service. Stop it with Ctrl+C.
+own machine, not a service. Stop it with Ctrl+C. To use the same UI in its
+own window instead of a browser, see the [desktop app](desktop.md).
 
 | Option | Meaning |
 | --- | --- |
@@ -25,7 +26,11 @@ after the fetches in flight; **Resume** continues it; **Stop** ends it
 early; **Clear** forgets it and returns to an empty screen. **Settings**
 holds the same options as the `crawl` command: max pages, delay, workers,
 timeout, sitemaps, robots.txt, query strings, and **Render JavaScript**
-(see [JavaScript rendering](render.md); needs Chromium installed).
+(see [JavaScript rendering](render.md); needs Chromium installed). Its
+**Save crawls to** field changes `--crawls-dir` for crawls started after
+it: type a path and press Enter. Under `serve` the change lasts until the
+server stops; the [desktop app](desktop.md) remembers it and adds a
+**Browse…** button.
 
 Each crawl is written to its own file, `crawls/<host>-<timestamp>.db`
 under `--crawls-dir`, as it runs. When the crawl ends the final audit is
