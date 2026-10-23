@@ -19,7 +19,7 @@ against `tests/fixtures/site/`, the user guide has a page for it, and
 | 6 | Custom extraction and search | v0.7.0 | Done (2026-10-22) |
 | 7 | XML sitemap audit and generation | v0.8.0 | Done (2026-10-22) |
 | 8 | Internal linking analysis | v0.9.0 | Done (2026-10-22) |
-| 9 | Duplicate content detection | v0.10.0 | |
+| 9 | Duplicate content detection | v0.10.0 | Done (2026-10-22) |
 | 10 | Structured data validation | v1.0.0 | |
 | 11 | API integrations | v1.x | |
 

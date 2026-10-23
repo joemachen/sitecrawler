@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-22
+
 Phase 9: duplicate and near-duplicate content.
 
 ### Added
