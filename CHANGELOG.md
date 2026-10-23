@@ -15,6 +15,12 @@ All notable changes to this project are documented here. The format follows
   a `.db` on the exe to open it read-only (ADR-0014).
 - `sitecrawler desktop [DB] [--crawls-dir DIR]`: the same window from a
   checkout. pywebview is the new `desktop` extra.
+- **Save crawls to** in the UI's Settings: choose the folder new crawls
+  are written to (`POST /api/crawls-dir`). In the desktop app a
+  **Browse…** button opens the Windows folder picker, and the choice is
+  remembered in `%APPDATA%\sitecrawler\settings.json` for the next launch
+  (`--crawls-dir` still overrides it for `sitecrawler desktop`). Under
+  `serve` it lasts until the server stops.
 - `store.crawl_file_problem(path)`: the check `require_crawl_db` used,
   moved into the store so the exe can use it without the CLI.
 

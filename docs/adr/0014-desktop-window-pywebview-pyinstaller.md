@@ -33,6 +33,17 @@ or throwing away a tested one.
   the exe, because a double-clicked exe's working directory can be
   anywhere. Errors appear in a message box. stdout and stderr, which a
   windowed exe lacks, go to `sitecrawler.log` beside the exe.
+- **The crawl folder is a setting, remembered per user.** Settings has a
+  *Save crawls to* field (`POST /api/crawls-dir`, which calls
+  `CrawlSession.set_crawls_dir`). In the desktop window a *Browse…* button
+  opens the native folder picker through pywebview's `js_api`
+  (`DesktopApi.choose_folder`, its only public method, so nothing else of
+  the Python side reaches the page). The choice is saved to
+  `%APPDATA%\sitecrawler\settings.json` (the XDG config folder elsewhere)
+  and used on the next launch. It is kept outside the exe's folder so it
+  survives moving or rebuilding the exe. `serve` shows the same field but
+  saves nothing: a browser tab has no folder picker, and a server started
+  with `--crawls-dir` should not change what the desktop app remembers.
 - **Playwright is excluded from the exe.** Rendering needs a separate
   Chromium download that a single file cannot carry. Ticking *Render
   JavaScript* in the exe reports the install hint, as it does in a

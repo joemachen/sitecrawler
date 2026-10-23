@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 
 from sitecrawler.store import open_store
 from sitecrawler.web import create_app
+from sitecrawler.web.prefs import Prefs, load_prefs
 from sitecrawler.web.tabs import rule_filters
 from tests.conftest import site_pages
 from tests.integration.test_audit import TRIGGERS
@@ -189,3 +190,44 @@ def test_starting_over_a_stored_file_leaves_it_untouched(
     assert audited_db.stat().st_mtime_ns == before
     with open_store(audited_db) as store:
         assert store.issue_counts() == counts
+
+
+def test_crawl_folder_can_be_changed_from_the_ui(client: TestClient, tmp_path: Path) -> None:
+    assert client.get("/api/crawl").json()["crawls_dir"] == str(tmp_path / "crawls")
+    assert f'value="{tmp_path / "crawls"}"' in client.get("/").text
+
+    response = client.post("/api/crawls-dir", json={"path": f"  {tmp_path / 'chosen'}  "})
+    assert response.status_code == 200, response.text
+    assert response.json()["crawls_dir"] == str((tmp_path / "chosen").resolve())
+    assert (tmp_path / "chosen").is_dir()
+
+
+def test_bad_crawl_folder_is_a_400(client: TestClient, tmp_path: Path) -> None:
+    (tmp_path / "file.txt").write_text("x", encoding="utf-8")
+    for path in ["", str(tmp_path / "file.txt" / "sub")]:
+        response = client.post("/api/crawls-dir", json={"path": path})
+        assert response.status_code == 400
+        assert response.json()["detail"]
+    assert client.get("/api/crawl").json()["crawls_dir"] == str(tmp_path / "crawls")
+
+
+def test_crawl_folder_is_remembered_only_with_a_settings_file(tmp_path: Path) -> None:
+    prefs = tmp_path / "settings.json"
+    with TestClient(create_app(crawls_dir=tmp_path / "a", prefs_file=prefs)) as c:
+        assert c.post("/api/crawls-dir", json={"path": str(tmp_path / "b")}).status_code == 200
+    assert load_prefs(prefs) == Prefs(crawls_dir=(tmp_path / "b").resolve())
+
+    with TestClient(create_app(crawls_dir=tmp_path / "a")) as c:
+        assert c.post("/api/crawls-dir", json={"path": str(tmp_path / "c")}).status_code == 200
+    assert load_prefs(prefs) == Prefs(crawls_dir=(tmp_path / "b").resolve())
+
+
+def test_unsaveable_settings_file_is_reported(tmp_path: Path) -> None:
+    blocker = tmp_path / "blocker"
+    blocker.write_text("a file where the settings folder should be", encoding="utf-8")
+    app = create_app(crawls_dir=tmp_path / "a", prefs_file=blocker / "settings.json")
+    with TestClient(app) as c:
+        response = c.post("/api/crawls-dir", json={"path": str(tmp_path / "b")})
+        assert response.status_code == 500
+        assert "could not remember it" in response.json()["detail"]
+        assert c.get("/api/crawl").json()["crawls_dir"] == str((tmp_path / "b").resolve())

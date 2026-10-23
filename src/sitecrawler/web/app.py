@@ -18,6 +18,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from sitecrawler.models import CrawlConfig
 from sitecrawler.parse import parse_extractor, parse_searches
 from sitecrawler.session import CrawlSession, SessionBusyError
+from sitecrawler.web.prefs import Prefs, save_prefs
 from sitecrawler.web.rows import RowStore
 from sitecrawler.web.tabs import to_json
 
@@ -57,6 +58,7 @@ def crawl_json(rows: RowStore) -> dict[str, object]:
         "audit_rev": state.audit_rev,
         "elapsed": round(state.elapsed, 1),
         "error": state.error,
+        "crawls_dir": str(rows.session.crawls_dir),
     }
 
 
@@ -219,6 +221,34 @@ def api_crawl_start(request: Request, body: StartRequest) -> JSONResponse:
     return JSONResponse(crawl_json(rows))
 
 
+class CrawlsDirRequest(BaseModel):
+    """Body of ``POST /api/crawls-dir``."""
+
+    path: str
+
+
+@router.post("/api/crawls-dir")
+def api_crawls_dir(request: Request, body: CrawlsDirRequest) -> JSONResponse:
+    """Choose where new crawls are written. 400 for a folder that cannot be used.
+
+    Remembered for the next launch when the app was given a settings file
+    (the desktop window); under ``serve`` it lasts until the server stops.
+    """
+    rows = _rows(request)
+    try:
+        folder = rows.session.set_crawls_dir(Path(body.path.strip()))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    prefs_file = cast(Path | None, request.app.state.prefs_file)
+    if prefs_file is not None:
+        try:
+            save_prefs(prefs_file, Prefs(crawls_dir=folder))
+        except OSError as exc:
+            detail = f"using {folder}, but could not remember it: {exc.strerror or exc}"
+            raise HTTPException(status_code=500, detail=detail) from exc
+    return JSONResponse(crawl_json(rows))
+
+
 @router.post("/api/crawl/{action}")
 def api_crawl_action(request: Request, action: str) -> JSONResponse:
     """``pause``, ``resume``, ``stop`` or ``clear`` the crawl; 409 when the status forbids it."""
@@ -251,12 +281,16 @@ async def _not_found(request: Request, exc: StarletteHTTPException) -> HTMLRespo
     return _render(request, "404.html", status_code=404, detail=exc.detail)
 
 
-def create_app(db: Path | None = None, *, crawls_dir: Path = Path("crawls")) -> FastAPI:
+def create_app(
+    db: Path | None = None, *, crawls_dir: Path = Path("crawls"), prefs_file: Path | None = None
+) -> FastAPI:
     """The app over ``db`` (read-only) or, with no file, over an empty session.
 
     Args:
         db: A stored crawl to open, or None to start idle.
         crawls_dir: Where crawls started from the UI are written.
+        prefs_file: Where a folder chosen in Settings is remembered, or None
+            to forget it when the server stops.
 
     Raises:
         ValueError: when ``db`` holds no crawl.
@@ -274,6 +308,7 @@ def create_app(db: Path | None = None, *, crawls_dir: Path = Path("crawls")) -> 
         title="sitecrawler", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan
     )
     app.state.session = session
+    app.state.prefs_file = prefs_file
     app.state.rows = RowStore(session)
     app.mount("/static", StaticFiles(directory=_HERE / "static"), name="static")
     app.include_router(router)
