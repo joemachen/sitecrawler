@@ -401,6 +401,32 @@ What exists now:
 
 Open:
 
+- **GitHub Actions has no minutes left for this private repository
+  (2026-10-22).** Every job fails in two seconds with the annotation
+  "The job was not started because recent account payments have failed
+  or your spending limit needs to be increased". Six full runs in one
+  day did it: the Windows job takes 15-22 minutes and counts double
+  against the free plan's monthly allowance. Fix in GitHub under
+  Settings > Billing and plans > Spending limits (raise the Actions
+  limit), or wait for the monthly reset, or make the repository public.
+  Until then no PR can go green; #43 (docs-only, `handoff.md` alone,
+  the rest of the tree identical to the green #42) was merged without
+  a run. Do not merge code PRs that way; run the full gates locally
+  (`uv run pytest --cov`, the audit coverage gate, `uv run mkdocs build
+  --strict`) and say so in the PR if CI is still down. There is no
+  branch protection on this repository (free plan), so GitHub will not
+  stop a merge on red checks. The `push` runs on `main` for ff24999 and
+  96dc245 are red for the same reason, not for the code; re-run the
+  latest one once minutes are back and expect green.
+- The Phase 9 session's worktree is still on disk:
+  `.claude/worktrees/unruffled-noether-5b7068` with `feat/duplicates`
+  checked out, plus the local branch `claude/unruffled-noether-5b7068`.
+  Both are merged; `git worktree remove` the folder and `git branch -D`
+  the two branches once that session is no longer wanted.
+- Manual QA: `docs/DEVELOPMENT.md` section 5 now has a "Manual QA"
+  checklist (a real-site crawl, the web UI walk-through, a spot check of
+  issues against the live page, the exports). The xlsx step there is
+  the still-open "opened in Excel by hand" item below.
 - **mabelslabels.com row-for-row check (Phase 0 acceptance) passed on
   2026-10-22**: 300 pages at `--delay 1` against `mabelslabels_pages.csv`
   (the original script's full crawl, ignored by git). Every difference
