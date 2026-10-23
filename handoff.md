@@ -476,10 +476,10 @@ Open:
   2026-10-22). A full run is about 12 minutes on Ubuntu and 20 on Windows.
   There is still no branch protection, so check `gh pr checks N` before
   merging.
-- `.claude/worktrees/` holds four empty folders from earlier sessions
-  (`cool-blackburn-847d7b`, `exciting-jang-5c7cce`, `fervent-kalam-2e41a5`,
-  `unruffled-noether-5b7068`); git has forgotten them and Claude Code's
-  sandbox refuses to delete them, so remove them by hand.
+- `.claude/worktrees/` is empty (2026-10-23). A phase session's worktree
+  folder stays locked while that session is unarchived; once its PR is
+  merged, archive the session (ask Joe first), then the empty folder can
+  be removed.
 - Manual QA: `docs/DEVELOPMENT.md` section 5 now has a "Manual QA"
   checklist (a real-site crawl, the web UI walk-through, a spot check of
   issues against the live page, the exports). The xlsx step there is
@@ -577,10 +577,7 @@ Open:
 - Merged branches are deleted from origin by hand after each merge
   (`git push origin --delete <branch>` from a terminal; Claude Code's
   sandbox refuses it); `git branch -r` should list only `origin/main`.
-  The local checkout is clean of merged branches; `.claude/worktrees/`
-  still holds empty folders from earlier sessions that `git worktree
-  prune` has already forgotten (delete them once nothing holds them
-  open).
+  The local checkout is clean of merged branches.
 - Dependabot will now also see fastapi/uvicorn/jinja2/playwright; the
   vendored htmx/Tabulator files are upgraded by hand (replace the three files
   under `src/sitecrawler/web/static/`).
