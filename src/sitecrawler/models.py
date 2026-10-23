@@ -319,6 +319,33 @@ class LinkMetrics:
 
 
 @dataclass(slots=True, frozen=True)
+class Fingerprint:
+    """What a page's main text hashes to (ADR-0012).
+
+    Computed in the crawl pass from the text the page record was parsed from,
+    boilerplate removed, because the HTML bodies are not stored. A page
+    with no main text has the empty fingerprint: no hash, SimHash 0, 0 words.
+    """
+
+    content_hash: str = ""
+    """SHA-256 of the casefolded words of the main text, hex; empty when there are none."""
+    simhash: int = 0
+    """64-bit SimHash over three-word runs of the main text; 0 when there are none."""
+    words: int = 0
+    """Words in the main text, which is fewer than ``word_count`` (the whole page)."""
+
+    @property
+    def empty(self) -> bool:
+        """True when the page had no main text to fingerprint."""
+        return self.words == 0
+
+    @property
+    def simhash_hex(self) -> str:
+        """The SimHash as 16 hex digits, the form the store and exports use."""
+        return f"{self.simhash:016x}"
+
+
+@dataclass(slots=True, frozen=True)
 class FetchResult:
     """Raw outcome of one HTTP request. No parsing has happened yet."""
 
@@ -451,6 +478,8 @@ class ParsedPage:
     hreflang: list[HreflangRef] = field(default_factory=list)
     rel_prev: str = ""
     rel_next: str = ""
+    fingerprint: Fingerprint | None = None
+    """Content hash and SimHash of the main text; set by the parser."""
 
 
 @dataclass(slots=True)
@@ -500,6 +529,8 @@ class PageRecord:
     """Why rendering failed; the parsed fields then come from the raw HTML."""
     extractions: tuple[Extraction, ...] = ()
     """Custom extraction and search results, in config order; empty unless the page was parsed."""
+    fingerprint: Fingerprint | None = None
+    """Content hash and SimHash of the main text (ADR-0012); None unless the page was parsed."""
 
     @property
     def rendered(self) -> bool:

@@ -225,3 +225,33 @@ def test_row_store_lookup_and_page_detail(tmp_path: Path) -> None:
     ]
     assert store.page_detail("https://elsewhere.test/") is None
     session.close()
+
+
+def test_audit_index_duplicate_cells() -> None:
+    from sitecrawler.audit.duplicates import MIN_WORDS
+    from sitecrawler.parse import fingerprint_text
+    from tests.unit.audit.helpers import long_text
+
+    text = long_text(MIN_WORDS + 10)
+    pages = [
+        page("/", links=links("/a", "/b", "/c"), fingerprint=fingerprint_text("home words")),
+        page("/a", fingerprint=fingerprint_text(text)),
+        page("/b", fingerprint=fingerprint_text(text)),
+        page("/c", fingerprint=fingerprint_text(text.replace("word5 word6", "near words"))),
+        page("/img", content_type="image/png", fingerprint=None),
+    ]
+    v = view(pages)
+    index = AuditIndex(1, run_audit(v), v)
+    a, b, c = (index.cells(f"{SITE}/{p}") for p in "abc")
+    assert (a["exact_duplicates"], a["near_duplicates"], a["duplicate_of"]) == (1, 1, "")
+    assert (b["exact_duplicates"], b["near_duplicates"], b["duplicate_of"]) == (1, 1, f"{SITE}/a")
+    assert (c["exact_duplicates"], c["near_duplicates"], c["duplicate_of"]) == (0, 2, f"{SITE}/a")
+    assert "content.duplicate" in a["rules"]  # type: ignore[operator]
+    assert "content.near_duplicate" in c["rules"]  # type: ignore[operator]
+    home = index.cells(f"{SITE}/")
+    assert (home["exact_duplicates"], home["near_duplicates"], home["duplicate_of"]) == (0, 0, "")
+    assert "content.low_word_count" in home["rules"]  # type: ignore[operator]
+    row = base_row(pages[1])
+    assert row["content_words"] == MIN_WORDS + 10
+    assert row["content_hash"] == fingerprint_text(text).content_hash
+    assert (base_row(pages[4])["content_words"], base_row(pages[4])["content_hash"]) == (None, "")

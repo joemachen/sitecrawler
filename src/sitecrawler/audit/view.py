@@ -10,6 +10,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
+from sitecrawler.audit.duplicates import DuplicateIndex
 from sitecrawler.audit.graph import LinkGraph
 from sitecrawler.crawl.urls import normalize, strip_www
 from sitecrawler.models import LinkRef, Outcome, PageRecord, SitemapEntry, SitemapFile
@@ -175,6 +176,11 @@ class CrawlView:
     def link_graph(self) -> LinkGraph:
         """Inlink counts, click depth and Link Score for every page (ADR-0011)."""
         return LinkGraph(self)
+
+    @cached_property
+    def duplicates(self) -> DuplicateIndex:
+        """Exact groups and near clusters over the fingerprinted pages (ADR-0012)."""
+        return DuplicateIndex(self)
 
     def group_html_pages(self, key: Callable[[PageRecord], str]) -> dict[str, list[PageRecord]]:
         """HTML pages grouped by ``key(page)``; empty keys are dropped."""

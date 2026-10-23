@@ -304,6 +304,7 @@ class Crawler:
         record.hreflang = tuple(page.hreflang)
         record.rel_prev = page.rel_prev
         record.rel_next = page.rel_next
+        record.fingerprint = page.fingerprint
         record.canonical_header = link_header_rels(
             result.headers.get("link", ""), result.final_url
         ).get("canonical", "")

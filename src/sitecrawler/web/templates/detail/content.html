@@ -1,0 +1,25 @@
+{% from "detail/_macros.html" import field %}
+{% set page = detail.page %}
+<h2>Content</h2>
+<table class="plain fields">
+  {{ field("Main text words", page.fingerprint.words if page.fingerprint else none) }}
+  {{ field("Word count (whole page)", page.word_count if page.fingerprint else none) }}
+  {{ field("Content hash", page.fingerprint.content_hash if page.fingerprint else none) }}
+  {{ field("SimHash", page.fingerprint.simhash_hex if page.fingerprint else none) }}
+</table>
+<h3>Duplicates <span class="muted">({{ detail.duplicates | length }})</span></h3>
+<table class="plain duplicates">
+  <thead><tr><th>Page</th><th>Kind</th><th>Bits apart</th><th>Indexability</th></tr></thead>
+  <tbody>
+  {% for row in detail.duplicates %}
+    <tr data-dup="{{ row.url }}" data-kind="{{ row.kind }}">
+      <td><a href="/page?url={{ row.url | urlencode }}" data-url="{{ row.url }}">{{ row.url }}</a></td>
+      <td>{{ row.kind }}</td>
+      <td>{{ row.distance }}</td>
+      <td>{{ row.status }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="4" class="muted">No other page shares this page's main text.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>

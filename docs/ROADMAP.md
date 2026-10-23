@@ -285,7 +285,25 @@ thresholds, and PageRank in pure Python (about a second per 10k pages).
 
 Acceptance:
 
-- [ ] Two fixture pages differing by one sentence cluster together; unrelated pages do not.
+- [x] Two fixture pages differing by one sentence cluster together; unrelated pages do not (`tests/integration/test_duplicates.py::test_pages_differing_by_one_sentence_cluster_and_unrelated_pages_do_not`: `audit/dup-near-1` and `dup-near-2` are the only near cluster of two texts, 9 of 64 bits apart; the identical trio is the other cluster; every other page is in none).
+
+Design notes: ADR-0012. The fingerprint (`content_hash`, `simhash`,
+`content_words`) is computed by `parse_html` over the main text (body or
+`<main>` minus `header`/`nav`/`footer`/`aside`, their ARIA roles, scripts
+and styles) and stored on `page_html`, because the bodies are not stored
+(ADR-0009). The duplicate index is `audit/duplicates.py`, reached as
+`CrawlView.duplicates`, for the reason the link graph is (ADR-0011): exact
+groups by hash at any length; near clusters over pages of 200+ words
+within 10 SimHash bits (single linkage, pigeonhole blocking over distinct
+values); the representative is the best-linked member. Three rules in a
+`Content` category flag indexable members only, so the canonical
+cross-check is the indexability verdict. `analysis/duplicates.py` holds
+the report (`sitecrawler duplicates report [--max-distance N]`, one
+`Duplicates:` line under `audit`). Left for later: the thresholds are
+constants in the rules (only the report's distance is an option); the
+near-duplicate floor is the low-content floor; boilerplate is recognised
+by element and role only; storing bodies behind a flag so fingerprints can
+be recomputed without a crawl.
 
 ---
 

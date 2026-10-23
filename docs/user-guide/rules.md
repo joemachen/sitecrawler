@@ -80,6 +80,32 @@ A canonical is a request to index a different URL instead of this one. If that U
 
 **Fix:** Point the canonical at a URL that returns 200 directly (no redirect).
 
+## Content
+
+### `content.duplicate`
+
+**Page content is identical to other indexable pages** (severity: high)
+
+Two indexable pages with the same main text (boilerplate such as menus and footers aside) compete with each other: search engines pick one to show, split the links between them, and may demote both. A copy that canonicalises to the original, redirects, or is noindex is not reported, because it has already told search engines which page to keep.
+
+**Fix:** Keep one URL and canonicalise or 301-redirect the others to it. If the pages must both exist, give them different content.
+
+### `content.low_word_count`
+
+**Page has fewer than 200 words of main content** (severity: low)
+
+The count is of the page's main text: the body with menus, headers, footers, sidebars and scripts removed. A page with little of its own to say is hard to rank, and many of them together read to search engines as thin content across the site. Non-indexable pages are not reported.
+
+**Fix:** Write the content the page is meant to rank for, or merge it into a page that has it. If the page is a stub, deliberately, noindex it.
+
+### `content.near_duplicate`
+
+**Page content is nearly identical to other indexable pages** (severity: medium)
+
+Pages that share most of their text, such as a product page per colour, a city page per city or an article published twice with a different introduction, are treated much like exact duplicates. Pages of 200 words or more are compared by SimHash; within 10 of 64 bits (roughly nine tenths of the text in common) they are near-duplicates. The message names the closest page. Shorter pages are reported by content.low_word_count instead.
+
+**Fix:** Merge the pages or canonicalise the variants to one of them; if each must rank on its own, write content that is specific to it.
+
 ## Headings
 
 ### `h1.duplicate`

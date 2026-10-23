@@ -110,8 +110,8 @@ header .db { margin-left: auto; max-width: 24rem; font-family: ui-monospace, mon
 #grid { height: 100%; }
 .issues-panel { height: 100%; overflow: auto; padding: 0.5rem 1rem; }
 .detail-pane { border-top: 1px solid var(--line); display: grid; grid-template-rows: auto minmax(0, 1fr); background: var(--panel); min-height: 0; }
-.detail-head { display: flex; align-items: center; gap: 0.75rem; padding: 0.3rem 0.75rem; border-bottom: 1px solid var(--line); }
-.subtabs { display: flex; gap: 2px; }
+.detail-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; padding: 0.3rem 0.75rem; border-bottom: 1px solid var(--line); }
+.subtabs { display: flex; flex-wrap: wrap; gap: 2px; }
 .subtabs button { padding: 0.2rem 0.6rem; border: 1px solid transparent; border-radius: 4px; background: transparent; cursor: pointer; font: inherit; }
 .subtabs button:hover { background: #e8eaed; }
 .subtabs button[aria-selected="true"] { background: var(--accent); color: #fff; }

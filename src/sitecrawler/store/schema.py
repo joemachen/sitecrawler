@@ -131,6 +131,12 @@ class PageHtmlRow(Base):
     canonical_header: Mapped[str] = mapped_column(default="")
     rel_prev: Mapped[str] = mapped_column(default="")
     rel_next: Mapped[str] = mapped_column(default="")
+    content_hash: Mapped[str | None] = mapped_column(default=None)
+    """SHA-256 of the main text's words (ADR-0012); NULL when the page was not parsed as HTML."""
+    simhash: Mapped[str | None] = mapped_column(default=None)
+    """64-bit SimHash of the main text as 16 hex digits; NULL with ``content_hash``."""
+    content_words: Mapped[int | None] = mapped_column(default=None)
+    """Words in the main text, boilerplate removed; NULL with ``content_hash``."""
 
     page: Mapped[PageRow] = relationship(back_populates="html")
 

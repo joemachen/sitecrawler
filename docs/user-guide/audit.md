@@ -41,6 +41,13 @@ every page's inlink count, click depth and Link Score to the file;
 `sitecrawler links report` lists the individual links and the six
 `link.*` rules are part of the fix list. See [Internal linking](links.md).
 
+The line after that is about content: how many pages were fingerprinted,
+how many share their main text with another page, how many are
+near-duplicates and how many indexable pages are under 200 words of main
+text; `sitecrawler duplicates report` lists the groups and the three
+`content.*` rules are part of the fix list. See
+[Duplicate content](duplicates.md).
+
 ## Indexability
 
 Every page gets a verdict: indexable, or not indexable with the first reason

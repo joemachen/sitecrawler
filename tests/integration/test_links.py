@@ -168,9 +168,10 @@ def test_audit_stores_the_metrics_and_prints_the_summary(crawled_db: Path, site:
     assert rows["/"] == (9, 0, 100)
     assert rows["/orphan"] == (0, None, 0)
     assert rows["/audit/link-deep-3"][1] == 4
-    assert tables["pages"].columns[-3:] == ("inlinks", "link_depth", "link_score")
+    columns = tables["pages"].columns
+    assert columns[-6:-3] == ("inlinks", "link_depth", "link_score")  # the fingerprint follows
     home = next(r for r in tables["pages"].rows if r[0] == f"{site}/")
-    assert home[-3:] == (9, 0, 100)
+    assert home[columns.index("inlinks") : columns.index("link_score") + 1] == (9, 0, 100)
     assert tables["links"].columns[-1] == "position"
     positions = {
         (str(r[0]).removeprefix(site) or "/", str(r[1]).removeprefix(site)): r[-1]
