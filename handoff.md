@@ -119,9 +119,18 @@ pages before the home page outranked the products cluster (with `/` linked
 from `/about` alone, PageRank put `/products` at 100 and `/` at 20).
 
 **Phase 9 (duplicate and near-duplicate content) is built and waiting on
-its PR**, `feat/duplicates` (#41), with the `/code-review` findings fixed;
-the release (`chore/release-v0.10.0`) and handoff PRs come after it is
-merged. ADR-0012 records the design calls: the fingerprint
+its PR**, `feat/duplicates` (#41); the release (`chore/release-v0.10.0`)
+and handoff PRs come after it is merged. A `/code-review` pass on #41
+found and fixed: `main_text` dropped the text that follows a role-marked
+boilerplate element (lxml's `remove()` discards the tail, unlike
+`strip_elements(with_tail=False)`; `_remove_keeping_tail` moves it to the
+previous sibling or the parent), `duplicates report --max-distance N`
+built the default index as well as its own, and the report re-implemented
+the rule's low-content predicate and the hash lookup (now
+`content.is_low_content()` and `Cluster.texts`). Left as is: the parser
+deep-copies the body per page and the SimHash inner loop is 64 Python
+iterations per shingle (both invisible behind the politeness delay).
+ADR-0012 records the design calls: the fingerprint
 (`content_hash`, `simhash`, `content_words`) is computed by `parse_html`
 in the crawl pass over the *main text* (`<main>`, `role=main` or the body
 minus `header`/`nav`/`footer`/`aside`, their ARIA roles, scripts and

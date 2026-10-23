@@ -9,7 +9,7 @@ import typer
 
 from sitecrawler.analysis import duplicate_report, member_status
 from sitecrawler.audit import CrawlView
-from sitecrawler.audit.duplicates import NEAR_DUPLICATE_DISTANCE, Cluster
+from sitecrawler.audit.duplicates import NEAR_DUPLICATE_DISTANCE, Cluster, DuplicateIndex
 from sitecrawler.cli._run import err, fail, require_crawl_db
 from sitecrawler.parse.fingerprint import BITS
 from sitecrawler.store import open_store
@@ -33,10 +33,9 @@ def _view(db: Path) -> CrawlView:
 
 
 def _print_cluster(crawl: CrawlView, kind: str, cluster: Cluster) -> None:
-    index = crawl.duplicates
     representative = next(p for p in cluster.members if p.url == cluster.representative)
     for member in cluster.members:
-        distance = index.distance(representative, member)
+        distance = DuplicateIndex.distance(representative, member)
         typer.echo(
             f"{kind}\t{cluster.representative}\t{member.url}\t{distance}\t"
             f"{member_status(crawl, member)}"

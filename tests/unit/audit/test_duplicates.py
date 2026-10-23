@@ -55,12 +55,14 @@ def test_exact_groups_near_clusters_and_lookups() -> None:
         (f"{SITE}/s1", f"{SITE}/s2"),
     ]
     assert index.exact[0].representative == f"{SITE}/a"  # a and b tie on score; first URL wins
+    assert len(index.exact[0].texts) == 1
     assert index.exact_group(f"{SITE}/b") is index.exact[0]
     assert index.exact_group(f"{SITE}/c") is None
     assert index.exact_group(f"{SITE}/gone") is None  # not an HTML page
     # near clusters only over pages of MIN_WORDS or more: the short pages stay out
     assert [c.urls for c in index.near] == [(f"{SITE}/a", f"{SITE}/b", f"{SITE}/c", f"{SITE}/d")]
     cluster = index.near[0]
+    assert len(cluster.texts) == 3  # a/b, c, d
     assert index.near_cluster(f"{SITE}/d") is cluster
     assert index.near_cluster(f"{SITE}/s1") is None
     assert index.near_cluster(f"{SITE}/") is None

@@ -66,10 +66,22 @@ def main_text(doc: etree._Element) -> str:
     etree.strip_elements(root, *BOILERPLATE, with_tail=False)
     for element in list(root.iter()):
         if isinstance(element.tag, str) and _role(element) in _ROLES:
-            parent = element.getparent()
-            if parent is not None:
-                parent.remove(element)  # drops the tail text too, like strip_elements above
+            _remove_keeping_tail(element)
     return " ".join(" ".join(t for t in root.itertext() if isinstance(t, str)).split())
+
+
+def _remove_keeping_tail(element: etree._Element) -> None:
+    """Detach ``element`` but keep the text after it, which lxml's ``remove`` would drop."""
+    parent = element.getparent()
+    if parent is None:
+        return
+    if element.tail:
+        previous = element.getprevious()
+        if previous is not None:
+            previous.tail = (previous.tail or "") + element.tail
+        else:
+            parent.text = (parent.text or "") + element.tail
+    parent.remove(element)
 
 
 def words(text: str) -> list[str]:

@@ -25,6 +25,18 @@ def _indexable(pages: Iterable[PageRecord], crawl: CrawlView) -> list[PageRecord
     return [p for p in pages if indexability(p, crawl).indexable]
 
 
+def is_low_content(page: PageRecord, crawl: CrawlView, floor: int = MIN_WORDS) -> bool:
+    """True for an indexable page whose fingerprint has fewer than ``floor`` main-text words.
+
+    Shared by ``content.low_word_count`` and the duplicate report, so the
+    two count the same pages.
+    """
+    fingerprint = page.fingerprint
+    if fingerprint is None or fingerprint.words >= floor:
+        return False
+    return indexability(page, crawl).indexable
+
+
 class Duplicate(Rule):
     """The same main text on more than one indexable page."""
 
@@ -112,8 +124,5 @@ class LowWordCount(HtmlPageRule):
 
     def check_html(self, page: PageRecord, crawl: CrawlView) -> Iterable[Issue]:
         """Flag indexable pages under the floor, with the count."""
-        fingerprint = page.fingerprint
-        if fingerprint is None or fingerprint.words >= MIN_WORDS:
-            return
-        if indexability(page, crawl).indexable:
-            yield self.issue(page, f"{fingerprint.words} words")
+        if page.fingerprint is not None and is_low_content(page, crawl):
+            yield self.issue(page, f"{page.fingerprint.words} words")

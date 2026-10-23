@@ -25,7 +25,12 @@ PAGE = """
 
 
 def test_main_text_strips_boilerplate_by_tag_and_role() -> None:
-    assert main_text(parse_document(PAGE)) == "Real content, first sentence. Second sentence."
+    assert (
+        main_text(parse_document(PAGE))
+        == "Real content, first sentence. Second sentence. tail text"
+    )
+    first = '<body><div role="banner">x</div> after banner<p>para</p></body>'
+    assert main_text(parse_document(first)) == "after banner para"
 
 
 def test_main_text_prefers_main_then_role_main_then_body() -> None:
@@ -81,8 +86,10 @@ def test_simhash_distances() -> None:
 
 def test_parse_html_sets_the_fingerprint() -> None:
     page = parse_html(PAGE, BASE)
-    assert page.fingerprint == fingerprint_text("Real content, first sentence. Second sentence.")
-    assert page.fingerprint.words == 6
+    assert page.fingerprint == fingerprint_text(
+        "Real content, first sentence. Second sentence. tail text"
+    )
+    assert page.fingerprint.words == 8
     assert page.word_count > page.fingerprint.words  # the whole page counts the menus too
     empty = parse_html("<html><body><nav>only a menu</nav></body></html>", BASE)
     assert empty.fingerprint == Fingerprint()

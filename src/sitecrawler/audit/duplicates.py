@@ -58,6 +58,11 @@ class Cluster:
         """Every member except the one at ``url``."""
         return [p for p in self.members if p.url != url]
 
+    @property
+    def texts(self) -> frozenset[str]:
+        """The distinct content hashes among the members; one means they are all identical."""
+        return frozenset(_hash(p) for p in self.members)
+
 
 def _hash(page: PageRecord) -> str:
     return page.fingerprint.content_hash if page.fingerprint else ""

@@ -10,8 +10,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from sitecrawler.audit.duplicates import MIN_WORDS, NEAR_DUPLICATE_DISTANCE, Cluster, DuplicateIndex
+from sitecrawler.audit.duplicates import NEAR_DUPLICATE_DISTANCE, Cluster, DuplicateIndex
 from sitecrawler.audit.engine import indexability
+from sitecrawler.audit.rules.content import is_low_content
 from sitecrawler.audit.view import CrawlView
 from sitecrawler.models import PageRecord
 from sitecrawler.parse.fingerprint import BITS
@@ -66,24 +67,16 @@ def duplicate_report(crawl: CrawlView, max_distance: int | None = None) -> Dupli
         if max_distance is None or max_distance == NEAR_DUPLICATE_DISTANCE
         else DuplicateIndex(crawl, max_distance)
     )
-    near = tuple(c for c in index.near if len({_hash(p) for p in c.members}) > 1)
-    low_content = sum(
-        1
-        for p in crawl.html_pages
-        if p.fingerprint is not None
-        and p.fingerprint.words < MIN_WORDS
-        and indexability(p, crawl).indexable
-    )
+    near = tuple(c for c in index.near if len(c.texts) > 1)
+    low_content = sum(1 for p in crawl.html_pages if is_low_content(p, crawl, index.min_words))
     return DuplicateReport(
         pages=len(index.pages),
-        compared=sum(1 for p in index.pages if p.fingerprint and p.fingerprint.words >= MIN_WORDS),
+        compared=sum(
+            1 for p in index.pages if p.fingerprint and p.fingerprint.words >= index.min_words
+        ),
         exact=index.exact,
         near=near,
         low_content=low_content,
         max_distance=index.max_distance,
         min_words=index.min_words,
     )
-
-
-def _hash(page: PageRecord) -> str:
-    return page.fingerprint.content_hash if page.fingerprint else ""
