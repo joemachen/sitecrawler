@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-23
+
 Phase 10: structured data validation.
 
 ### Added
@@ -46,8 +48,11 @@ Phase 10: structured data validation.
 
 ### Changed
 
-- Crawl files written before this release have no `structured_data` table
-  and open with an error; re-crawl.
+- Commands that read a crawl file refuse one written by an older version
+  (a table this version writes is missing) with "written by an older
+  sitecrawler ... re-crawl it" and exit 2, instead of reading it as a crawl
+  that found nothing. 1.0 makes no promise that crawl files carry across
+  versions: there are no migrations, and a schema change means a re-crawl.
 
 ## [0.10.0] - 2026-10-22
 
