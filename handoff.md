@@ -1,8 +1,7 @@
 # Handoff: sitecrawler
 
 Read this first in a new session. It is the state of the project as of
-2026-10-22 (v0.9.0 released, Phase 9 built and waiting on its PR) and
-everything that is
+2026-10-22 (v0.10.0 released, Phase 10 not started) and everything that is
 not obvious from the code.
 
 ## What this is
@@ -118,10 +117,12 @@ over every internal link (nofollow included); `audit` writes `inlinks`,
 pages before the home page outranked the products cluster (with `/` linked
 from `/about` alone, PageRank put `/products` at 100 and `/` at 20).
 
-**Phase 9 (duplicate and near-duplicate content) is built and waiting on
-its PR**, `feat/duplicates` (#41); the release (`chore/release-v0.10.0`)
-and handoff PRs come after it is merged. A `/code-review` pass on #41
-found and fixed: `main_text` dropped the text that follows a role-marked
+**Phase 9 (duplicate and near-duplicate content) is complete and released
+as v0.10.0** (annotated tag on `main` at ff24999, 2026-10-22). One PR,
+`feat/duplicates` (#41, squash-merged as c094428), then
+`chore/release-v0.10.0` (#42) and `docs/handoff-v0.10.0` (#43). A
+`/code-review` pass on #41 found and fixed: `main_text` dropped the text
+that follows a role-marked
 boilerplate element (lxml's `remove()` discards the tail, unlike
 `strip_elements(with_tail=False)`; `_remove_keeping_tail` moves it to the
 previous sibling or the parent), `duplicates report --max-distance N`
@@ -418,9 +419,8 @@ Open:
   serve HTTPS (see the note under Phase 2 in the roadmap).
 - Dependabot's older uv can produce lockfile-downgrading PRs (#4 was closed
   for that); read the lock diff before merging.
-- Next piece of work: merge #41 once `gh pr checks 41` is green, then
-  release v0.10.0 and a handoff PR; after that **Phase 10, structured
-  data validation** (`docs/ROADMAP.md`). The release recipe is #39: bump
+- Next piece of work: **Phase 10, structured data validation**
+  (`docs/ROADMAP.md`). The release recipe is #42: bump
   `pyproject.toml`, `__init__.py` and `uv.lock` (`uv lock`), date the
   CHANGELOG Unreleased block, mark the roadmap row Done, PR, squash-merge
   once `gh pr checks N` is green, annotated tag on `main`, then a handoff
