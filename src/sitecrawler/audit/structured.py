@@ -22,7 +22,8 @@ from typing import TYPE_CHECKING, Literal
 from urllib.parse import urljoin
 
 from sitecrawler.audit.richresults import RICH_RESULTS, Need, RichResult
-from sitecrawler.models import PageRecord, StructuredItem, StructuredNode
+from sitecrawler.models import PageRecord, StructuredItem, StructuredNode, StructuredValue
+from sitecrawler.parse.structured import is_bare
 
 if TYPE_CHECKING:
     from sitecrawler.audit.view import CrawlView
@@ -102,14 +103,9 @@ class Vocabulary:
         return any(d in domains for d in self.ancestors(type_name))
 
 
-def _bare(name: str) -> bool:
-    """True for a schema.org name: the parser keeps every other vocabulary's full IRI."""
-    return not any(c in name for c in ":/#")
-
-
 def _schema_names(names: Sequence[object]) -> list[str]:
     """The schema.org names in an ``@type`` list."""
-    return [n for n in names if isinstance(n, str) and _bare(n)]
+    return [n for n in names if isinstance(n, str) and is_bare(n)]
 
 
 def _present(node: StructuredNode, path: Sequence[str]) -> bool:
@@ -174,7 +170,7 @@ def _vocabulary_findings(
         # An action may annotate any property as <name>-input or <name>-output
         # (schema.org Actions; the sitelinks search box's query-input).
         prop = re.sub(r"-(input|output)$", "", key)
-        if types and not unknown and not key.startswith("@") and _bare(key):
+        if types and not unknown and not key.startswith("@") and is_bare(key):
             if prop not in vocabulary.properties:
                 yield Finding(
                     "unknown_property",
@@ -203,6 +199,12 @@ def _entity(item: StructuredItem, page_url: str) -> str:
     return ""
 
 
+def _texts(values: Sequence[StructuredValue], key: str, page_url: str) -> tuple[str, ...]:
+    """A property's text values as compared: whitespace squashed, a ``url`` resolved."""
+    texts = (" ".join(v.split()) for v in values if isinstance(v, str))
+    return tuple(sorted(urljoin(page_url, t) if key == "url" else t for t in texts))
+
+
 def _conflicts(items: Sequence[StructuredItem], page_url: str) -> Iterator[Finding]:
     """Items of one type describing one entity that give a property different text values."""
     groups: dict[tuple[str, str], list[StructuredItem]] = defaultdict(list)
@@ -214,12 +216,9 @@ def _conflicts(items: Sequence[StructuredItem], page_url: str) -> Iterator[Findi
         if len(group) < 2:
             continue
         for key in dict.fromkeys(k for item in group for k in item.data):
-            if key.startswith("@") or key == "url":  # the entity, spelt either way
+            if key.startswith("@"):
                 continue
-            texts = {
-                tuple(sorted(v.strip() for v in item.data.get(key, []) if isinstance(v, str)))
-                for item in group
-            } - {()}
+            texts = {_texts(item.data.get(key, []), key, page_url) for item in group} - {()}
             if len(texts) > 1:
                 shown = " vs ".join(repr(" | ".join(t)) for t in sorted(texts))
                 yield Finding(

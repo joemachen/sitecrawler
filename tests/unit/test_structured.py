@@ -209,6 +209,25 @@ def test_microdata_item_without_type_and_full_iri_properties() -> None:
     assert item.types == ()
 
 
+def test_jsonld_context_documents_and_empty_contexts_mean_schema_org() -> None:
+    for context in (
+        "https://schema.org/docs/jsonldcontext.jsonld",
+        "http://schema.org/docs/jsonldcontext.json",
+        "https://www.schema.org",
+        "",
+    ):
+        item = only(ld(f'{{"@context": "{context}", "@type": "Product"}}'))
+        assert item.types == ("Product",), context
+
+
+def test_microdata_itemprop_item_outside_any_item_is_top_level() -> None:
+    found = parse(
+        '<body><div itemprop="mainEntity" itemscope itemtype="https://schema.org/Product">'
+        '<span itemprop="name">W</span></div></body>'
+    )
+    assert [i.data for i in found.items] == [{"@type": ["Product"], "name": ["W"]}]
+
+
 def test_microdata_other_vocabulary_types_keep_their_iris() -> None:
     item = only('<p itemscope itemtype="http://data-vocabulary.org/Breadcrumb"></p>')
     assert item.types == ("http://data-vocabulary.org/Breadcrumb",)
@@ -248,6 +267,8 @@ def test_rdfa_lite_items_nested_items_and_values() -> None:
     }
     assert event.data == {"@type": ["Event"], "name": ["Gig"]}
     assert other.types == ("http://e.test/v/Thing",)
+    reset = only('<div vocab="http://e.test/v/"><p vocab="" typeof="Event"></p></div>')
+    assert reset.types == ("Event",)
 
 
 def test_meta_property_tags_without_an_item_are_not_structured_data() -> None:
@@ -260,7 +281,10 @@ def test_meta_property_tags_without_an_item_are_not_structured_data() -> None:
 
 
 def test_parse_html_sets_structured_before_scripts_are_stripped() -> None:
-    page = parse_html(ld('{"@type": "Event", "name": "Gig"}') + "<p>two words</p>", BASE)
+    html = ld('{"@type": "Event", "name": "Gig"}').replace(
+        "</html>", "<body><p>two words</p></body></html>"
+    )
+    page = parse_html(html, BASE)
     assert page.structured is not None
     assert page.structured.types == ("Event",)
     assert page.word_count == 2

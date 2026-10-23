@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
+import sqlite3
+from contextlib import closing
 from pathlib import Path
 
+from typer.testing import CliRunner
+
+from sitecrawler.cli.main import app
 from sitecrawler.models import (
     CrawlConfig,
     Fingerprint,
@@ -13,7 +18,7 @@ from sitecrawler.models import (
     StructuredError,
     StructuredItem,
 )
-from sitecrawler.store import open_store
+from sitecrawler.store import missing_tables, open_store
 from sitecrawler.store.dump import EXPORT_TABLES, PAGE_COLUMNS, dump_tables
 
 PRODUCT = StructuredItem(
@@ -68,3 +73,22 @@ def test_structured_data_round_trips_and_is_exported(tmp_path: Path) -> None:
         "https://x.test/plain": "",
         "https://x.test/pdf": "",
     }
+
+
+def test_a_crawl_file_from_before_the_table_is_refused(tmp_path: Path) -> None:
+    db = tmp_path / "old.db"
+    with open_store(db) as store:
+        store.begin(CrawlConfig(start_url="https://x.test/"), resume=False)
+        store.page_done(_page("/", fingerprint=Fingerprint()), [])
+    assert missing_tables(db) == []
+    with closing(sqlite3.connect(db)) as conn:
+        conn.execute("DROP TABLE structured_data")
+        conn.commit()
+    assert missing_tables(db) == ["structured_data"]
+    result = CliRunner().invoke(app, ["schema", "report", str(db)])
+    assert result.exit_code == 2
+    assert "older sitecrawler" in result.output
+    assert "re-crawl" in result.output
+    empty = tmp_path / "empty.db"
+    sqlite3.connect(empty).close()
+    assert missing_tables(empty) == []  # not a crawl yet

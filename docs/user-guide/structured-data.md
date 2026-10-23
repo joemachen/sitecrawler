@@ -19,7 +19,7 @@ Google requires for a rich result. `schema report` lists every finding.
 | Syntax | Read | Not read |
 | --- | --- | --- |
 | JSON-LD | `@type` (one or a list), `@id`, `@graph`, top-level arrays, value objects (`@value`, `@list`, `@set`); `@context` for its vocabulary | Full JSON-LD expansion, remote contexts |
-| Microdata | `itemscope`, `itemtype` (one or more), `itemprop` (one or more names), `itemid`; values from `content` on `meta`, `href`/`src` (resolved against the page), `value` on `data`/`meter`, `datetime` on `time`, else the text | `itemref` |
+| Microdata | `itemscope`, `itemtype` (one or more), `itemprop` (one or more names), `itemid`; values from `content` on `meta`, `href`/`src` (resolved against the page), `value` on `data`/`meter`, `datetime` on `time`, else the text. An `itemprop` item outside any other item is read as an item of its own, as search engines do | `itemref` |
 | RDFa Lite | `vocab`, `typeof`, `property`, `resource`; values from `content`, then `href`/`src`, then the text | `prefix` maps, `rel`/`rev`, full RDFa |
 
 All three become the same shape, so they are checked the same way. Each

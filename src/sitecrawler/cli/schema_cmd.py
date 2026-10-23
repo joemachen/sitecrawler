@@ -9,27 +9,14 @@ import typer
 from rich.table import Table
 
 from sitecrawler.analysis import structured_report
-from sitecrawler.audit import CrawlView
 from sitecrawler.audit.structured import KINDS
-from sitecrawler.cli._run import err, fail, require_crawl_db
-from sitecrawler.store import open_store
+from sitecrawler.cli._run import err, fail, load_view
 
 schema_app = typer.Typer(
     name="schema",
     help="Structured data: the types a crawl carries and every problem with them.",
     no_args_is_help=True,
 )
-
-
-def _view(db: Path) -> CrawlView:
-    """The stored crawl as a view."""
-    require_crawl_db(db)
-    with open_store(db) as store:
-        try:
-            return CrawlView.from_store(store)
-        except ValueError as exc:
-            fail(str(exc))
-            raise  # unreachable: fail() exits
 
 
 @schema_app.command()
@@ -50,7 +37,7 @@ def report(
     """
     if kind is not None and kind not in KINDS:
         fail(f"--kind must be one of {', '.join(KINDS)}")
-    found = structured_report(_view(db))
+    found = structured_report(load_view(db))
     table = Table(title="Structured data types")
     table.add_column("Type")
     table.add_column("Items", justify="right")

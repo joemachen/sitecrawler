@@ -27,9 +27,9 @@ from sitecrawler.models import (
 )
 
 _SCHEMA = re.compile(r"(?:schema:|https?://(?:www\.)?schema\.org/)([A-Za-z0-9_]*)/?")
-_SCHEMA_CONTEXTS = frozenset(
-    f"{scheme}://{host}schema.org" for scheme in ("http", "https") for host in ("", "www.")
-)
+_SCHEMA_CONTEXT = re.compile(r"https?://(?:www\.)?schema\.org(?:/.*)?")
+"""A context naming schema.org: the site itself or its context document
+(``https://schema.org/docs/jsonldcontext.jsonld``)."""
 _JSONLD = "application/ld+json"
 _URL_ATTRS = {
     "a": "href",
@@ -47,7 +47,8 @@ _URL_ATTRS = {
 """Elements whose microdata or RDFa value is a URL attribute, resolved against the page."""
 
 
-def _is_bare(name: str) -> bool:
+def is_bare(name: str) -> bool:
+    """True for a name with no prefix or IRI: in a parsed item, a schema.org name."""
     return not any(c in name for c in ":/#")
 
 
@@ -58,7 +59,7 @@ def schema_name(raw: str) -> str | None:
     https, with or without ``www.`` or a trailing slash) all give ``Product``.
     """
     raw = raw.strip()
-    if _is_bare(raw):
+    if is_bare(raw):
         return raw or None
     match = _SCHEMA.fullmatch(raw)
     return (match.group(1) or None) if match else None
@@ -67,7 +68,7 @@ def schema_name(raw: str) -> str | None:
 def _term(raw: str, vocab: str) -> str:
     """``raw`` as a bare schema.org name, or prefixed with ``vocab`` / kept as written."""
     raw = raw.strip()
-    if _is_bare(raw):
+    if is_bare(raw):
         return vocab + raw
     name = schema_name(raw)
     return name if name is not None else raw
@@ -98,8 +99,9 @@ def _tag(element: etree._Element) -> str:
 def _vocab(context: Any, inherited: str) -> str:  # Any: raw JSON
     """The vocabulary ``context`` puts bare names in: ``""`` for schema.org, else an IRI."""
     if isinstance(context, str):
-        if context.strip().rstrip("/") in _SCHEMA_CONTEXTS:
-            return ""
+        context = context.strip()
+        if not context or _SCHEMA_CONTEXT.fullmatch(context):
+            return ""  # an empty vocab resets to the default, which is schema.org
         return context if context.endswith(("/", "#")) else f"{context}/"
     if isinstance(context, dict):
         return _vocab(context["@vocab"], inherited) if "@vocab" in context else inherited
@@ -234,12 +236,21 @@ def _microdata_props(element: etree._Element, node: StructuredNode, base_url: st
         _microdata_props(child, node, base_url)
 
 
+def _in_item(element: etree._Element) -> bool:
+    return any(a.get("itemscope") is not None for a in element.iterancestors())
+
+
 def _microdata(doc: etree._Element, base_url: str, items: list[StructuredItem]) -> None:
+    """Top-level items: ``itemscope`` without ``itemprop``, or with one but outside any item.
+
+    The second is a common mistake (``itemprop="mainEntity"`` on a page whose
+    body is not an item); the spec ignores it, search engines read it.
+    """
     for element in doc.iter():
         if (
             _tag(element)
             and element.get("itemscope") is not None
-            and element.get("itemprop") is None
+            and (element.get("itemprop") is None or not _in_item(element))
         ):
             items.append(
                 StructuredItem("microdata", _microdata_item(element, base_url), _line(element))

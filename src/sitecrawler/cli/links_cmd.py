@@ -9,27 +9,14 @@ import typer
 from rich.table import Table
 
 from sitecrawler.analysis import anchor_texts, link_report
-from sitecrawler.audit import CrawlView
-from sitecrawler.cli._run import err, fail, require_crawl_db
+from sitecrawler.cli._run import err, fail, load_view
 from sitecrawler.models import LinkMetrics
-from sitecrawler.store import open_store
 
 links_app = typer.Typer(
     name="links",
     help="Internal linking: Link Score, links to errors and redirects, anchor text per page.",
     no_args_is_help=True,
 )
-
-
-def _view(db: Path) -> CrawlView:
-    """The stored crawl as a view."""
-    require_crawl_db(db)
-    with open_store(db) as store:
-        try:
-            return CrawlView.from_store(store)
-        except ValueError as exc:
-            fail(str(exc))
-            raise  # unreachable: fail() exits
 
 
 @links_app.command()
@@ -40,7 +27,7 @@ def report(
     ] = 10,
 ) -> None:
     """Link Score extremes, then every internal link to an error or a redirect, with its anchor."""
-    crawl = _view(db)
+    crawl = load_view(db)
     found = link_report(crawl)
     metrics = crawl.link_graph.metrics
     ranked = sorted(metrics.items(), key=lambda kv: (-kv[1].link_score, kv[0]))
@@ -90,7 +77,7 @@ def anchors(
     ] = None,
 ) -> None:
     """What the site calls each page: one line per target URL and anchor text, with a count."""
-    crawl = _view(db)
+    crawl = load_view(db)
     texts = anchor_texts(crawl)
     if url is not None:
         page = crawl.page_for(url)

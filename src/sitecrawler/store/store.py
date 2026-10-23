@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import logging
+import sqlite3
 from collections import defaultdict
 from collections.abc import Iterator, Mapping, Sequence
+from contextlib import closing
 from dataclasses import asdict
 from datetime import UTC, datetime
 from pathlib import Path
@@ -73,6 +75,23 @@ def _set_pragmas(dbapi_connection: Any, _record: Any) -> None:
     cursor.execute("PRAGMA synchronous=NORMAL")
     cursor.execute("PRAGMA foreign_keys=ON")
     cursor.close()
+
+
+def missing_tables(path: Path) -> list[str]:
+    """Tables this version writes that the crawl file at ``path`` lacks.
+
+    Empty for a current file and for one that is not a crawl yet. Opening a
+    file creates missing tables, so an older crawl would otherwise read as one
+    that found nothing (no structured data, say) rather than one never looked
+    at; callers refuse it instead. Missing columns fail on their own.
+    """
+    with closing(sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)) as conn:
+        names = {
+            row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
+    if "pages" not in names:
+        return []
+    return sorted(set(Base.metadata.tables) - names)
 
 
 def open_store(path: Path | str) -> Store:
@@ -515,10 +534,21 @@ class Store:
                     Extraction(name, kind, tuple(json.loads(values_json)), count)
                 )
             structured: dict[int, list[StructuredRow]] = defaultdict(list)
-            for item in session.scalars(
-                select(StructuredRow).order_by(StructuredRow.page_id, StructuredRow.id)
+            for page_id, fmt, types, data_json, error, line in session.execute(
+                select(
+                    StructuredRow.page_id,
+                    StructuredRow.format,
+                    StructuredRow.types,
+                    StructuredRow.data_json,
+                    StructuredRow.error,
+                    StructuredRow.line,
+                ).order_by(StructuredRow.page_id, StructuredRow.id)
             ):
-                structured[item.page_id].append(item)
+                structured[page_id].append(
+                    StructuredRow(
+                        format=fmt, types=types, data_json=data_json, error=error, line=line
+                    )
+                )
             for row in rows:
                 yield _to_record(
                     row,

@@ -12,7 +12,6 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass
 
-from sitecrawler.audit.richresults import RICH_RESULTS
 from sitecrawler.audit.structured import KINDS, Finding, FindingKind, rich_result_for
 from sitecrawler.audit.view import CrawlView
 
@@ -91,4 +90,4 @@ def structured_report(crawl: CrawlView) -> StructuredReport:
 
 def _rich(crawl: CrawlView, type_name: str) -> str:
     spec = rich_result_for(crawl.structured.vocabulary, type_name)
-    return spec.type if spec is not None and spec.type in RICH_RESULTS else ""
+    return spec.type if spec is not None else ""

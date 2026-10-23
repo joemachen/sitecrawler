@@ -187,6 +187,16 @@ def test_items_are_grouped_by_url_when_there_is_no_id() -> None:
     assert [f.path for f in findings(differ) if f.kind == "conflicting"] == ["name"]
 
 
+def test_conflicts_ignore_spacing_and_url_spelling_but_not_other_urls() -> None:
+    spaced = ld(
+        '{"@type": "WebPage", "@id": "#p", "url": "/p", "name": "Kiln  guide"}',
+        '{"@type": "WebPage", "@id": "#p", "url": "https://site.test/p", "name": "Kiln\\nguide"}',
+    )
+    assert [f for f in findings(spaced) if f.kind == "conflicting"] == []
+    moved = spaced.replace('"url": "/p"', '"url": "/q"')
+    assert [f.path for f in findings(moved) if f.kind == "conflicting"] == ["url"]
+
+
 # ------------------------------------------------------------------ the index
 
 
