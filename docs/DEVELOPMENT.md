@@ -169,6 +169,42 @@ The fixture site is the heart of the test suite. Every audit rule we ship has a
 page in it that triggers the rule and a page that does not. When a bug is found
 on a real site, we add a minimal reproduction to the fixture site first.
 
+### Manual QA
+
+The automated suite proves the code does what the fixture site expects. It
+cannot tell you whether the findings are *right* on a real site, whether the
+UI is usable, or whether a page looks broken. Do this pass before a release
+that changes rules, the crawler or the UI, on a site you know well:
+
+1. **Crawl a real site, capped and polite.** `uv run sitecrawler crawl
+   https://example.com --db qa.db --max-pages 300 --delay 1` (add `--render`
+   for a JavaScript-heavy site). Read the summary: page count, status
+   breakdown, time. Anything surprising there is the first bug to chase.
+2. **Audit and read the fix list.** `uv run sitecrawler audit qa.db`. For
+   each rule that fires, open two or three of its URLs in a browser and
+   confirm the finding by eye (view source for titles, canonicals and
+   robots directives). A rule that is technically right but useless on a
+   real site is a bug in its threshold or wording.
+3. **Walk the web UI.** `uv run sitecrawler serve qa.db`, then open every
+   tab, apply every filter once, sort a column, click a row and read every
+   detail pane section, follow a rule link to `/rules/<id>`, export a
+   filtered grid. Then `uv run sitecrawler serve` with no file and run the
+   same crawl live: Start, Pause, Resume, Stop, watch the counts move.
+4. **Open the exports in their real applications.** `export --format xlsx`
+   in Excel (every sheet, frozen header, no `#####` columns), the CSV in a
+   spreadsheet, the JSON through `python -m json.tool`. The sitemap from
+   `sitemap generate` through a validator.
+5. **Compare with a second opinion** when one is available: the same site
+   in Screaming Frog or Google Search Console. Counts need not match
+   exactly; a rule that fires on far more or far fewer pages than the other
+   tool deserves a look.
+6. **File what you find as fixture pages.** Every real-site bug becomes a
+   page under `tests/fixtures/site/` and a test before it is fixed, so the
+   manual pass never has to find the same thing twice.
+
+Never crawl a site you do not own or have permission to test at more than
+one request per second, and never from CI.
+
 Coverage gate: 85% overall, 100% for `audit/` rules.
 
 ### Documentation
@@ -196,8 +232,10 @@ Coverage gate: 85% overall, 100% for `audit/` rules.
 
 - Semantic versioning. `0.x` until the core crawl and issues engine are stable.
 - `CHANGELOG.md` follows [Keep a Changelog](https://keepachangelog.com/).
-- A release is a git tag `vX.Y.Z` on `main`. CI builds a wheel and attaches it
-  to a GitHub Release. Installable with `uv tool install` or `pipx`.
+- A release is an annotated git tag `vX.Y.Z` on `main`, made by hand after
+  the release PR merges (the recipe is in `handoff.md`). There is no release
+  workflow yet: `uv build` makes the wheel, and `uv tool install .` or
+  `pipx install .` installs it from the checkout.
 
 ---
 
