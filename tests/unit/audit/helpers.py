@@ -49,6 +49,11 @@ def links(*paths: str, rel: str = "") -> tuple[LinkRef, ...]:
     return tuple(LinkRef(f"{SITE}{p}", text=p, rel=rel) for p in paths)
 
 
+def long_text(count: int, prefix: str = "word") -> str:
+    """``count`` distinct numbered words, for pages over the low-content floor."""
+    return " ".join(f"{prefix}{i}" for i in range(count))
+
+
 def view(pages: Iterable[PageRecord], **kwargs: object) -> CrawlView:
     """A view over ``pages``."""
     return CrawlView.from_records(pages, **kwargs)  # type: ignore[arg-type]

@@ -23,6 +23,7 @@ from sitecrawler.models import (
     CrawlConfig,
     CrawlInfo,
     Extraction,
+    Fingerprint,
     HreflangRef,
     Indexability,
     Issue,
@@ -230,6 +231,7 @@ class Store:
             page.last_modified = record.headers.get("last-modified")
             page.headers_json = json.dumps(record.headers)
             page.fetched_at = _now()
+            fp = record.fingerprint
             page.hops = [
                 RedirectHopRow(
                     hop_no=h.hop_no, from_url=h.from_url, to_url=h.to_url, status_code=h.status_code
@@ -254,6 +256,9 @@ class Store:
                     canonical_header=record.canonical_header,
                     rel_prev=record.rel_prev,
                     rel_next=record.rel_next,
+                    content_hash=fp.content_hash if fp else None,
+                    simhash=fp.simhash_hex if fp else None,
+                    content_words=fp.words if fp else None,
                 )
                 if record.outcome is Outcome.FETCHED
                 else None
@@ -590,6 +595,13 @@ def render_diff_from_row(row: PageRenderRow | None) -> RenderDiff | None:
     )
 
 
+def fingerprint_from_row(html: PageHtmlRow | None) -> Fingerprint | None:
+    """The :class:`~sitecrawler.models.Fingerprint` stored on ``html``, if the page was parsed."""
+    if html is None or html.content_hash is None:
+        return None
+    return Fingerprint(html.content_hash, int(html.simhash or "0", 16), html.content_words or 0)
+
+
 def _to_record(
     row: PageRow,
     hops: Sequence[RedirectHop],
@@ -630,6 +642,7 @@ def _to_record(
         hreflang=tuple(hreflang),
         rel_prev=html.rel_prev if html else "",
         rel_next=html.rel_next if html else "",
+        fingerprint=fingerprint_from_row(html),
         render=render_diff_from_row(row.render),
         render_ms=row.render.render_ms if row.render else 0,
         render_error=row.render.error if row.render else "",

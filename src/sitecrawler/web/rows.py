@@ -16,6 +16,7 @@ from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from urllib.parse import urlparse
 
+from sitecrawler.analysis import member_status
 from sitecrawler.audit import AuditResult, CrawlView, Rule
 from sitecrawler.audit.engine import RuleCount, robots_directives
 from sitecrawler.audit.view import Inlink
@@ -40,6 +41,9 @@ NO_AUDIT: Row = {
     "link_depth": None,
     "link_score": None,
     "unreachable": False,
+    "exact_duplicates": 0,
+    "near_duplicates": 0,
+    "duplicate_of": "",
 }
 """Audit cells of a page the audit has not seen yet."""
 
@@ -170,6 +174,8 @@ def base_row(
         "render_error": record.render_error,
         "raw_title": record.render.raw_title if record.render else "",
         "raw_canonical": record.render.raw_canonical if record.render else "",
+        "content_words": record.fingerprint.words if record.fingerprint else None,
+        "content_hash": record.fingerprint.content_hash if record.fingerprint else "",
     }
     for extraction in record.extractions:
         row[extraction.column] = extraction.cell
@@ -228,6 +234,10 @@ class AuditIndex:
         issues = self.issues_for_url(url)
         verdict = self.result.verdicts.get(url)
         metrics = self.view.link_graph.metrics.get(url)
+        duplicates = self.view.duplicates
+        exact = duplicates.exact_group(url)
+        near = duplicates.near_cluster(url)
+        page = self.view.page_for(url)
         return {
             "rules": [i.rule_id for i in issues],
             "issues_n": len(issues),
@@ -241,6 +251,19 @@ class AuditIndex:
             "unreachable": metrics is not None
             and metrics.link_depth is None
             and self.view.start_page is not None,
+            "exact_duplicates": len(exact.others(url)) if exact else 0,
+            "near_duplicates": sum(
+                1
+                for p in near.others(url)
+                if page is not None and not duplicates.same_text(page, p)
+            )
+            if near
+            else 0,
+            "duplicate_of": near.representative
+            if near and near.representative != url
+            else exact.representative
+            if exact and exact.representative != url
+            else "",
         }
 
 
@@ -303,6 +326,9 @@ class PageDetail:
     """Inlink counts, click depth and Link Score; None until an audit has run."""
     anchors: list[tuple[str, int]] = field(default_factory=list)
     """Anchor texts of the inlinks with how often each is used, most used first."""
+    duplicates: list[Row] = field(default_factory=list)
+    """``url``, ``kind`` (``exact`` or ``near``), ``distance`` (SimHash bits), ``status``
+    for every other page in this page's duplicate group or near cluster."""
 
 
 class RowStore:
@@ -525,6 +551,7 @@ class RowStore:
             ]
             inlinks = self._index.view.inlinks_to(page.url) if self._index else []
             anchors = Counter(i.link.text for i in inlinks)
+            duplicates = _duplicate_rows(self._index.view, page) if self._index else []
             return PageDetail(
                 page=page,
                 indexable=indexable if isinstance(indexable, bool) else None,
@@ -544,7 +571,32 @@ class RowStore:
                 sitemaps=self._index.view.sitemap_listings_for(page.url) if self._index else [],
                 links=self._index.view.link_graph.metrics.get(page.url) if self._index else None,
                 anchors=sorted(anchors.items(), key=lambda kv: (-kv[1], kv[0])),
+                duplicates=duplicates,
             )
+
+
+def _duplicate_rows(view: CrawlView, page: PageRecord) -> list[Row]:
+    """The other members of ``page``'s exact group, then of its near cluster."""
+    index = view.duplicates
+    rows: list[Row] = []
+    exact = index.exact_group(page.url)
+    for other in exact.others(page.url) if exact else []:
+        rows.append(
+            {"url": other.url, "kind": "exact", "distance": 0, "status": member_status(view, other)}
+        )
+    near = index.near_cluster(page.url)
+    for other in near.others(page.url) if near else []:
+        if index.same_text(page, other):
+            continue
+        rows.append(
+            {
+                "url": other.url,
+                "kind": "near",
+                "distance": index.distance(page, other),
+                "status": member_status(view, other),
+            }
+        )
+    return rows
 
 
 def _issue_row(issue: Issue) -> Row:

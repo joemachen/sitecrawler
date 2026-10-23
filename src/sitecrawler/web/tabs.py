@@ -14,6 +14,7 @@ from collections.abc import Sequence
 from dataclasses import asdict, dataclass, field
 from typing import Literal
 
+from sitecrawler.audit.duplicates import MIN_WORDS
 from sitecrawler.models import Extraction
 from sitecrawler.store.dump import Cell
 
@@ -352,6 +353,28 @@ TABS: tuple[TabSpec, ...] = (
             _R("missing_return", "Missing return link", "hreflang.missing_return_link"),
             _R("to_non_200", "To non-200", "hreflang.to_non_200"),
             _R("to_non_canonical", "To non-canonical", "hreflang.to_non_canonical"),
+        ),
+    ),
+    TabSpec(
+        "content",
+        "Content",
+        (
+            "url",
+            "content_words",
+            "word_count",
+            "exact_duplicates",
+            "near_duplicates",
+            "duplicate_of",
+            "content_hash",
+            "status_code",
+            "indexable",
+        ),
+        (
+            ALL,
+            _R("duplicate", "Exact duplicates", "content.duplicate"),
+            _R("near_duplicate", "Near duplicates", "content.near_duplicate"),
+            _R("low_word_count", f"Under {MIN_WORDS} words", "content.low_word_count"),
+            _F("no_text", "No main text", "content_words", "eq", 0),
         ),
     ),
     TabSpec(

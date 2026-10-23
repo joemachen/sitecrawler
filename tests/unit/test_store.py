@@ -234,3 +234,24 @@ def test_issues_for_unknown_urls_are_dropped_with_a_warning(
 def test_writing_before_begin_fails(store: Store) -> None:
     with pytest.raises(RuntimeError, match="begin"):
         store.seeded([QueueItem("https://x.test/", 0, "start")], [], [])
+
+
+def test_fingerprint_round_trips_and_is_null_for_unparsed_pages(store: Store) -> None:
+    from sitecrawler.models import Fingerprint
+    from sitecrawler.store.schema import PageHtmlRow
+
+    store.begin(CONFIG, resume=False)
+    fingerprint = Fingerprint("ab" * 32, 2**63 + 5, 240)
+    store.page_done(_page("https://x.test/", status_code=200, fingerprint=fingerprint), [])
+    store.page_done(_page("https://x.test/empty", status_code=200, fingerprint=Fingerprint()), [])
+    store.page_done(_page("https://x.test/img.png", status_code=200, content_type="image/png"), [])
+    with Session(store.engine) as s:
+        rows = {r.page.url: r for r in s.scalars(select(PageHtmlRow))}
+        assert rows["https://x.test/"].simhash == f"{2**63 + 5:016x}"
+        assert rows["https://x.test/"].content_words == 240
+        assert rows["https://x.test/empty"].content_hash == ""
+        assert rows["https://x.test/img.png"].content_hash is None
+    records = {r.url: r for r in store.iter_pages()}
+    assert records["https://x.test/"].fingerprint == fingerprint
+    assert records["https://x.test/empty"].fingerprint == Fingerprint()
+    assert records["https://x.test/img.png"].fingerprint is None

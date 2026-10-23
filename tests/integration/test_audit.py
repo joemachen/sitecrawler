@@ -39,8 +39,19 @@ CANONICALISED = {
     "/audit/canonical-chain-2",
     "/audit/canonical-conflict",
     "/audit/paged-bad-2",
+    "/audit/dup-exact-canonical",
 }
 """Linked pages whose effective canonical is a different URL."""
+
+DUPLICATE_CONTENT = {
+    "/audit/dup-exact-1",
+    "/audit/dup-exact-2",
+    "/audit/dup-exact-canonical",
+    "/audit/dup-near-1",
+    "/audit/dup-near-2",
+}
+"""Phase 9 fixtures: long articles, so the only fixture pages over the low-content floor
+besides ``/audit/many-outlinks`` (301 anchor texts)."""
 
 TRIGGERS: dict[str, set[str]] = {
     "response.4xx": {"/missing"},
@@ -66,7 +77,7 @@ TRIGGERS: dict[str, set[str]] = {
     "meta_description.multiple": {"/audit/meta-multiple"},
     "h1.missing": {"/notitle"},
     "h1.multiple": {"/about"},
-    "h1.duplicate": {"/audit/h1-dup-1", "/audit/h1-dup-2"},
+    "h1.duplicate": {"/audit/h1-dup-1", "/audit/h1-dup-2"} | DUPLICATE_CONTENT,
     "h1.too_long": {"/audit/h1-long"},
     "h2.missing": OLD_HTML,
     "canonical.missing": (OLD_HTML - {"/", "/about"})
@@ -121,6 +132,14 @@ TRIGGERS: dict[str, set[str]] = {
         "/audit/noindex-in-sitemap",
     },
     "sitemap.duplicate": {"/audit/sitemap-twice"},
+    # h1-dup-1 and h1-dup-2 share their whole (tiny) main text, not just the H1.
+    "content.duplicate": {
+        "/audit/dup-exact-1",
+        "/audit/dup-exact-2",
+        "/audit/h1-dup-1",
+        "/audit/h1-dup-2",
+    },
+    "content.near_duplicate": {"/audit/dup-near-1", "/audit/dup-near-2"},
 }
 
 IN_SITEMAP = {
@@ -156,8 +175,14 @@ NON_INDEXABLE: dict[str, str] = {
     "/audit/canonical-chain-2": "canonicalised to",
     "/audit/canonical-conflict": "canonicalised to",
     "/audit/paged-bad-2": "canonicalised to",
+    "/audit/dup-exact-canonical": "canonicalised to",
 }
 TRIGGERS["page.non_indexable"] = set(NON_INDEXABLE)
+TRIGGERS["content.low_word_count"] = (
+    set(site_pages()) - set(NON_INDEXABLE) - DUPLICATE_CONTENT - {"/audit/many-outlinks"}
+)
+"""Every indexable page under 200 words of main text: the whole fixture site bar the
+Phase 9 articles and the 301-link page."""
 TRIGGERS["sitemap.missing"] = set(site_pages()) - set(NON_INDEXABLE) - IN_SITEMAP
 """Every indexable 200 page the sitemaps do not list; ``/blog/post-2`` is the roadmap's example."""
 WELL_LINKED = {path for path, sources in follow_inlink_sources().items() if len(sources) >= 2}

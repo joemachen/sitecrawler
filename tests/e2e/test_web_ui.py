@@ -148,6 +148,8 @@ def test_row_click_fills_the_detail_pane_and_links_to_the_full_page(
 
     pane.locator(f'table.inlinks a[data-url="{site}/"]').click()  # follow an inlink in the pane
     expect(pane).to_have_attribute("data-url", f"{site}/")
+    pane.locator('[data-sub="content"]').click()
+    expect(pane.locator("table.duplicates")).to_contain_text("No other page shares")
 
     pane.locator("[data-detail-open]").click()
     expect(page).to_have_url(f"{ui}/page?url={site.replace(':', '%3A').replace('/', '%2F')}%2F")

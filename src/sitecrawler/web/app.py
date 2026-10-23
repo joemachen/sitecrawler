@@ -60,6 +60,7 @@ def crawl_json(rows: RowStore) -> dict[str, object]:
 DETAIL_SUBS: tuple[tuple[str, str], ...] = (
     ("details", "URL Details"),
     ("html", "HTML"),
+    ("content", "Content"),
     ("render", "Rendering"),
     ("inlinks", "Inlinks"),
     ("outlinks", "Outlinks"),

@@ -16,5 +16,6 @@ newcomer. Copy `0000-template.md`, number it, fill it in, link it from the PR.
 | [0009](0009-extract-in-the-crawl-pass.md) | Custom extractors and searches run in the crawl pass over the HTML in hand; bodies stay unstored; lxml + cssselect replace BeautifulSoup | Accepted |
 | [0010](0010-sitemap-audit-as-page-rules.md) | Sitemap findings are page rules over the normalised entries and the indexability verdict; file-level facts are a report; generation is an export with `lastmod` only on request | Accepted |
 | [0011](0011-link-graph-in-the-audit-index.md) | The link graph is part of the audit index (`audit/graph.py`); Link Score is log-scaled PageRank over the follow graph with redirects resolved; `audit` stores inlinks, click depth and score on `pages` | Accepted |
+| [0012](0012-content-fingerprints-in-the-crawl-pass.md) | Content hash and SimHash are computed in the crawl pass over the main text (boilerplate stripped) and stored on `page_html`; clustering is an audit index (`audit/duplicates.py`); the content rules flag indexable members only | Accepted |
 
 Statuses: Proposed, Accepted, Superseded by ####, Deprecated.

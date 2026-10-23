@@ -8,6 +8,7 @@ from lxml import etree
 from lxml import html as lxml_html
 
 from sitecrawler.models import HreflangRef, LinkRef, ParsedPage
+from sitecrawler.parse.fingerprint import fingerprint
 
 _NON_LINK_SCHEMES = ("#", "mailto:", "tel:", "javascript:")
 _NOISE = ("script", "style", "noscript")
@@ -81,7 +82,7 @@ def _metas(doc: etree._Element, name: str) -> list[etree._Element]:
 
 
 def parse_html(html: str, base_url: str) -> ParsedPage:
-    """Extract title, metas, headings, canonical, links and word count.
+    """Extract title, metas, headings, canonical, links, word count and the content fingerprint.
 
     Args:
         html: The document text.
@@ -145,6 +146,7 @@ def parse_html(html: str, base_url: str) -> ParsedPage:
             )
         )
 
+    page.fingerprint = fingerprint(doc)
     etree.strip_elements(doc, *_NOISE, with_tail=False)
     page.word_count = len(text_of(doc).split())
     return page

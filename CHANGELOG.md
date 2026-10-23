@@ -6,6 +6,47 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+Phase 9: duplicate and near-duplicate content.
+
+### Added
+
+- Every parsed HTML page is fingerprinted during the crawl: `content_hash`
+  (SHA-256 of the main text's words, boilerplate such as `header`, `nav`,
+  `footer`, `aside` and their ARIA-role stand-ins removed), `simhash`
+  (64 bits over three-word runs) and `content_words`, stored on
+  `page_html` and exported at the end of the `pages` sheet. Under
+  `--render` the rendered DOM is fingerprinted. ADR-0012.
+- The audit builds a duplicate index (`CrawlView.duplicates`): exact
+  groups by content hash at any length, and near clusters of pages with
+  200 words or more within 10 SimHash bits of each other, each with a
+  representative (the best-linked member).
+- Three audit rules in a new `Content` category: `content.duplicate`
+  (high: an indexable page whose main text another indexable page
+  repeats), `content.near_duplicate` (medium: an indexable page of 200+
+  words within 10 bits of another indexable page with a different text,
+  naming the closest one) and `content.low_word_count` (low: an indexable
+  page under 200 words of main text). Copies that canonicalise to the
+  original, redirect or are noindex are not reported.
+- `sitecrawler duplicates report crawl.db [--max-distance N]`: one line
+  per member of every exact group and near cluster with its representative,
+  distance and indexability. `audit` prints the same as one `Duplicates:`
+  summary line.
+- Web UI: a **Content** tab (`content_words`, exact and near duplicate
+  counts, `duplicate_of`, the hash) with a filter per content rule plus
+  *No main text*; a **Content** section in the detail pane listing the
+  fingerprint and every other page in the same group or cluster.
+- Fixture: `audit/dup-exact-1`, `dup-exact-2` and `dup-exact-canonical`
+  (one article three times, the third canonicalised), `audit/dup-near-1`
+  and `dup-near-2` (one guide twice, one sentence changed);
+  `tests/integration/test_duplicates.py`.
+
+### Changed
+
+- Crawl files written before this version lack the `page_html` fingerprint
+  columns and open with an error; re-crawl (no migrations during 0.x).
+- `h1-dup-1` and `h1-dup-2` in the fixture site, which differ only in
+  their `<head>`, now also trip `content.duplicate`.
+
 ## [0.9.0] - 2026-10-22
 
 Phase 8: internal linking analysis.

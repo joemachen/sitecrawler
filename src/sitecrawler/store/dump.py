@@ -87,6 +87,9 @@ PAGE_COLUMNS: tuple[str, ...] = (
     "inlinks",
     "link_depth",
     "link_score",
+    "content_words",
+    "content_hash",
+    "simhash",
 )
 """Column names of the ``pages`` dump, in order.
 
@@ -141,6 +144,9 @@ def _page_row(page: PageRow) -> tuple[Cell, ...]:
         page.inlinks,
         page.link_depth,
         page.link_score,
+        html.content_words if html else None,
+        html.content_hash if html else None,
+        html.simhash if html else None,
     )
 
 

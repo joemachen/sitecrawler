@@ -1,7 +1,8 @@
 # Handoff: sitecrawler
 
 Read this first in a new session. It is the state of the project as of
-2026-10-22 (v0.9.0 released, Phase 9 not started) and everything that is
+2026-10-22 (v0.9.0 released, Phase 9 built and waiting on its PR) and
+everything that is
 not obvious from the code.
 
 ## What this is
@@ -117,7 +118,81 @@ over every internal link (nofollow included); `audit` writes `inlinks`,
 pages before the home page outranked the products cluster (with `/` linked
 from `/about` alone, PageRank put `/products` at 100 and `/` at 20).
 
+**Phase 9 (duplicate and near-duplicate content) is built and waiting on
+its PR**, `feat/duplicates` (#41); the release (`chore/release-v0.10.0`)
+and handoff PRs come after it is merged. A `/code-review` pass on #41
+found and fixed: `main_text` dropped the text that follows a role-marked
+boilerplate element (lxml's `remove()` discards the tail, unlike
+`strip_elements(with_tail=False)`; `_remove_keeping_tail` moves it to the
+previous sibling or the parent), `duplicates report --max-distance N`
+built the default index as well as its own, and the report re-implemented
+the rule's low-content predicate and the hash lookup (now
+`content.is_low_content()` and `Cluster.texts`). Left as is: the parser
+deep-copies the body per page and the SimHash inner loop is 64 Python
+iterations per shingle (both invisible behind the politeness delay).
+ADR-0012 records the design calls: the fingerprint
+(`content_hash`, `simhash`, `content_words`) is computed by `parse_html`
+in the crawl pass over the *main text* (`<main>`, `role=main` or the body
+minus `header`/`nav`/`footer`/`aside`, their ARIA roles, scripts and
+styles) and stored on `page_html`, because the bodies are still not
+stored (ADR-0009); the duplicate index lives in `audit/duplicates.py` as
+`CrawlView.duplicates` for the reason the link graph does (the rules read
+it and `audit` may not import `analysis`); the three `content.*` rules
+flag indexable members only, so the canonical cross-check is the
+indexability verdict. Two numbers were measured, not guessed: the
+roadmap's acceptance pair (`audit/dup-near-1`/`-2`, one sentence changed
+in 260 words) is 9 of 64 SimHash bits apart, so the threshold is 10 (not
+the textbook 3, which only catches a word or two); and the one-sentence
+fixture pages landed within 5 to 9 bits of each other, so near-duplicate
+clustering only runs over pages of `MIN_WORDS` (200) or more, the
+low-content floor. SimHash distance depends on the share of three-word
+runs changed, not on length (`64 * acos(1 - f) / pi`). Adding `Home`
+links to the new fixture pages changed the Phase 8 inlink counts, so they
+link only to `/audit/`; the fifth new fixture, `dup-exact-canonical`,
+joined `CANONICALISED` and `NON_INDEXABLE` in `test_audit.py`.
+
 What exists now:
+
+- **Content.** `CrawlView.duplicates` is a `DuplicateIndex`
+  (`audit/duplicates.py`): `pages` (parsed HTML pages with a non-empty
+  fingerprint), `exact` (tuple of `Cluster(representative, members)` by
+  content hash, any length) and `near` (clusters of pages with 200+ words
+  within `NEAR_DUPLICATE_DISTANCE` = 10 bits, single linkage, candidate
+  pairs by pigeonhole blocking over distinct SimHash values), with
+  `exact_group(url)`, `near_cluster(url)`, `distance(a, b)` and
+  `same_text(a, b)`; the representative is the best-linked member
+  (highest Link Score, then first URL). `parse/fingerprint.py` holds
+  `main_text()`, `fingerprint()`, `fingerprint_text()`, `simhash()` and
+  `hamming()`; `parse_html` sets `ParsedPage.fingerprint` and the crawler
+  copies it to `PageRecord.fingerprint` (`Fingerprint(content_hash,
+  simhash, words)`, `.empty`, `.simhash_hex`; None on unparsed pages).
+  Store: `page_html.content_hash`, `.simhash` (16 hex digits),
+  `.content_words` (NULL when not parsed); `store.fingerprint_from_row()`;
+  the `pages` dump ends with the three. Rules in `audit/rules/content.py`
+  (category `Content`): `content.duplicate` (high), `content.near_duplicate`
+  (medium: names the closest partner and the bit distance),
+  `content.low_word_count` (low: indexable HTML pages under `MIN_WORDS`).
+  `analysis/duplicates.py`: `duplicate_report(crawl, max_distance=None)`
+  (`DuplicateReport`: `pages`, `compared`, `exact`, `near` (clusters with
+  more than one distinct text), `low_content`, `summary()`) and
+  `member_status()`. CLI: `sitecrawler duplicates report crawl.db
+  [--max-distance N]` (one `<exact|near>`, representative, member, bits,
+  indexability line per member, tab-separated); `audit` prints one
+  `Duplicates:` line. Web: a **Content** tab (`content_words`,
+  `word_count`, `exact_duplicates`, `near_duplicates`, `duplicate_of`,
+  `content_hash`) with a filter per rule plus `no_text`;
+  `AuditIndex.cells` and `NO_AUDIT` carry the three new cells;
+  `PageDetail.duplicates` feeds `detail/content.html` (a new `content`
+  entry in `DETAIL_SUBS`; `.detail-head` and `.subtabs` now wrap, because
+  the eleventh sub-tab pushed *Open full page* under the sidebar). Fixture:
+  `audit/dup-exact-1`, `dup-exact-2`, `dup-exact-canonical`,
+  `dup-near-1`, `dup-near-2` (linked from the hub under *Content*);
+  `TRIGGERS["content.low_word_count"]` is computed (every indexable page
+  bar `DUPLICATE_CONTENT` and `many-outlinks`), and `h1-dup-1`/`-2`, which
+  differ only in `<head>`, are exact duplicates too;
+  `tests/integration/test_duplicates.py` holds the roadmap acceptance
+  test, the CLI, the stored columns and the web cells. User guide:
+  `docs/user-guide/duplicates.md`.
 
 - **Links.** `CrawlView.link_graph` is a `LinkGraph` (`audit/graph.py`)
   with `metrics: dict[url, LinkMetrics(inlinks, follow_inlinks,
@@ -303,7 +378,7 @@ What exists now:
 - `sitecrawler crawl URL [-o pages.csv] [--db crawl.db [--resume]]`,
   `sitecrawler list urls.txt|- [--follow]`, `sitecrawler export crawl.db
   --format csv|xlsx|json`: see the Phase 1 notes in `docs/ROADMAP.md`.
-- `sitecrawler audit crawl.db`: runs 63 rules over a stored crawl, writes the
+- `sitecrawler audit crawl.db`: runs 66 rules over a stored crawl, writes the
   `issues` table, an indexability verdict and the link metrics per page, prints
   the fix list by severity. `sitecrawler issues crawl.db --rule ID` lists affected URLs.
 - Rules live in `src/sitecrawler/audit/rules/<category>.py` as classes with
@@ -320,8 +395,8 @@ What exists now:
   detail pane; vendored `htmx.min.js` (2.0.11), `tabulator.min.js`/`.css`
   (6.7.0). Rule explanations are rendered in-app at `/rules/<id>`, the
   full page per URL at `/page?url=`, built from `templates/detail/*`.
-- 656 offline tests (20 of them headless Chromium, marker `browser`:
-  the UI e2e tests plus the rendered crawls). ADRs 0001-0011.
+- 693 offline tests (20 of them headless Chromium, marker `browser`:
+  the UI e2e tests plus the rendered crawls). ADRs 0001-0012.
 
 Open:
 
@@ -343,15 +418,25 @@ Open:
   serve HTTPS (see the note under Phase 2 in the roadmap).
 - Dependabot's older uv can produce lockfile-downgrading PRs (#4 was closed
   for that); read the lock diff before merging.
-- Next piece of work: **Phase 9, duplicate and near-duplicate content**
-  (`docs/ROADMAP.md`); `analysis/` is where the clusters belong, next to
-  `sitemaps.py` and `links.py`, and the HTML bodies are still not stored
-  (ADR-0009 names storing them behind a flag as the obvious next step,
-  which content hashing will want). The release recipe is #39: bump
+- Next piece of work: merge #41 once `gh pr checks 41` is green, then
+  release v0.10.0 and a handoff PR; after that **Phase 10, structured
+  data validation** (`docs/ROADMAP.md`). The release recipe is #39: bump
   `pyproject.toml`, `__init__.py` and `uv.lock` (`uv lock`), date the
   CHANGELOG Unreleased block, mark the roadmap row Done, PR, squash-merge
   once `gh pr checks N` is green, annotated tag on `main`, then a handoff
   PR.
+- Phase 9 left for later: the thresholds (`NEAR_DUPLICATE_DISTANCE` = 10,
+  `MIN_WORDS` = 200) are constants in the rules and only the report's
+  distance is an option; the near-duplicate floor is the low-content
+  floor, so templated pages under 200 words are reported as thin rather
+  than as variants of each other; boilerplate is recognised by element
+  and ARIA role only (a sidebar in a plain `<div>` counts as content);
+  a change to the main-text rule or the shingle size changes every stored
+  fingerprint, so it means a re-crawl (storing bodies behind a flag is
+  still the obvious next step); the web Content tab has no cluster grid
+  (the detail pane and `duplicates report` cover it); the e2e tests do
+  not open the Content sub-tab. Crawl files written before 0.10 lack the
+  `page_html` fingerprint columns and open with an error; re-crawl.
 - Phase 8 left for later: canonicals are ignored by the link graph (a
   canonicalised page keeps its own node and score); no row-per-link grid in
   the web UI (the detail pane and `links report` cover it); the rule
