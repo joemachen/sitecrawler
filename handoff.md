@@ -1,8 +1,8 @@
 # Handoff: sitecrawler
 
 Read this first in a new session. It is the state of the project as of
-2026-10-22 (v0.10.0 released, Phase 10 not started) and everything that is
-not obvious from the code.
+2026-10-23 (v1.0.0 released: every core phase is done; Phase 11, API
+integrations, not started) and everything that is not obvious from the code.
 
 ## What this is
 
@@ -152,7 +152,77 @@ links to the new fixture pages changed the Phase 8 inlink counts, so they
 link only to `/audit/`; the fifth new fixture, `dup-exact-canonical`,
 joined `CANONICALISED` and `NON_INDEXABLE` in `test_audit.py`.
 
+**Phase 10 (structured data validation) is complete and released as
+v1.0.0** (annotated tag on `main` at ef07c7b, 2026-10-23). One PR,
+`feat/structured-data` (#45), then `chore/release-v1.0.0` (#46) and
+`docs/handoff-v1.0.0` (#47). The roadmap named extruct; ADR-0013
+records why it is not used (last release 2024-11, no Python 3.13
+classifier, seven dependencies including rdflib, drops broken JSON-LD
+silently, parses the page again): `parse/structured.py` reads the three
+syntaxes from the tree `parse_html` already has. Google retired FAQ rich
+results on 2026-05-07, so FAQPage is not in the rich-result table. A
+`/code-review` pass on #45 found and fixed: crawl files from before the
+new table opened as crawls with no structured data (`open_store`'s
+`create_all` adds missing tables silently; `missing_tables()` and
+`require_crawl_db` now refuse them), microdata `itemprop` items outside any
+item were dropped, the schema.org context document URL read as a foreign
+vocabulary, `vocab=""` produced `/Name` types, conflicts compared unsquashed
+JSON-LD whitespace and skipped `url` instead of resolving it, and the
+CLI's `_view` helper existed in four copies (now `cli/_run.py::load_view`,
+used by `duplicates`, `links` and `schema`; `sitemap_cmd` keeps its own,
+which returns a tuple). A 40-page crawl of mabelslabels.com found
+`query-input` on the sitelinks `SearchAction` flagged as unknown: schema.org
+Actions allow `<property>-input` / `-output`, now understood. Joe decided
+1.0 makes **no crawl-file compatibility promise**: no migrations; an older
+file is refused with a re-crawl message.
+
 What exists now:
+
+- **Structured data.** `parse/structured.py::extract_structured(doc,
+  base_url)` runs in `parse_html` before the scripts are stripped and
+  returns `StructuredData(items, errors)`: each `StructuredItem(format,
+  data, line)` has `format` `json-ld` / `microdata` / `rdfa` and `data` a
+  `StructuredNode` (every key to a list of `str` or nested nodes; `@type`
+  and `@id` kept; schema.org names bare, other vocabularies as full IRIs,
+  `is_bare()` tells them apart); a `StructuredError(message, line)` per
+  JSON-LD block that fails `json.loads`. `ParsedPage.structured` /
+  `PageRecord.structured` (None unless parsed). Store: `structured_data`
+  table (`StructuredRow`: `format`, `types` space-separated, `data_json`,
+  `error`, `line`); `structured_from_rows()` uses the fingerprint to tell
+  "parsed, nothing found" from "not parsed"; `missing_tables(path)` lists
+  tables an older file lacks. Exports: `structured_data` sheet (last in
+  `EXPORT_TABLES`), `structured_types` last in `PAGE_COLUMNS`. Vocabulary:
+  `src/sitecrawler/data/schemaorg.json` (types to parents, properties to
+  domains, ~100 kB), refreshed by `scripts/update_schemaorg.py`.
+  `audit/structured.py`: `Vocabulary.bundled()` (`is_type`, `ancestors`
+  BFS, `allows` with inheritance), `rich_result_for()`, `check_page()`,
+  `StructuredIndex` (`CrawlView.structured`, `findings_for(url, kind)`),
+  `Finding(kind, message, type, path)`, `KINDS`. `audit/richresults.py`:
+  `RICH_RESULTS` (Product, Article, BreadcrumbList, Organization,
+  LocalBusiness, Recipe, Event, VideoObject) of `Need(paths, when)`; a
+  dotted path must hold on every node it reaches. Rules in
+  `audit/rules/structured.py` (category `Structured data`, one issue per
+  page, findings joined with `; `): `schema.invalid_json` (high),
+  `schema.missing_required` (high), `schema.unknown_type` (medium),
+  `schema.conflicting` (medium: same type and same `@id` or resolved `url`,
+  different text), `schema.unknown_property` (low),
+  `schema.missing_recommended` (low). `analysis/structured.py`:
+  `structured_report()` (`StructuredReport`: `pages`, `with_items`,
+  `formats`, `types` as `TypeCount`, `findings`, `summary()`). CLI:
+  `sitecrawler schema report crawl.db [--kind KIND]` (Rich types table to
+  stderr, `<kind>\t<url>\t<type>\t<path>\t<message>` to stdout); `audit`
+  prints one `Structured data:` line. Web: a **Structured Data** tab
+  (`structured_types`, `structured_items`, `structured_formats`,
+  `schema_problems`) with a filter per rule plus `has_structured` /
+  `no_structured`; `PageDetail.schema_findings` and
+  `templates/detail/structured.html` (a `structured` entry in
+  `DETAIL_SUBS`; items shown with the `pretty_json` Jinja filter in
+  `web/app.py`). Fixture: `audit/schema-product` (complete, trips
+  nothing), `schema-no-price`, `schema-invalid-json`, `schema-unknown`
+  (microdata), `schema-article` (RDFa Lite), `schema-conflict`, under a
+  *Structured data* heading on the hub; `tests/integration/test_structured.py`
+  holds the roadmap acceptance test. User guide:
+  `docs/user-guide/structured-data.md`.
 
 - **Content.** `CrawlView.duplicates` is a `DuplicateIndex`
   (`audit/duplicates.py`): `pages` (parsed HTML pages with a non-empty
@@ -379,7 +449,7 @@ What exists now:
 - `sitecrawler crawl URL [-o pages.csv] [--db crawl.db [--resume]]`,
   `sitecrawler list urls.txt|- [--follow]`, `sitecrawler export crawl.db
   --format csv|xlsx|json`: see the Phase 1 notes in `docs/ROADMAP.md`.
-- `sitecrawler audit crawl.db`: runs 66 rules over a stored crawl, writes the
+- `sitecrawler audit crawl.db`: runs 72 rules over a stored crawl, writes the
   `issues` table, an indexability verdict and the link metrics per page, prints
   the fix list by severity. `sitecrawler issues crawl.db --rule ID` lists affected URLs.
 - Rules live in `src/sitecrawler/audit/rules/<category>.py` as classes with
@@ -396,33 +466,20 @@ What exists now:
   detail pane; vendored `htmx.min.js` (2.0.11), `tabulator.min.js`/`.css`
   (6.7.0). Rule explanations are rendered in-app at `/rules/<id>`, the
   full page per URL at `/page?url=`, built from `templates/detail/*`.
-- 693 offline tests (20 of them headless Chromium, marker `browser`:
-  the UI e2e tests plus the rendered crawls). ADRs 0001-0012.
+- 754 offline tests (20 of them headless Chromium, marker `browser`:
+  the UI e2e tests plus the rendered crawls). ADRs 0001-0013.
 
 Open:
 
-- **GitHub Actions has no minutes left for this private repository
-  (2026-10-22).** Every job fails in two seconds with the annotation
-  "The job was not started because recent account payments have failed
-  or your spending limit needs to be increased". Six full runs in one
-  day did it: the Windows job takes 15-22 minutes and counts double
-  against the free plan's monthly allowance. Fix in GitHub under
-  Settings > Billing and plans > Spending limits (raise the Actions
-  limit), or wait for the monthly reset, or make the repository public.
-  Until then no PR can go green; #43 (docs-only, `handoff.md` alone,
-  the rest of the tree identical to the green #42) was merged without
-  a run. Do not merge code PRs that way; run the full gates locally
-  (`uv run pytest --cov`, the audit coverage gate, `uv run mkdocs build
-  --strict`) and say so in the PR if CI is still down. There is no
-  branch protection on this repository (free plan), so GitHub will not
-  stop a merge on red checks. The `push` runs on `main` for ff24999 and
-  96dc245 are red for the same reason, not for the code; re-run the
-  latest one once minutes are back and expect green.
-- The Phase 9 session's worktree is still on disk:
-  `.claude/worktrees/unruffled-noether-5b7068` with `feat/duplicates`
-  checked out, plus the local branch `claude/unruffled-noether-5b7068`.
-  Both are merged; `git worktree remove` the folder and `git branch -D`
-  the two branches once that session is no longer wanted.
+- GitHub Actions: the repository is **public** since 2026-10-23, so
+  Actions minutes are no longer a limit (the private repo ran out on
+  2026-10-22). A full run is about 12 minutes on Ubuntu and 20 on Windows.
+  There is still no branch protection, so check `gh pr checks N` before
+  merging.
+- `.claude/worktrees/` holds four empty folders from earlier sessions
+  (`cool-blackburn-847d7b`, `exciting-jang-5c7cce`, `fervent-kalam-2e41a5`,
+  `unruffled-noether-5b7068`); git has forgotten them and Claude Code's
+  sandbox refuses to delete them, so remove them by hand.
 - Manual QA: `docs/DEVELOPMENT.md` section 5 now has a "Manual QA"
   checklist (a real-site crawl, the web UI walk-through, a spot check of
   issues against the live page, the exports). The xlsx step there is
@@ -445,12 +502,26 @@ Open:
   serve HTTPS (see the note under Phase 2 in the roadmap).
 - Dependabot's older uv can produce lockfile-downgrading PRs (#4 was closed
   for that); read the lock diff before merging.
-- Next piece of work: **Phase 10, structured data validation**
-  (`docs/ROADMAP.md`). The release recipe is #42: bump
-  `pyproject.toml`, `__init__.py` and `uv.lock` (`uv lock`), date the
-  CHANGELOG Unreleased block, mark the roadmap row Done, PR, squash-merge
-  once `gh pr checks N` is green, annotated tag on `main`, then a handoff
-  PR.
+- Next piece of work: **Phase 11, API integrations** (`docs/ROADMAP.md`,
+  v1.x): each integration an `Enricher` that adds columns from Search
+  Console, GA4, PageSpeed/CrUX or a backlink API; OAuth and keys via
+  `.env`, all optional and off by default. It needs credentials Joe has to
+  create, so start by asking which integration matters first. The release
+  recipe is #46: bump `pyproject.toml`, `__init__.py` and `uv.lock` (`uv
+  lock`), date the CHANGELOG Unreleased block, mark the roadmap row Done,
+  PR, squash-merge once `gh pr checks N` is green, annotated tag on `main`,
+  then a handoff PR.
+- Phase 10 left for later: property values are not checked against their
+  schema.org ranges; rich-result needs are checked on top-level items only
+  (a Product under `WebPage.mainEntity` in JSON-LD is not checked as a
+  Product); microdata `itemref`, full RDFa (`prefix`, `rel`/`rev`) and
+  JSON-LD expansion are not supported; `parse/structured.py::_text`
+  duplicates `parse/html.py::text_of` (importing it would be circular);
+  the e2e tests do not open the Structured Data tab; the rich-result table
+  is hand-kept and will drift as Google changes its docs (checked
+  2026-10-22). 1.0 has no crawl-file compatibility: a missing table is
+  refused by `require_crawl_db`, a missing column still fails with a SQL
+  error.
 - Phase 9 left for later: the thresholds (`NEAR_DUPLICATE_DISTANCE` = 10,
   `MIN_WORDS` = 200) are constants in the rules and only the report's
   distance is an option; the near-duplicate floor is the low-content
@@ -482,9 +553,10 @@ Open:
   50,000-URL one); sitemap files over other hosts are fetched but never
   recorded as pages. Old crawl files have no `sitemaps` table and open with
   an error; re-crawl (there are no migrations during 0.x).
-- GitHub's auto-merge cannot be enabled on this private repository (the
-  settings PATCH is accepted and ignored), so PRs are merged by hand with
-  `gh pr merge N --squash` once `gh pr checks N` is green.
+- PRs are merged by hand with `gh pr merge N --squash` once
+  `gh pr checks N` is green. GitHub's auto-merge could not be enabled while
+  the repository was private (the settings PATCH was accepted and
+  ignored); it has not been tried since it went public.
 - Phase 6 left for later: storing raw and rendered HTML bodies behind a
   flag so extractors can be re-run on a finished crawl (ADR-0009 names it
   as the obvious next step; today a changed extractor means crawling
@@ -532,6 +604,8 @@ Open:
 | Tabs and filters | Data in `web/tabs.py`; a filter with a rule id is that rule; presentational filters (URL flags, status class) are computed columns, not rules; the Custom tab is the one tab built per crawl, from the extraction names in the rows |
 | Custom extraction | Runs in the crawl pass over the HTML in hand (rendered DOM under `--render`); bodies not stored; grammar `NAME=KIND[MODS]:EXPR` + TOML; columns `extract_<name>` / `search_<name>` (ADR-0009) |
 | Sitemaps | Per-page findings are audit rules (`sitemap.*`) over normalised entries and the indexability verdict; file-level facts are `sitemap report`, not issues; `sitemap generate` is an export, `lastmod` only with `--lastmod`, never `changefreq`/`priority`; `/sitemap.xml` guessed only when robots.txt names none (ADR-0010) |
+| Structured data | Parsed in-house (no extruct) over the crawl's tree into one normalised item shape, one `structured_data` row per item; checked against a bundled, reduced schema.org vocabulary and the hand-kept `RICH_RESULTS` table; FAQPage left out (retired by Google) (ADR-0013) |
+| Crawl-file compatibility | None in 1.0: no migrations; a file missing a table is refused with a re-crawl message (Joe, 2026-10-23) |
 | Links | The link graph is part of the audit index (`audit/graph.py`, `CrawlView.link_graph`), not `analysis/`, because rules read it; Link Score is PageRank over the follow graph (nofollow, page-wide nofollow and self-links excluded, redirects resolved to the landing page, d=0.85) on a log scale 0-100; click depth is a BFS from the start page over every internal link; `audit` stores `inlinks`, `link_depth`, `link_score` on `pages`; `links report` / `links anchors` are the report (ADR-0011) |
 
 Full rationale in `docs/adr/`.
@@ -548,6 +622,8 @@ uv run sitecrawler issues example.db --rule title.missing
 uv run sitecrawler export example.db --format xlsx
 uv run sitecrawler sitemap report example.db      # sitemap files read, other-host / uncrawled / duplicate entries
 uv run sitecrawler sitemap generate example.db --lastmod   # sitemap.xml of indexable 200 pages next to the DB
+uv run sitecrawler schema report example.db       # every structured data finding, with type and property
+uv run python scripts/update_schemaorg.py         # refresh the bundled schema.org vocabulary
 uv run sitecrawler serve                     # web UI on http://127.0.0.1:8765, crawl from the browser
 uv run sitecrawler serve example.db          # browse a stored crawl read-only
 uv run playwright install chromium           # once per machine, for tests/e2e/test_web_ui.py
@@ -563,7 +639,7 @@ uv run mkdocs serve                      # docs at http://127.0.0.1:8000
 gh pr list                               # open PRs
 ```
 
-Commits must end with `Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>`.
+Commits must end with `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
 PR descriptions end with `🤖 Generated with [Claude Code](https://claude.com/claude-code)`.
 
 Per-PR workflow that worked well: branch from `main`, tests first, implement,
@@ -579,6 +655,22 @@ and a self canonical so it trips nothing else), a line in `TRIGGERS`, a unit
 test, then regenerate `rules.md`.
 
 ## Gotchas learned the hard way
+
+- **libxml2 differs between Windows and Linux.** Text after `</html>` is
+  kept on Windows and dropped on the Ubuntu runner, so a test page must be
+  well formed or it passes locally and fails in CI (#45).
+- **`open_store` creates missing tables.** A crawl file from an older
+  version opens cleanly with an empty new table; `missing_tables()` is
+  the guard. New tables need no extra work; new *columns* still fail with
+  a SQL error.
+- Python 3.13's `json` reports a trailing comma as `Illegal trailing comma
+  before end of object` at the comma's line, not the closing brace's.
+- **Do not run two test suites at once on this machine.** Under the load,
+  local fixture fetches fail now and then and integration tests that
+  count issues go red (an orphan that is not, a missing duplicate title).
+  Re-run alone before investigating.
+- The full local suite takes 9-12 minutes now (the rendered-crawl tests
+  dominate); run it in the background and read the result file.
 
 - **The Claude Code Bash tool drops any command whose heredoc runs past
   about 100 lines** ("unexpected EOF while looking for matching quote");
@@ -694,13 +786,19 @@ test, then regenerate `rules.md`.
 
 ## Where to look next
 
-- Phase 9 scope and acceptance: `docs/ROADMAP.md` under "Phase 9".
-  `analysis/` is where duplicate clusters belong, next to `sitemaps.py`
-  and `links.py`; `PageRecord.word_count` exists but the HTML bodies are
-  not stored (ADR-0009), so a content hash has to be computed in the crawl
-  pass (`Crawler._fetch_and_parse`, where the extractors run) or the bodies
-  stored first. `Crawler.arun()` is the entry point for callers that
-  already have an event loop; `CrawlSession` is how the UI drives it.
+- Phase 11 scope: `docs/ROADMAP.md` under "Phase 11". Enrichers add
+  columns per URL, so they look like the extraction columns (Phase 6:
+  `web/tabs.py::custom_tab`, `store/dump.py::_pages`); its acceptance
+  ("thin title with 40k impressions" as one Issues filter) means an audit
+  rule that reads enricher data. `Crawler.arun()` is the entry point for
+  callers that already have an event loop; `CrawlSession` is how the UI
+  drives it.
+- Structured data: `parse/structured.py` (the reader), `audit/structured.py`
+  (vocabulary, index, findings), `audit/richresults.py` (Google's needs,
+  one entry per type, each naming its source page),
+  `audit/rules/structured.py`, `analysis/structured.py`,
+  `cli/schema_cmd.py`. `tests/unit/test_structured.py` is the parser's
+  spec; `tests/unit/audit/test_structured.py` the checker's.
 - Links: `audit/graph.py` (`LinkGraph`, PageRank, click depth,
   `is_broken`, `redirects_elsewhere`), `audit/directives.py`,
   `audit/rules/links.py` (the six rules and their thresholds),
@@ -730,5 +828,6 @@ test, then regenerate `rules.md`.
 
 Two memory files exist under
 `C:\Users\joema\.claude\projects\D--Projects-scraper\memory\`:
-`user-joe-profile.md` and `project-sitecrawler-roadmap.md`. They repeat the
-owner and roadmap facts above.
+`user-joe-profile.md`, `project-sitecrawler-roadmap.md` and
+`feedback-bash-heredoc-limit.md`. They repeat the owner, roadmap and
+heredoc facts above.
