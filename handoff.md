@@ -1,7 +1,8 @@
 # Handoff: sitecrawler
 
 Read this first in a new session. It is the state of the project as of
-2026-10-23 (v1.0.0 released: every core phase is done; Phase 11, API
+2026-10-28 (v1.1.0 released: the standalone Windows desktop exe, published
+to GitHub Releases by a workflow; every core phase is done; Phase 11, API
 integrations, not started) and everything that is not obvious from the code.
 
 ## What this is
@@ -13,7 +14,7 @@ developer, new to formal software process. Joe wants recommended defaults with a
 one-line reason, not menus of options.
 
 - Local checkout: `D:\Projects\scraper`
-- Remote: `https://github.com/joemachen/sitecrawler` (private), branch `main`
+- Remote: `https://github.com/joemachen/sitecrawler` (public), branch `main`
 - Package: `src/sitecrawler/`, Python 3.13, managed with `uv`
 
 ## Where things stand
@@ -175,6 +176,44 @@ which returns a tuple). A 40-page crawl of mabelslabels.com found
 Actions allow `<property>-input` / `-output`, now understood. Joe decided
 1.0 makes **no crawl-file compatibility promise**: no migrations; an older
 file is refused with a re-crawl message.
+
+**The desktop app is released as v1.1.0** (annotated tag on `main` at
+b729efa, 2026-10-28), the first release whose exe is on GitHub Releases
+(https://github.com/joemachen/sitecrawler/releases/latest). One PR,
+`feat/desktop-app` (#49, squash-merged as 3e62c71), then
+`chore/release-v1.1.0` (#54). It was not a roadmap phase; the roadmap's
+parked "Packaging as a single executable" idea is marked done. Joe first
+saw the exe answer *Render JavaScript* with `uv`/`pip` install steps; the
+fix grew into ADR-0015: Playwright is bundled and renders with the
+installed Microsoft Edge.
+
+- **Desktop.** `web/desktop.py`: `DesktopServer` (the FastAPI app on a
+  loopback port bound before its thread starts), `run_desktop` (pywebview
+  window, Edge WebView2), `DesktopApi.choose_folder` (the only `js_api`
+  method), `main()` (the exe's entry: optional `.db` argument, opened
+  read-only; errors in a message box; stdout/stderr to `sitecrawler.log`
+  beside the exe). `web/prefs.py` keeps the *Save crawls to* folder in
+  `%APPDATA%\sitecrawler\settings.json`. `sitecrawler desktop [DB]` runs
+  it from a checkout. `packaging/sitecrawler.spec` (one-file, windowed,
+  about 69 MB) and `packaging/sitecrawler_app.py`. ADR-0014.
+- **Rendering with Edge.** `Renderer.__aenter__` launches Playwright's
+  Chromium, then `channel="msedge"` (`EDGE_CHANNEL`) when that fails; both
+  failing is a `RenderUnavailableError` naming both. In a frozen exe
+  `install_hint()` returns `FROZEN_HINT` (install Edge) instead of
+  `INSTALL_HINT`. `render_unavailable_reason()` greys out the Render
+  JavaScript checkbox, with the reason as its tooltip, when Playwright does
+  not import. ADR-0015. An empty `PLAYWRIGHT_BROWSERS_PATH` is how tests
+  and the smoke test force the Edge path.
+- **Releases.** `.github/workflows/release.yml`: a `v*` tag on
+  `windows-latest` checks the tag against `pyproject.toml`, cuts that
+  version's CHANGELOG section into the notes, builds the exe, runs
+  `scripts/smoke_exe.py`, and publishes the Release with the exe. PRs
+  touching the build run it without publishing (exe kept as a run
+  artifact). The smoke test runs a copy named
+  `sitecrawler-smoke-test.exe` (the port is found by process name, so a
+  `sitecrawler.exe` Joe has open is never driven), crawls the fixture site
+  with rendering over the exe's HTTP API, and checks `/js-injected` got
+  its JavaScript title. Run it locally after a build.
 
 What exists now:
 
@@ -574,9 +613,10 @@ Open:
   resuming a stopped crawl from the UI (the CLI's `--resume` works on the
   file). Summary counts are recomputed per `(seq, audit_rev)` over every
   filter of every tab; fine at 10k pages, not profiled beyond.
-- Merged branches are deleted from origin by hand after each merge
-  (`git push origin --delete <branch>` from a terminal; Claude Code's
-  sandbox refuses it); `git branch -r` should list only `origin/main`.
+- Merged branches are deleted on merge with `gh pr merge N --squash
+  --delete-branch`, which works from Claude Code (a bare
+  `git push origin --delete` was refused by the sandbox before);
+  `git branch -r` should list only `origin/main` plus Dependabot's.
   The local checkout is clean of merged branches.
 - Dependabot will now also see fastapi/uvicorn/jinja2/playwright; the
   vendored htmx/Tabulator files are upgraded by hand (replace the three files
@@ -597,6 +637,8 @@ Open:
 | List mode | URLs may span hosts; `--follow` stays within the listed hosts |
 | Resume | `pages.state` is the frontier; `max_pages` counts across runs; `crawls.status` is `stopped` when capped |
 | Web UI | One page, Screaming Frog layout; grids filter/export client-side; htmx and Tabulator vendored; rule pages rendered in-app (ADR-0006) |
+| Desktop app | The web UI in a pywebview window, one-file PyInstaller exe; Playwright bundled, rendering through the installed Edge (ADR-0014, ADR-0015) |
+| Releases | A `vX.Y.Z` tag on `main` publishes the exe via `release.yml`; the release PR bumps `pyproject.toml`, `__init__.py`, `uv.lock` and dates the CHANGELOG |
 | Live crawl | `CrawlSession` on a worker thread, audit thread with adaptive gap, file written as it goes and closed before `done`; browser polls, no websockets (ADR-0007) |
 | Tabs and filters | Data in `web/tabs.py`; a filter with a rule id is that rule; presentational filters (URL flags, status class) are computed columns, not rules; the Custom tab is the one tab built per crawl, from the extraction names in the rows |
 | Custom extraction | Runs in the crawl pass over the HTML in hand (rendered DOM under `--render`); bodies not stored; grammar `NAME=KIND[MODS]:EXPR` + TOML; columns `extract_<name>` / `search_<name>` (ADR-0009) |
@@ -783,6 +825,12 @@ test, then regenerate `rules.md`.
 
 ## Where to look next
 
+- Desktop and releases: `web/desktop.py`, `packaging/sitecrawler.spec`,
+  `crawl/renderer.py` (the Edge fallback), `.github/workflows/release.yml`,
+  `scripts/smoke_exe.py`. A crawl file opens only by dropping it on the
+  exe; an in-app Open button (a `DesktopApi` file picker, like
+  `choose_folder`) was suggested but not built. The exe is unsigned, so
+  SmartScreen warns on other machines; signing needs a paid certificate.
 - Phase 11 scope: `docs/ROADMAP.md` under "Phase 11". Enrichers add
   columns per URL, so they look like the extraction columns (Phase 6:
   `web/tabs.py::custom_tab`, `store/dump.py::_pages`); its acceptance
@@ -823,7 +871,7 @@ test, then regenerate `rules.md`.
 
 ## Claude memory
 
-Two memory files exist under
+Three memory files exist under
 `C:\Users\joema\.claude\projects\D--Projects-scraper\memory\`:
 `user-joe-profile.md`, `project-sitecrawler-roadmap.md` and
 `feedback-bash-heredoc-limit.md`. They repeat the owner, roadmap and
