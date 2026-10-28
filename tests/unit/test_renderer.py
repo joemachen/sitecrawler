@@ -7,7 +7,13 @@ import asyncio
 import pytest
 
 from sitecrawler.crawl import Crawler, Renderer, RenderUnavailableError
-from sitecrawler.crawl.renderer import INSTALL_HINT, WAIT_STRATEGIES, require_playwright
+from sitecrawler.crawl.renderer import (
+    FROZEN_HINT,
+    INSTALL_HINT,
+    WAIT_STRATEGIES,
+    render_unavailable_reason,
+    require_playwright,
+)
 from sitecrawler.models import CrawlConfig
 
 
@@ -44,6 +50,18 @@ def test_missing_playwright_is_a_config_error(monkeypatch: pytest.MonkeyPatch) -
     with pytest.raises(ValueError, match=INSTALL_HINT[:30]):
         Crawler(CrawlConfig(start_url="https://x.test/", render=True))
     assert Crawler(CrawlConfig(start_url="https://x.test/")).renderer is None
+
+
+def test_the_exe_says_rendering_is_not_included(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("sitecrawler.crawl.renderer.playwright_available", lambda: False)
+    assert render_unavailable_reason() == INSTALL_HINT
+    # PyInstaller sets sys.frozen; uv and pip instructions mean nothing to someone running the exe.
+    monkeypatch.setattr("sys.frozen", True, raising=False)
+    assert render_unavailable_reason() == FROZEN_HINT
+    with pytest.raises(RenderUnavailableError, match="not included in the standalone"):
+        require_playwright()
+    monkeypatch.setattr("sitecrawler.crawl.renderer.playwright_available", lambda: True)
+    assert render_unavailable_reason() is None
 
 
 def test_crawler_builds_a_renderer_from_the_config() -> None:

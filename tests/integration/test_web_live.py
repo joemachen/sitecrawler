@@ -62,6 +62,16 @@ def test_idle_app(client: TestClient) -> None:
     assert 'data-status="idle"' in client.get("/").text
 
 
+def test_render_checkbox_is_disabled_without_playwright(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert '<input type="checkbox" name="render">' in client.get("/").text
+    monkeypatch.setattr("sitecrawler.crawl.renderer.playwright_available", lambda: False)
+    html = client.get("/").text
+    assert '<input type="checkbox" name="render" disabled>' in html
+    assert "playwright install chromium" in html
+
+
 def test_full_crawl_from_the_ui(client: TestClient, site: str, tmp_path: Path) -> None:
     started = start(client, site)
     assert started["status"] == "running"

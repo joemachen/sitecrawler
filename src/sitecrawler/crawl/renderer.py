@@ -12,6 +12,7 @@ import asyncio
 import contextlib
 import importlib.util
 import logging
+import sys
 import time
 from types import TracebackType
 from typing import TYPE_CHECKING, Literal, cast
@@ -42,6 +43,13 @@ INSTALL_HINT = (
     "and then `playwright install chromium`"
 )
 
+FROZEN_HINT = (
+    "JavaScript rendering is not included in the standalone sitecrawler.exe: "
+    "untick Render JavaScript, or run sitecrawler from a source checkout "
+    "with the render extra installed"
+)
+"""Shown instead of :data:`INSTALL_HINT` in the PyInstaller exe, where pip and uv do not apply."""
+
 
 class RenderUnavailableError(ValueError):
     """Playwright or Chromium is missing, or the browser could not start."""
@@ -52,10 +60,25 @@ def playwright_available() -> bool:
     return importlib.util.find_spec("playwright") is not None
 
 
+def install_hint() -> str:
+    """How to get rendering working: :data:`FROZEN_HINT` in the exe, else :data:`INSTALL_HINT`."""
+    return FROZEN_HINT if getattr(sys, "frozen", False) else INSTALL_HINT
+
+
+def render_unavailable_reason() -> str | None:
+    """Why a crawl cannot render here, or None when Playwright imports.
+
+    Chromium itself is only found when the browser launches, so None does not
+    promise that rendering will start.
+    """
+    return None if playwright_available() else install_hint()
+
+
 def require_playwright() -> None:
     """Raise :class:`RenderUnavailableError`, with an install hint, unless Playwright imports."""
-    if not playwright_available():
-        raise RenderUnavailableError(INSTALL_HINT)
+    reason = render_unavailable_reason()
+    if reason is not None:
+        raise RenderUnavailableError(reason)
 
 
 class Renderer:
@@ -130,7 +153,7 @@ class Renderer:
         except Error as exc:
             await self._playwright.stop()
             self._playwright = None
-            msg = f"could not start Chromium: {str(exc).splitlines()[0]}. {INSTALL_HINT}"
+            msg = f"could not start Chromium: {str(exc).splitlines()[0]}. {install_hint()}"
             raise RenderUnavailableError(msg) from exc
         try:
             self._context = await self._browser.new_context(user_agent=self.user_agent)

@@ -26,7 +26,8 @@ after the fetches in flight; **Resume** continues it; **Stop** ends it
 early; **Clear** forgets it and returns to an empty screen. **Settings**
 holds the same options as the `crawl` command: max pages, delay, workers,
 timeout, sitemaps, robots.txt, query strings, and **Render JavaScript**
-(see [JavaScript rendering](render.md); needs Chromium installed). Its
+(see [JavaScript rendering](render.md); needs Chromium installed, and is
+greyed out when Playwright is not). Its
 **Save crawls to** field changes `--crawls-dir` for crawls started after
 it: type a path and press Enter. Under `serve` the change lasts until the
 server stops; the [desktop app](desktop.md) remembers it and adds a

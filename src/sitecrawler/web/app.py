@@ -15,6 +15,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from sitecrawler.crawl.renderer import render_unavailable_reason
 from sitecrawler.models import CrawlConfig
 from sitecrawler.parse import parse_extractor, parse_searches
 from sitecrawler.session import CrawlSession, SessionBusyError
@@ -83,7 +84,14 @@ DETAIL_SUBS: tuple[tuple[str, str], ...] = (
 def index(request: Request) -> HTMLResponse:
     """The app shell: tab strip, grid, detail pane and sidebar, filled by JavaScript."""
     tabs = _rows(request).tabs()
-    return _render(request, "index.html", tabs=tabs, specs=to_json(tabs), detail_subs=DETAIL_SUBS)
+    return _render(
+        request,
+        "index.html",
+        tabs=tabs,
+        specs=to_json(tabs),
+        detail_subs=DETAIL_SUBS,
+        render_unavailable=render_unavailable_reason(),
+    )
 
 
 @router.get("/detail/{sub}", response_class=HTMLResponse)

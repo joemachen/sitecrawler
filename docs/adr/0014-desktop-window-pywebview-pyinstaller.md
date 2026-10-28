@@ -45,9 +45,11 @@ or throwing away a tested one.
   saves nothing: a browser tab has no folder picker, and a server started
   with `--crawls-dir` should not change what the desktop app remembers.
 - **Playwright is excluded from the exe.** Rendering needs a separate
-  Chromium download that a single file cannot carry. Ticking *Render
-  JavaScript* in the exe reports the install hint, as it does in a
-  checkout without the `render` extra.
+  Chromium download that a single file cannot carry. *Render JavaScript*
+  is greyed out wherever Playwright does not import, the exe included,
+  with the reason as its tooltip. In the exe that reason says rendering is
+  not included rather than giving `uv`/`pip` instructions that do not
+  apply there.
 
 ## Consequences
 

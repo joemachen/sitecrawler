@@ -27,8 +27,10 @@ never seen it, Windows SmartScreen may warn: choose *More info*, then
 *Run anyway*.
 
 *Render JavaScript* is not available in the exe, because rendering needs
-Playwright and a Chromium download. Use the command line for rendered
-crawls (see [JavaScript rendering](render.md)), then open the `.db` in the
+Playwright and a Chromium download, so the exe greys it out; hover over it
+to see why. Use the command line for rendered crawls (see
+[JavaScript rendering](render.md)), or run `uv run sitecrawler desktop`
+from a source checkout with Chromium installed, then open the `.db` in the
 exe.
 
 ## Choosing where crawls are saved
