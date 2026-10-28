@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-28
+
+The standalone Windows desktop app, attached to this release as
+`sitecrawler.exe`.
+
 ### Added
 
 - A standalone Windows desktop app: `dist/sitecrawler.exe`, built with

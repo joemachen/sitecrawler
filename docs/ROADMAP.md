@@ -362,4 +362,5 @@ Not scheduled; captured so they are not forgotten.
 - Spelling and grammar.
 - AMP, mobile usability.
 - Log file analysis.
-- Packaging as a single executable.
+- ~~Packaging as a single executable.~~ Done in v1.1.0: the Windows
+  desktop exe (ADR-0014, ADR-0015).
