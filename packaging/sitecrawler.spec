@@ -7,19 +7,22 @@ hiddenimports = (
     collect_submodules("sitecrawler")
     # uvicorn picks its loop, protocol and lifespan implementations at runtime.
     + collect_submodules("uvicorn")
+    # The renderer imports Playwright inside functions, only when a crawl renders.
+    + collect_submodules("playwright")
 )
 
 a = Analysis(
     ["sitecrawler_app.py"],
     pathex=[],
     binaries=[],
-    # Templates, vendored JS/CSS and the bundled schema.org vocabulary.
-    datas=collect_data_files("sitecrawler"),
+    # Templates, vendored JS/CSS and the bundled schema.org vocabulary, plus
+    # Playwright's driver (node.exe and its package), which it finds beside
+    # its own modules. Rendering uses the installed Edge (ADR-0015).
+    datas=collect_data_files("sitecrawler") + collect_data_files("playwright"),
     hiddenimports=hiddenimports,
     hookspath=[],
     runtime_hooks=[],
-    # Rendering needs a Chromium download the exe cannot ship; the rest are dev tools.
-    excludes=["playwright", "pytest", "mypy", "ruff", "mkdocs", "tkinter"],
+    excludes=["pytest", "mypy", "ruff", "mkdocs", "tkinter"],
     noarchive=False,
 )
 pyz = PYZ(a.pure)

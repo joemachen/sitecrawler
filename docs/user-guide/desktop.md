@@ -26,12 +26,11 @@ itself on every launch. It is not code-signed, so on a machine that has
 never seen it, Windows SmartScreen may warn: choose *More info*, then
 *Run anyway*.
 
-*Render JavaScript* is not available in the exe, because rendering needs
-Playwright and a Chromium download, so the exe greys it out; hover over it
-to see why. Use the command line for rendered crawls (see
-[JavaScript rendering](render.md)), or run `uv run sitecrawler desktop`
-from a source checkout with Chromium installed, then open the `.db` in the
-exe.
+*Render JavaScript* works in the exe with nothing else to install: the
+exe renders pages in the Microsoft Edge that comes with Windows (see
+[JavaScript rendering](render.md)). If Edge has been removed, the crawl
+stops at the start with a message saying so; install Edge or untick the
+option.
 
 ## Choosing where crawls are saved
 

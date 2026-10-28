@@ -54,6 +54,11 @@ Without them `--render` exits with status 2 and this hint before any
 request is made. Developers get Playwright through the dev dependencies
 already.
 
+When Playwright is installed but its Chromium is not, the crawler renders
+with the installed Microsoft Edge instead (it comes with Windows 10 and
+11), so on Windows `playwright install chromium` is optional. The
+[desktop exe](desktop.md) bundles Playwright and always renders this way.
+
 ## Options
 
 | Flag | Default | Purpose |

@@ -1,7 +1,10 @@
 """JavaScript rendering in headless Chromium, through Playwright's async API.
 
 The renderer is optional: Playwright is only imported when a crawl asks for
-rendering, so a plain crawl never needs a browser installed. It uses the
+rendering, so a plain crawl never needs a browser installed. It launches the
+Chromium that ``playwright install chromium`` downloads, and falls back to
+the installed Microsoft Edge when that is missing, which is how the
+standalone exe renders (ADR-0015). It uses the
 async API because the crawl loop is an asyncio loop; Playwright's sync API
 starts a loop of its own and refuses to run inside one.
 """
@@ -44,11 +47,13 @@ INSTALL_HINT = (
 )
 
 FROZEN_HINT = (
-    "JavaScript rendering is not included in the standalone sitecrawler.exe: "
-    "untick Render JavaScript, or run sitecrawler from a source checkout "
-    "with the render extra installed"
+    "the standalone sitecrawler.exe renders with Microsoft Edge: "
+    "install Edge from https://www.microsoft.com/edge, or untick Render JavaScript"
 )
 """Shown instead of :data:`INSTALL_HINT` in the PyInstaller exe, where pip and uv do not apply."""
+
+EDGE_CHANNEL = "msedge"
+"""Playwright's name for the installed Microsoft Edge, tried when its own Chromium is missing."""
 
 
 class RenderUnavailableError(ValueError):
@@ -79,6 +84,12 @@ def require_playwright() -> None:
     reason = render_unavailable_reason()
     if reason is not None:
         raise RenderUnavailableError(reason)
+
+
+def _first_line(exc: Exception) -> str:
+    """Playwright's errors run to a page of call log; the first line says what failed."""
+    text = str(exc)
+    return text.splitlines()[0] if text else type(exc).__name__
 
 
 class Renderer:
@@ -137,12 +148,12 @@ class Renderer:
         self._slots: asyncio.Semaphore | None = None
 
     async def __aenter__(self) -> Renderer:
-        """Start Playwright and launch Chromium.
+        """Start Playwright and launch Chromium, or the installed Edge without it.
 
         Raises:
-            RenderUnavailableError: Playwright is not installed or Chromium
-                could not be launched (usually ``playwright install chromium``
-                has not been run).
+            RenderUnavailableError: Playwright is not installed, or neither
+                Playwright's Chromium (``playwright install chromium``) nor
+                Microsoft Edge could be launched.
         """
         require_playwright()
         from playwright.async_api import Error, async_playwright
@@ -150,11 +161,18 @@ class Renderer:
         self._playwright = await async_playwright().start()
         try:
             self._browser = await self._playwright.chromium.launch()
-        except Error as exc:
-            await self._playwright.stop()
-            self._playwright = None
-            msg = f"could not start Chromium: {str(exc).splitlines()[0]}. {install_hint()}"
-            raise RenderUnavailableError(msg) from exc
+        except Error as chromium_exc:
+            log.info("Chromium did not start, trying Microsoft Edge: %s", _first_line(chromium_exc))
+            try:
+                self._browser = await self._playwright.chromium.launch(channel=EDGE_CHANNEL)
+            except Error as edge_exc:
+                await self._playwright.stop()
+                self._playwright = None
+                msg = (
+                    f"could not start Chromium ({_first_line(chromium_exc)}) "
+                    f"or Microsoft Edge ({_first_line(edge_exc)}). {install_hint()}"
+                )
+                raise RenderUnavailableError(msg) from edge_exc
         try:
             self._context = await self._browser.new_context(user_agent=self.user_agent)
             if self.block:

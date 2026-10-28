@@ -1,6 +1,6 @@
 # ADR-0014: The desktop app is the web UI in a pywebview window, packed into one exe by PyInstaller
 
-**Status:** Accepted
+**Status:** Accepted; the Playwright decision superseded by ADR-0015
 **Date:** 2026-10-23
 
 ## Context
@@ -45,11 +45,9 @@ or throwing away a tested one.
   saves nothing: a browser tab has no folder picker, and a server started
   with `--crawls-dir` should not change what the desktop app remembers.
 - **Playwright is excluded from the exe.** Rendering needs a separate
-  Chromium download that a single file cannot carry. *Render JavaScript*
-  is greyed out wherever Playwright does not import, the exe included,
-  with the reason as its tooltip. In the exe that reason says rendering is
-  not included rather than giving `uv`/`pip` instructions that do not
-  apply there.
+  Chromium download that a single file cannot carry. *Superseded by
+  [ADR-0015](0015-exe-renders-with-installed-edge.md): the exe now bundles
+  Playwright and renders with the installed Edge.*
 
 ## Consequences
 
