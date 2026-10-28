@@ -9,8 +9,9 @@ uv run sitecrawler crawl https://example.com -o pages.csv
 ```
 
 On Windows there is also a standalone desktop app with nothing to install:
-build it with `uv run pyinstaller --noconfirm packaging/sitecrawler.spec`, then run
-`dist/sitecrawler.exe` (see [Desktop app](docs/user-guide/desktop.md)).
+download `sitecrawler.exe` from the [latest release](https://github.com/joemachen/sitecrawler/releases/latest), or build it
+with `uv run pyinstaller --noconfirm packaging/sitecrawler.spec` (see
+[Desktop app](docs/user-guide/desktop.md)).
 
 ## Status
 

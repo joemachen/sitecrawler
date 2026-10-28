@@ -23,11 +23,20 @@ All notable changes to this project are documented here. The format follows
   `serve` it lasts until the server stops.
 - `store.crawl_file_problem(path)`: the check `require_crawl_db` used,
   moved into the store so the exe can use it without the CLI.
+- **Render JavaScript works in the exe.** The exe bundles Playwright and
+  renders with the installed Microsoft Edge. Everywhere else, the renderer
+  falls back to Edge when Playwright's Chromium was never downloaded, so on
+  Windows `playwright install chromium` is optional (ADR-0015).
+- Releases publish `sitecrawler.exe`: pushing a `vX.Y.Z` tag builds the exe
+  on Windows, smoke-tests a rendered crawl in it
+  (`scripts/smoke_exe.py`) and attaches it to a GitHub Release.
 
 ### Fixed
 
 - The Settings panel showed while closed in Edge WebView2; `app.css` now
   hides a closed panel's body explicitly.
+- **Render JavaScript** is greyed out, with the reason as its tooltip,
+  when Playwright is not installed, instead of failing when a crawl starts.
 
 ## [1.0.0] - 2026-10-23
 

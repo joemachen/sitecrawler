@@ -7,7 +7,8 @@ tabs, open the detail pane, export CSV.
 ## The standalone exe (Windows)
 
 `sitecrawler.exe` is one file with nothing to install: no Python, no uv.
-Put it in a folder of its own and double-click it.
+Download it from the [latest release](https://github.com/joemachen/sitecrawler/releases/latest) (under *Assets*), put it
+in a folder of its own and double-click it.
 
 - **Crawls** you start are saved to a `crawls` folder next to the exe, one
   `.db` file per crawl, until you choose another folder (below).
