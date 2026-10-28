@@ -29,6 +29,9 @@ dependencies = [
 
 [project.optional-dependencies]
 render = ["playwright>=1.49"]
+desktop = [
+    "pywebview>=6",
+]
 
 [project.scripts]
 sitecrawler = "sitecrawler.cli.main:app"
@@ -51,6 +54,8 @@ dev = [
   "respx>=0.22",
   "types-openpyxl>=3.1.5.20261017",
   "playwright>=1.49",
+  "pywebview>=6",
+  "pyinstaller>=6.10",
 ]
 
 [build-system]

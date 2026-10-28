@@ -12,6 +12,7 @@ from rich.logging import RichHandler
 from sitecrawler import __version__
 from sitecrawler.cli._run import err, extraction_config, run_crawl
 from sitecrawler.cli.audit_cmd import audit, issues
+from sitecrawler.cli.desktop_cmd import desktop
 from sitecrawler.cli.duplicates_cmd import duplicates_app
 from sitecrawler.cli.export_cmd import export
 from sitecrawler.cli.links_cmd import links_app
@@ -150,6 +151,7 @@ app.command("export")(export)
 app.command("audit")(audit)
 app.command("issues")(issues)
 app.command("serve")(serve)
+app.command("desktop")(desktop)
 app.add_typer(sitemap_app, name="sitemap")
 app.add_typer(links_app, name="links")
 app.add_typer(duplicates_app, name="duplicates")

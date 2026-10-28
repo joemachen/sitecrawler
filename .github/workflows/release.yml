@@ -1,0 +1,89 @@
+name: Release
+
+# A version tag (vX.Y.Z, pushed after the release PR merges) builds the
+# Windows exe, smoke-tests it and publishes it as a GitHub Release with that
+# version's CHANGELOG section as the notes. A pull request that touches the
+# build only builds and smoke-tests it, and keeps the exe as a run artifact.
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - packaging/**
+      - pyproject.toml
+      - uv.lock
+      - scripts/smoke_exe.py
+      - src/sitecrawler/crawl/renderer.py
+      - src/sitecrawler/web/desktop.py
+      - .github/workflows/release.yml
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  exe:
+    name: windows exe
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write # gh release create
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Tag matches the project version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          version=$(uv run python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match version $version in pyproject.toml"
+            exit 1
+          fi
+
+      - name: Release notes from CHANGELOG.md
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v head="## [$version]" 'index($0, head) == 1 { on = 1; next } /^## \[/ { on = 0 } on' CHANGELOG.md > notes.md
+          if ! grep -q '[^[:space:]]' notes.md; then
+            echo "::error::CHANGELOG.md has no '## [$version]' section"
+            exit 1
+          fi
+
+      - name: Build sitecrawler.exe
+        run: uv run pyinstaller --noconfirm packaging/sitecrawler.spec
+
+      - name: Smoke-test the exe (rendered crawl through Edge)
+        timeout-minutes: 10
+        run: uv run python scripts/smoke_exe.py dist/sitecrawler.exe
+
+      - name: Keep the exe as a run artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: sitecrawler-exe
+          path: dist/sitecrawler.exe
+          if-no-files-found: error
+
+      - name: Publish the GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/sitecrawler.exe \
+            --verify-tag \
+            --title "sitecrawler $GITHUB_REF_NAME" \
+            --notes-file notes.md

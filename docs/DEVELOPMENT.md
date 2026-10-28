@@ -233,8 +233,22 @@ Coverage gate: 85% overall, 100% for `audit/` rules.
 - Semantic versioning. `0.x` until the core crawl and issues engine are stable.
 - `CHANGELOG.md` follows [Keep a Changelog](https://keepachangelog.com/).
 - A release is an annotated git tag `vX.Y.Z` on `main`, made by hand after
-  the release PR merges (the recipe is in `handoff.md`). There is no release
-  workflow yet: `uv build` makes the wheel, and `uv tool install .` or
+  the release PR merges (the recipe is in `handoff.md`). The release PR
+  bumps `version` in `pyproject.toml` and turns `## [Unreleased]` in
+  `CHANGELOG.md` into `## [X.Y.Z] - date`.
+- Pushing the tag runs `.github/workflows/release.yml` on Windows. It
+  checks that the tag matches `pyproject.toml`, builds
+  `dist/sitecrawler.exe` with PyInstaller (ADR-0014), smoke-tests it, and
+  publishes a GitHub Release with the exe attached and that version's
+  CHANGELOG section as the notes. A tag that does not match the version, or
+  a version with no CHANGELOG section, fails before anything is published.
+- The smoke test, `scripts/smoke_exe.py`, opens the exe with empty settings
+  and no Playwright Chromium, crawls the fixture site with rendering through
+  the installed Edge (ADR-0015), and checks the JavaScript-set title came
+  through. Run it locally after a build with
+  `uv run python scripts/smoke_exe.py`. Pull requests that touch the build
+  run the same job without publishing; the exe is kept as a run artifact.
+- No wheel is published: `uv build` makes one, and `uv tool install .` or
   `pipx install .` installs it from the checkout.
 
 ---

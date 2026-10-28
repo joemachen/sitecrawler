@@ -78,9 +78,16 @@ header .db { margin-left: auto; max-width: 24rem; font-family: ui-monospace, mon
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   white-space: nowrap;
 }
+/* display: grid above would otherwise show the body while closed in Edge WebView2 (the desktop window). */
+.settings:not([open]) .settings-body { display: none; }
+.folder-row { display: flex; gap: 0.5rem; align-items: center; }
+.folder-row label { flex: none; }
+.folder-row input { flex: 1; width: 20rem; padding: 0.2rem 0.4rem; border: 1px solid var(--line); border-radius: 4px; font: inherit; font-size: 0.85rem; }
+.folder-row button { flex: none; padding: 0.2rem 0.6rem; border: 1px solid var(--line); border-radius: 4px; background: #fff; cursor: pointer; }
 .settings-body label { display: flex; justify-content: space-between; gap: 1rem; align-items: center; }
 .settings-body input[type="number"] { width: 6rem; padding: 0.2rem 0.4rem; border: 1px solid var(--line); border-radius: 4px; }
 .settings-body label.wide { align-items: flex-start; }
+.settings-body label.unavailable { opacity: 0.5; cursor: help; }
 .settings-body textarea { width: 20rem; font: inherit; font-size: 0.85rem; padding: 0.2rem 0.4rem; border: 1px solid var(--line); border-radius: 4px; resize: vertical; }
 .progress { display: flex; align-items: center; gap: 0.5rem; white-space: nowrap; min-width: 0; overflow: hidden; }
 .app { overflow: hidden; }

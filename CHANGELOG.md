@@ -6,6 +6,38 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- A standalone Windows desktop app: `dist/sitecrawler.exe`, built with
+  `uv run pyinstaller --noconfirm packaging/sitecrawler.spec`. It is the web
+  UI in its own window (pywebview over Edge WebView2), with no browser,
+  Python or uv needed. Crawls are saved to `crawls\` next to the exe; drop
+  a `.db` on the exe to open it read-only (ADR-0014).
+- `sitecrawler desktop [DB] [--crawls-dir DIR]`: the same window from a
+  checkout. pywebview is the new `desktop` extra.
+- **Save crawls to** in the UI's Settings: choose the folder new crawls
+  are written to (`POST /api/crawls-dir`). In the desktop app a
+  **Browse…** button opens the Windows folder picker, and the choice is
+  remembered in `%APPDATA%\sitecrawler\settings.json` for the next launch
+  (`--crawls-dir` still overrides it for `sitecrawler desktop`). Under
+  `serve` it lasts until the server stops.
+- `store.crawl_file_problem(path)`: the check `require_crawl_db` used,
+  moved into the store so the exe can use it without the CLI.
+- **Render JavaScript works in the exe.** The exe bundles Playwright and
+  renders with the installed Microsoft Edge. Everywhere else, the renderer
+  falls back to Edge when Playwright's Chromium was never downloaded, so on
+  Windows `playwright install chromium` is optional (ADR-0015).
+- Releases publish `sitecrawler.exe`: pushing a `vX.Y.Z` tag builds the exe
+  on Windows, smoke-tests a rendered crawl in it
+  (`scripts/smoke_exe.py`) and attaches it to a GitHub Release.
+
+### Fixed
+
+- The Settings panel showed while closed in Edge WebView2; `app.css` now
+  hides a closed panel's body explicitly.
+- **Render JavaScript** is greyed out, with the reason as its tooltip,
+  when Playwright is not installed, instead of failing when a crawl starts.
+
 ## [1.0.0] - 2026-10-23
 
 Phase 10: structured data validation.

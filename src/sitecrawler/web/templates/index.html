@@ -14,6 +14,11 @@
       <details class="settings">
         <summary>Settings</summary>
         <div class="settings-body">
+          <div class="folder-row" title="Each crawl you start is saved here as its own .db file">
+            <label for="crawls-dir">Save crawls to</label>
+            <input id="crawls-dir" type="text" value="{{ rows.session.crawls_dir }}" spellcheck="false" data-crawls-dir>
+            <button type="button" data-browse hidden>Browse…</button>
+          </div>
           <label>Max pages <input type="number" name="max_pages" value="5000" min="1"></label>
           <label>Delay (s) <input type="number" name="delay_seconds" value="0.5" min="0" step="0.1"></label>
           <label>Workers <input type="number" name="workers" value="4" min="1" max="32"></label>
@@ -21,7 +26,11 @@
           <label><input type="checkbox" name="use_sitemap" checked> Seed from sitemaps</label>
           <label><input type="checkbox" name="respect_robots" checked> Respect robots.txt</label>
           <label><input type="checkbox" name="keep_query"> Keep query strings</label>
+          {% if render_unavailable %}
+          <label class="unavailable" title="{{ render_unavailable }}"><input type="checkbox" name="render" disabled> Render JavaScript</label>
+          {% else %}
           <label title="Loads every HTML page in headless Chromium after the raw fetch and compares the two. Needs Playwright and Chromium installed."><input type="checkbox" name="render"> Render JavaScript</label>
+          {% endif %}
           <label class="wide" title="One per line: NAME=css:SELECTOR, NAME=xpath:EXPRESSION or NAME=regex:PATTERN. Modifiers in brackets after the kind: css[attr=src,all]:img">Extract <textarea name="extract" rows="2" placeholder="price=css:.price&#10;sku=xpath://*[@data-sku]/@data-sku"></textarea></label>
           <label class="wide" title="One regex per line, matched case-insensitively against the HTML; NAME=PATTERN names the column">Search <textarea name="search" rows="1" placeholder="ga=G-[A-Z0-9]+"></textarea></label>
         </div>

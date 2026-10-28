@@ -8,6 +8,7 @@ API, so they must not share a session with the sync Playwright used by
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -18,7 +19,7 @@ from werkzeug.wrappers import Request, Response
 
 from sitecrawler.audit import CrawlView, run_audit
 from sitecrawler.cli.main import app
-from sitecrawler.crawl import Crawler, Renderer
+from sitecrawler.crawl import Crawler, Renderer, RenderUnavailableError
 from sitecrawler.models import CrawlConfig, PageRecord
 from sitecrawler.store import open_store
 from tests.conftest import serve_site, site_pages
@@ -49,6 +50,29 @@ def rendered(site_module: str) -> dict[str, PageRecord]:
     """One rendered crawl of the whole site, shared by the module (Chromium is slow to start)."""
     records = Crawler(_config(site_module, render=True, render_timeout_seconds=15)).run()
     return {r.url.removeprefix(site_module): r for r in records}
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Microsoft Edge ships with Windows")
+def test_falls_back_to_edge_without_playwrights_chromium(
+    site: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # An empty browsers folder is what the exe sees: no `playwright install chromium`.
+    monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(tmp_path))
+    records = Crawler(_config(site, max_pages=100, render=True, render_timeout_seconds=15)).run()
+    page = next(r for r in records if r.url.endswith("/js-injected"))
+    assert page.render_status == "rendered"
+    assert page.title == RENDERED_TITLE
+
+
+def test_neither_chromium_nor_edge_is_a_render_unavailable_error(
+    site: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("PLAYWRIGHT_BROWSERS_PATH", str(tmp_path))
+    monkeypatch.setattr("sitecrawler.crawl.renderer.EDGE_CHANNEL", "no-such-browser")
+    with pytest.raises(
+        RenderUnavailableError, match=r"could not start Chromium .* or Microsoft Edge"
+    ):
+        Crawler(_config(site, render=True)).run()
 
 
 def test_without_render_the_page_is_what_the_server_sent(site: str) -> None:
